@@ -3,6 +3,7 @@
 
 export { defineProvider } from "./provider.js";
 export { createOpencodePlugin } from "./opencode.js";
+export { isOAuthAuth, accessTokenExpired, calculateTokenExpiry, refreshAccessToken, TokenRefreshError } from "./oauth.js";
 export { listAccounts, addAccount, removeAccounts, selectAccount, saveAccounts } from "./accounts.js";
 export { getConfigDir, configFolder, reposDir } from "./env.js";
 export { log } from "./log.js";
