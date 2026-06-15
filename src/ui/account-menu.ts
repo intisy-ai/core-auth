@@ -35,6 +35,7 @@ async function accountDetails(controller, view) {
 
 export async function runAccountMenu(controller, opts) {
   const label = (opts && opts.label) || "Accounts";
+  const extraActions = (opts && opts.actions) || [];
   if (!isTTY()) { try { await controller.login(); } catch {} return; }
 
   while (true) {
@@ -44,6 +45,7 @@ export async function runAccountMenu(controller, opts) {
       { label: "Add account", value: { type: "add" }, color: "cyan" },
     ];
     if (typeof controller.refreshQuota === "function") items.push({ label: "Refresh quotas", value: { type: "quota" }, color: "cyan" });
+    extraActions.forEach((action, i) => items.push({ label: action.label, value: { type: "action", index: i }, color: action.color || "cyan" }));
     items.push({ label: "", value: { type: "noop" }, separator: true });
     items.push({ label: `Accounts (${views.length})`, value: { type: "noop" }, kind: "heading" });
     for (const view of views) {
@@ -61,6 +63,7 @@ export async function runAccountMenu(controller, opts) {
     if (!action || action.type === "done" || action.type === "noop") return;
     if (action.type === "add") { try { await controller.login(); } catch (error) { process.stderr.write(String(error) + "\n"); } }
     else if (action.type === "quota") { try { await controller.refreshQuota(); } catch {} }
+    else if (action.type === "action") { try { await extraActions[action.index].run(); } catch (error) { process.stderr.write(String(error) + "\n"); } }
     else if (action.type === "account") await accountDetails(controller, action.view);
   }
 }

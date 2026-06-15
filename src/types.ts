@@ -67,10 +67,17 @@ export interface AccountView {
 }
 
 // Implemented by the provider; consumed by the shared core TUI.
+export interface MenuAction {
+  label: string;
+  color?: string;
+  run: () => void | Promise<void>;
+}
+
 export interface AccountController {
   list(): AccountView[];
   enable(id: string, on: boolean): void;
   remove(id: string): void;
   login(): Promise<AccountView | null>;
   refreshQuota?(): Promise<void>;
+  actions?(): MenuAction[];   // extra provider-specific top-level menu items
 }
