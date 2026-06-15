@@ -19,6 +19,10 @@ export interface ProviderDef {
   opencodeNpm?: string;               // SDK package for a custom (non-built-in) opencode provider
   models: Record<string, ProviderModel>;
   handle: (request: Request, ctx: ProviderCtx) => Promise<Response>;
+  // optional OAuth login: returns the authorize URL + a complete() that finishes
+  // the flow and persists a CoreAccount. When present, core exposes an opencode
+  // oauth auth method (and a Claude-side CLI can call it too).
+  loginFlow?: (ctx: ProviderCtx) => Promise<{ url: string; instructions?: string; complete: () => Promise<CoreAccount | null> }>;
 }
 
 // One account in the generic pool. OAuth creds + generic rate-limit "lanes" +

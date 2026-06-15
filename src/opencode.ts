@@ -42,6 +42,36 @@ function mergeModels(opencodeProvider: string, models: Record<string, unknown>, 
   } catch (e) { log("opencode model merge failed: " + (e && e.message)); }
 }
 
+// The auth methods opencode shows under `oc auth login`. When the driver provides
+// a loginFlow, core owns the entire OAuth TUI: authorize() hands opencode the URL
+// + instructions, callback() waits for the driver flow to finish and persists the
+// account. Otherwise we fall back to a no-key api method (just makes opencode route
+// through loader.fetch, using accounts already in the core store).
+function authMethods(def) {
+  if (typeof def.loginFlow !== "function") {
+    return [{ label: def.label + " (via core-auth)", type: "api" }];
+  }
+  return [{
+    type: "oauth",
+    label: def.label,
+    authorize: async function () {
+      const flow = await def.loginFlow({ configDir: getConfigDir(), log });
+      return {
+        url: flow.url,
+        instructions: flow.instructions || ("Sign in to " + def.label + ", then return to your terminal."),
+        method: "auto",
+        callback: async function () {
+          try {
+            const account = await flow.complete();
+            if (!account || !account.refresh) return { type: "failed" };
+            return { type: "success", refresh: account.refresh, access: account.access || "", expires: account.expires || 0 };
+          } catch (error) { log("oauth login failed: " + error); return { type: "failed" }; }
+        },
+      };
+    },
+  }];
+}
+
 export function createOpencodePlugin(def) {
   const opencodeProvider = def.opencodeProvider || "anthropic";
   return async function () {
@@ -49,7 +79,7 @@ export function createOpencodePlugin(def) {
     return {
       auth: {
         provider: opencodeProvider,
-        methods: [{ label: def.label + " (via core-auth)", type: "api" }],
+        methods: authMethods(def),
         loader: async function () {
           return {
             apiKey: def.id,
