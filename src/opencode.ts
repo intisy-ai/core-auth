@@ -7,6 +7,8 @@ import { homedir } from "os";
 import { getConfigDir } from "./env.js";
 import { log } from "./log.js";
 import { listAccounts } from "./accounts.js";
+import { isTTY } from "./ui/ansi.js";
+import { runAccountMenu } from "./ui/account-menu.js";
 
 function opencodeConfigPath(): string {
   const override = (process.env.OPENCODE_CONFIG || "").trim();
@@ -50,6 +52,12 @@ function authMethods(def) {
     type: "oauth",
     label: def.label,
     authorize: async function () {
+      // TTY with a controller: run the interactive account-management menu (add does OAuth);
+      // afterwards return a success so opencode routes through our loader (real accounts live in the core store).
+      if (def.accounts && isTTY()) {
+        try { await runAccountMenu(def.accounts, { label: def.label }); } catch (e) { log("account menu failed: " + e); }
+        return { url: "", instructions: def.label + " accounts updated.", method: "auto", callback: async () => ({ type: "success", refresh: "core-auth", access: "", expires: 0 }) };
+      }
       const flow = await def.loginFlow({ configDir: getConfigDir(), log });
       return {
         url: flow.url,
