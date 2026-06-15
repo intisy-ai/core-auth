@@ -23,14 +23,19 @@ function quotaHint(view) {
 
 async function accountDetails(controller, view) {
   const label = view.email || view.id;
-  const result = await select([
-    { label: "Back", value: "back" },
-    { label: view.enabled === false ? "Enable" : "Disable", value: "toggle", color: view.enabled === false ? "green" : "yellow" },
-    { label: "Remove", value: "remove", color: "red" },
-  ], { message: `${label}${STATUS_BADGE[view.status] ? " " + STATUS_BADGE[view.status] : ""}`, clearScreen: true });
+  const extra = typeof controller.accountActions === "function" ? controller.accountActions(view) : [];
+  const items = [
+    { label: "Back", value: { type: "back" } },
+    { label: view.enabled === false ? "Enable" : "Disable", value: { type: "toggle" }, color: view.enabled === false ? "green" : "yellow" },
+  ];
+  extra.forEach((action, i) => items.push({ label: action.label, value: { type: "action", index: i }, color: action.color || "cyan" }));
+  items.push({ label: "Remove", value: { type: "remove" }, color: "red" });
 
-  if (result === "toggle") controller.enable(view.id, view.enabled === false);
-  else if (result === "remove" && await confirm(`Remove ${label}?`)) controller.remove(view.id);
+  const result = await select(items, { message: `${label}${STATUS_BADGE[view.status] ? " " + STATUS_BADGE[view.status] : ""}`, clearScreen: true });
+  if (!result || result.type === "back") return;
+  if (result.type === "toggle") controller.enable(view.id, view.enabled === false);
+  else if (result.type === "remove") { if (await confirm(`Remove ${label}?`)) controller.remove(view.id); }
+  else if (result.type === "action") { try { await extra[result.index].run(); } catch (error) { process.stderr.write(String(error) + "\n"); } }
 }
 
 export async function runAccountMenu(controller, opts) {

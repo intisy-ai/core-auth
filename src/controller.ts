@@ -31,5 +31,7 @@ export function accountControllerFromManager(manager, opts) {
     remove(id) { manager.remove(id); },
     login: options.login || (async () => null),
     refreshQuota: options.refreshQuota,
+    actions: options.actions,
+    accountActions: options.accountActions,
   };
 }

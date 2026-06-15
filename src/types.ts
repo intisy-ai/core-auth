@@ -77,5 +77,6 @@ export interface AccountController {
   remove(id: string): void;
   login(): Promise<AccountView | null>;
   refreshQuota?(): Promise<void>;
-  actions?(): MenuAction[];   // extra provider-specific top-level menu items
+  actions?(): MenuAction[];                       // extra top-level menu items
+  accountActions?(view: AccountView): MenuAction[];   // extra per-account menu items
 }

@@ -12,4 +12,8 @@ export { isAvailable, availableAt, isLaneRateLimited, isCoolingDown, isEnabled, 
 export { selectIndex } from "./selection.js";
 export { getConfigDir, configFolder, reposDir } from "./env.js";
 export { log } from "./log.js";
+export { select } from "./ui/select.js";
+export { confirm } from "./ui/confirm.js";
+export { prompt } from "./ui/prompt.js";
+export { isTTY } from "./ui/ansi.js";
 export * from "./types.js";

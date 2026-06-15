@@ -103,4 +103,17 @@ export class AccountManager {
   remove(id) {
     removeAccount(this.providerId, id, this.store);
   }
+
+  // force a token refresh regardless of expiry (manual "refresh token" action)
+  async refresh(id) {
+    const account = this.load().accounts.find((candidate) => candidate.id === id);
+    if (!account || !this.oauth || !account.refresh) return false;
+    const refreshed = await refreshAccessToken(account.refresh, this.oauth);
+    this.mutate(id, (a) => {
+      a.access = refreshed.access;
+      a.expires = refreshed.expires;
+      if (refreshed.refresh) a.refresh = refreshed.refresh;
+    });
+    return true;
+  }
 }
