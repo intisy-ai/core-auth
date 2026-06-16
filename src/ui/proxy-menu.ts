@@ -73,20 +73,33 @@ export async function runProxyMenu() {
   }
 }
 
-// manual-mode multi-select of pool proxies for one account
+// per-account proxy selection: toggle global proxies for this account, and add a
+// new proxy as global (all accounts) or account-only (auto-used here, hidden elsewhere)
 export async function selectAccountProxies(accountId) {
   if (!isTTY()) return;
   while (true) {
     const selected = new Set(proxyManager.getAccountSelection(accountId));
-    const all = proxyManager.list();
-    if (!all.length) { process.stdout.write("No proxies in the pool — add some via Manage proxies first.\n"); return; }
-    const items = [{ label: "Done", value: { t: "done" } }];
-    for (const p of all) items.push({ label: (selected.has(p.url) ? "[x] " : "[ ] ") + p.url, hint: p.provider + " · score " + fmtScore(p.score), value: { t: "toggle", url: p.url } });
-    const result = await select(items, { message: "Proxies for " + accountId, subtitle: selected.size + " selected (manual mode)", clearScreen: true });
+    const all = proxyManager.accountProxies(accountId);
+    const items = [
+      { label: "Done", value: { t: "done" } },
+      { label: "Add proxy", value: { t: "add" }, color: "cyan" },
+    ];
+    for (const p of all) {
+      const owned = p.owner === accountId;
+      const on = owned || selected.has(p.url);
+      items.push({ label: (on ? "[x] " : "[ ] ") + p.url + (owned ? " (this account)" : ""), hint: p.provider + " · score " + fmtScore(p.score), value: { t: "toggle", url: p.url, owned } });
+    }
+    const result = await select(items, { message: "Proxies for " + accountId, subtitle: "manual mode · [x] = used by this account", clearScreen: true });
     if (!result || result.t === "done") return;
-    if (result.t === "toggle") {
-      if (selected.has(result.url)) selected.delete(result.url); else selected.add(result.url);
-      proxyManager.setAccountSelection(accountId, [...selected]);
+    if (result.t === "add") {
+      const url = await prompt("Proxy URL (host:port or http://...):");
+      if (!url) continue;
+      const scope = await select([{ label: "Global (all accounts)", value: "global" }, { label: "This account only", value: "account" }], { message: "Proxy visibility", clearScreen: true });
+      if (scope === "account") proxyManager.addManual(url, accountId);
+      else if (scope === "global") { const clean = proxyManager.addManual(url); proxyManager.setAccountSelection(accountId, [...selected, clean]); }
+    } else if (result.t === "toggle") {
+      if (result.owned) { if (await confirm("Remove this account-only proxy?")) proxyManager.remove(result.url); }
+      else { if (selected.has(result.url)) selected.delete(result.url); else selected.add(result.url); proxyManager.setAccountSelection(accountId, [...selected]); }
     }
   }
 }

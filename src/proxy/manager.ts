@@ -37,16 +37,23 @@ export class ProxyManager {
     const store = this.load();
     return [...store.proxies].map((p) => ({ ...p, score: scoreOf(store, p), inUse: countAssignments(store, p.url) })).sort((a, b) => a.score - b.score);
   }
+  // global view (account-only proxies are excluded; they show in their account's menu)
   byProvider() {
     const groups = {};
-    for (const p of this.list()) (groups[p.provider] = groups[p.provider] || []).push(p);
+    for (const p of this.list()) if (!p.owner) (groups[p.provider] = groups[p.provider] || []).push(p);
     return groups;
+  }
+  // proxies visible to one account: all global + the account's own
+  accountProxies(accountId) {
+    return this.list().filter((p) => !p.owner || p.owner === accountId);
   }
   get(url) { return this.list().find((p) => p.url === url) || null; }
 
-  addManual(url) {
+  // owner set -> account-only (visible + auto-used for that account only); else global
+  addManual(url, owner) {
     const clean = url.startsWith("http") ? url : "http://" + url;
-    updateProxyStore((s) => { if (!s.proxies.find((p) => p.url === clean)) s.proxies.push({ url: clean, provider: "manual", addedAt: Date.now(), stats: { checks: 0, failures: 0, avgLatencyMs: 0, ipRateLimitHits: 0, lastOkAt: 0 } }); });
+    updateProxyStore((s) => { if (!s.proxies.find((p) => p.url === clean)) s.proxies.push({ url: clean, provider: "manual", owner: owner || undefined, addedAt: Date.now(), stats: { checks: 0, failures: 0, avgLatencyMs: 0, ipRateLimitHits: 0, lastOkAt: 0 } }); });
+    return clean;
   }
   remove(url) {
     updateProxyStore((s) => {
@@ -66,7 +73,8 @@ export class ProxyManager {
     if (store.mode === "disabled") return null;
 
     if (store.mode === "manual") {
-      const pool = (store.manualSelection[accountId] || []).filter((u) => store.proxies.find((p) => p.url === u));
+      const owned = store.proxies.filter((p) => p.owner === accountId).map((p) => p.url);
+      const pool = [...new Set([...(store.manualSelection[accountId] || []), ...owned])].filter((u) => store.proxies.find((p) => p.url === u));
       if (!pool.length) return null;
       const current = store.assignments[accountId];
       if (current && pool.includes(current)) return current;
@@ -75,10 +83,10 @@ export class ProxyManager {
       return chosen;
     }
 
-    // automatic
+    // automatic — global proxies + this account's own, under the per-proxy cap
     const current = store.assignments[accountId];
     if (current && store.proxies.find((p) => p.url === current)) return current;
-    const candidates = store.proxies.filter((p) => countAssignments(store, p.url) < MAX_ACCOUNTS_PER_PROXY).sort((a, b) => scoreOf(store, a) - scoreOf(store, b));
+    const candidates = store.proxies.filter((p) => (!p.owner || p.owner === accountId) && countAssignments(store, p.url) < MAX_ACCOUNTS_PER_PROXY).sort((a, b) => scoreOf(store, a) - scoreOf(store, b));
     if (!candidates.length) return null;
     const chosen = candidates[0].url;
     updateProxyStore((s) => { s.assignments[accountId] = chosen; });
