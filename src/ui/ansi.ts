@@ -19,6 +19,10 @@ export function parseKey(data) {
   const s = data.toString();
   if (s === "\x1b[A" || s === "\x1bOA") return "up";
   if (s === "\x1b[B" || s === "\x1bOB") return "down";
+  if (s === "\x1b[5~") return "pageup";
+  if (s === "\x1b[6~") return "pagedown";
+  if (s === "\x1b[H" || s === "\x1b[1~" || s === "\x1bOH") return "home";
+  if (s === "\x1b[F" || s === "\x1b[4~" || s === "\x1bOF") return "end";
   if (s === "\r" || s === "\n") return "enter";
   if (s === "\x03" || s === "\x1b") return "escape";
   return null;

@@ -21,7 +21,7 @@ async function proxyStats(proxy) {
     { label: "", separator: true, value: 0 },
     { label: "Back", value: "back" },
   ];
-  if (proxy.provider === "manual") items.push({ label: "Remove this proxy", value: "remove", color: "red" });
+  items.push({ label: "Remove this proxy", value: "remove", color: "red" });
   const result = await select(items, { message: proxy.url, clearScreen: true });
   if (result === "remove" && await confirm("Remove " + proxy.url + "?")) proxyManager.remove(proxy.url);
 }
@@ -43,6 +43,7 @@ async function providerMenu() {
 
 export async function runProxyMenu() {
   if (!isTTY()) return;
+  const expanded = new Set();   // provider categories are collapsed by default
   while (true) {
     const mode = proxyManager.getMode();
     const grouped = proxyManager.byProvider();
@@ -54,15 +55,17 @@ export async function runProxyMenu() {
     ];
     for (const [provider, list] of Object.entries(grouped)) {
       items.push({ label: "", separator: true, value: { t: "noop" } });
-      items.push({ label: provider + " (" + list.length + ")", kind: "heading", value: { t: "noop" } });
-      for (const p of list) items.push({ label: p.url, hint: "score " + fmtScore(p.score) + " · in-use " + p.inUse + "/3", value: { t: "proxy", url: p.url } });
+      const open = expanded.has(provider);
+      items.push({ label: (open ? "▾ " : "▸ ") + provider + " (" + list.length + ")", value: { t: "toggle", provider }, color: "cyan" });
+      if (open) for (const p of list) items.push({ label: "   " + p.url, hint: "score " + fmtScore(p.score) + " · in-use " + p.inUse + "/3", value: { t: "proxy", url: p.url } });
     }
     items.push({ label: "", separator: true, value: { t: "noop" } });
     items.push({ label: "Back", value: { t: "back" } });
 
-    const action = await select(items, { message: "Proxies", subtitle: "mode: " + mode, clearScreen: true });
+    const action = await select(items, { message: "Proxies", subtitle: "mode: " + mode + " · Enter a provider to expand", clearScreen: true });
     if (!action || action.t === "back" || action.t === "noop") return;
-    if (action.t === "mode") { const m = await select([{ label: "automatic", value: "automatic" }, { label: "manual", value: "manual" }, { label: "disabled", value: "disabled" }], { message: "Proxy mode", clearScreen: true }); if (m) proxyManager.setMode(m); }
+    if (action.t === "toggle") { if (expanded.has(action.provider)) expanded.delete(action.provider); else expanded.add(action.provider); }
+    else if (action.t === "mode") { const m = await select([{ label: "automatic", value: "automatic" }, { label: "manual", value: "manual" }, { label: "disabled", value: "disabled" }], { message: "Proxy mode", clearScreen: true }); if (m) proxyManager.setMode(m); }
     else if (action.t === "add") { const url = await prompt("Proxy URL (host:port or http://...):"); if (url) proxyManager.addManual(url); }
     else if (action.t === "refresh") { process.stdout.write("Fetching…\n"); const n = await proxyManager.refresh(); process.stdout.write("Fetched " + n + " proxies.\n"); }
     else if (action.t === "providers") await providerMenu();

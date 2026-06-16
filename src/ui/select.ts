@@ -70,7 +70,7 @@ export async function select(items, options) {
     }
 
     const windowHint = items.length > (end - start) ? ` (${start + 1}-${end}/${items.length})` : "";
-    writeLine(`${ANSI.cyan}│${ANSI.reset}  ${ANSI.dim}${options.help ?? `↑↓ select | Enter confirm | Esc back${windowHint}`}${ANSI.reset}`);
+    writeLine(`${ANSI.cyan}│${ANSI.reset}  ${ANSI.dim}${options.help ?? `↑↓ move · PgUp/PgDn fast · Enter select · Esc back${windowHint}`}${ANSI.reset}`);
     writeLine(`${ANSI.cyan}└${ANSI.reset}`);
     renderedLines = written;
   };
@@ -93,10 +93,23 @@ export async function select(items, options) {
       while (!isSelectable(items[next]) && next !== from);
       return next;
     };
+    const nearestSelectable = (idx) => {
+      const clamped = Math.max(0, Math.min(items.length - 1, idx));
+      for (let d = 0; d < items.length; d++) {
+        if (clamped + d < items.length && isSelectable(items[clamped + d])) return clamped + d;
+        if (clamped - d >= 0 && isSelectable(items[clamped - d])) return clamped - d;
+      }
+      return cursor;
+    };
+    const page = () => Math.max(1, (stdout.rows || 24) - 8);
     const onKey = (data) => {
       const action = parseKey(data);
       if (action === "up") { cursor = nextSelectable(cursor, -1); render(); }
       else if (action === "down") { cursor = nextSelectable(cursor, 1); render(); }
+      else if (action === "pageup") { cursor = nearestSelectable(cursor - page()); render(); }
+      else if (action === "pagedown") { cursor = nearestSelectable(cursor + page()); render(); }
+      else if (action === "home") { cursor = nearestSelectable(0); render(); }
+      else if (action === "end") { cursor = nearestSelectable(items.length - 1); render(); }
       else if (action === "enter") { cleanup(); resolve(items[cursor]?.value ?? null); }
       else if (action === "escape") { cleanup(); resolve(null); }
     };
