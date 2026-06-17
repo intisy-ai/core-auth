@@ -5,19 +5,6 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, openSyn
 import { join } from "path";
 import { randomBytes } from "crypto";
 import { configFolder } from "./env.js";
-import { syncAccounts as crossAppSync } from "./accountsync.js";
-
-let pulledOnce = false;
-
-// cross-app sync applies only to the default store; a custom dir/file (e.g. tests) must not sync the standard account file.
-function isDefaultStore(opts) {
-  return !opts || (!opts.dir && !opts.file);
-}
-
-function maybeSync(opts) {
-  if (!isDefaultStore(opts)) return;
-  try { crossAppSync(); } catch {}
-}
 
 const DEFAULT_FILE = "core-auth-accounts.json";
 const LOCK_STALE_MS = 15 * 1000;
@@ -87,8 +74,6 @@ function poolFrom(store, provider) {
 }
 
 export function loadAccounts(provider, opts) {
-  // one pull per process so a reader picks up accounts added by the other app
-  if (!pulledOnce && isDefaultStore(opts)) { pulledOnce = true; maybeSync(opts); }
   return poolFrom(readStore(opts), provider);
 }
 
@@ -104,7 +89,6 @@ export function saveAccounts(provider, pool, opts) {
     };
     writeStore(store, opts);
   });
-  maybeSync(opts);
 }
 
 // atomic read-modify-write: mutator mutates the freshly-read pool in place.
@@ -123,7 +107,6 @@ export function updateAccounts(provider, mutator, opts) {
     writeStore(store, opts);
     return current;
   });
-  maybeSync(opts);
   return pool;
 }
 
