@@ -9,6 +9,7 @@ import { log } from "./log.js";
 import { listAccounts } from "./accounts.js";
 import { isTTY } from "./ui/ansi.js";
 import { runProviderMenu } from "./menu.js";
+import { resolveProviderModels } from "./models-cache.js";
 
 function opencodeConfigPath(): string {
   const override = (process.env.OPENCODE_CONFIG || "").trim();
@@ -54,6 +55,18 @@ function mergeModels(opencodeProvider: string, models: Record<string, unknown>, 
   } catch (e) { log("opencode model merge failed: " + (e && e.message)); }
 }
 
+// Resolve the provider's catalog (live fetch -> cache -> empty) and write it into
+// opencode config. Run at plugin startup and again right after a login so newly
+// authed accounts populate the model list without waiting for the next start.
+async function refreshAndMerge(def): Promise<void> {
+  const opencodeProvider = def.opencodeProvider || "anthropic";
+  try {
+    const hasAccounts = listAccounts(def.id).length > 0;
+    const models = await resolveProviderModels(def, { configDir: getConfigDir(), log, hasAccounts }, Date.now());
+    mergeModels(opencodeProvider, models, def.opencodeNpm);
+  } catch (e) { log("model refresh/merge failed: " + e); }
+}
+
 // `oc auth login` for a provider with an account controller (in a TTY) opens our
 // interactive account-management TUI (runProviderMenu: list/add/remove/verify),
 // where "Add account" runs the driver's own OAuth login (loopback listener +
@@ -70,6 +83,7 @@ function authMethods(def) {
     authorize: async function () {
       if (def.accounts && isTTY()) {
         try { await runProviderMenu(def); } catch (e) { log("account menu failed: " + e); }
+        await refreshAndMerge(def);   // pull the now-authed account's live model catalog
         return { url: "", instructions: def.label + " accounts updated.", method: "auto", callback: async () => ({ type: "success", refresh: "core-auth", access: "", expires: 0 }) };
       }
       const flow = await def.loginFlow({ configDir: getConfigDir(), log });
@@ -81,6 +95,7 @@ function authMethods(def) {
           try {
             const account = await flow.complete(code);
             if (!account || !account.refresh) return { type: "failed" };
+            await refreshAndMerge(def);   // pull the now-authed account's live model catalog
             return { type: "success", refresh: account.refresh, access: account.access || "", expires: account.expires || 0 };
           } catch (error) { log("oauth login failed: " + error); return { type: "failed" }; }
         },
@@ -92,7 +107,7 @@ function authMethods(def) {
 export function createOpencodePlugin(def) {
   const opencodeProvider = def.opencodeProvider || "anthropic";
   return async function (input) {
-    try { mergeModels(opencodeProvider, def.models || {}, def.opencodeNpm); } catch {}
+    await refreshAndMerge(def);
     // when accounts already exist, seed opencode's auth entry so it routes through our loader without the user running `oc auth login`
     try {
       const client = input && input.client;
