@@ -67,7 +67,20 @@ export async function refreshAccessToken(refreshToken, opts) {
     body: new URLSearchParams(params),
   };
   if (opts.proxy) init.proxy = opts.proxy;   // Bun fetch honors .proxy; keeps refresh on the account's IP
-  const response = await fetch(opts.tokenUrl, init);
+  let response;
+  try {
+    response = await fetch(opts.tokenUrl, init);
+  } catch (err) {
+    // A dead/unreachable proxy must not strand the account on an expired token —
+    // a token refresh that never reached the server can be safely retried direct.
+    const message = String((err && err.message) || err);
+    if (init.proxy && /unable to connect|failed to connect|could not connect|fetch failed|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EHOSTUNREACH|EAI_AGAIN|socket|proxy|tunnel|network/i.test(message)) {
+      delete init.proxy;
+      response = await fetch(opts.tokenUrl, init);
+    } else {
+      throw err;
+    }
+  }
 
   if (!response.ok) {
     let errorText;
