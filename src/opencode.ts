@@ -35,8 +35,9 @@ function mergeModels(opencodeProvider: string, models: Record<string, unknown>, 
   config.provider[opencodeProvider] = config.provider[opencodeProvider] || {};
   // a custom (non-built-in) provider needs an SDK to parse the response
   if (npm) config.provider[opencodeProvider].npm = npm;
-  const existing = config.provider[opencodeProvider].models || {};
-  config.provider[opencodeProvider].models = { ...existing, ...models };
+  // REPLACE (not merge) the provider's models every startup so a renamed/removed
+  // model id can never linger as a stale entry — the provider owns this list.
+  config.provider[opencodeProvider].models = { ...models };
   try {
     if (!existsSync(dirname(path))) mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
