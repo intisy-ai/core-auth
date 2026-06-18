@@ -11,6 +11,8 @@ export { accountControllerFromManager } from "./controller.js";
 export { isAvailable, availableAt, isLaneRateLimited, isCoolingDown, isEnabled, calculateBackoffMs } from "./ratelimit.js";
 export { selectIndex } from "./selection.js";
 export { getConfigDir, configFolder, reposDir } from "./env.js";
+export { readConfig, writeConfig, activeProvider, setActiveProvider, getAutoConfig, setAutoConfig, getAutoCandidates } from "./config.js";
+export { readModelCache, resolveProviderModels } from "./models-cache.js";
 export { log } from "./log.js";
 export { select } from "./ui/select.js";
 export { confirm } from "./ui/confirm.js";
