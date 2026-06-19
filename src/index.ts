@@ -23,6 +23,7 @@ export { runProxyMenu, selectAccountProxies } from "./ui/proxy-menu.js";
 export { runProviderMenu } from "./menu.js";
 export { buildAccountMenu, buildAutoMenu } from "./ui/menu-model.js";
 export { buildLoginInput } from "./ui/url-auth.js";
+export { buildSettingsMenu } from "./ui/settings-menu.js";
 export { openBrowser } from "./browser.js";
 export { runMenu } from "./ui/menu-render.js";
 export * from "./types.js";

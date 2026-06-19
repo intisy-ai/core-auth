@@ -17,6 +17,7 @@ import { selectAccountProxies } from "./proxy-menu.js";
 import { getAutoConfig, setAutoConfig } from "../config.js";
 import { readModelCache } from "../models-cache.js";
 import { buildLoginInput } from "./url-auth.js";
+import { buildSettingsMenu } from "./settings-menu.js";
 
 // ---- Proxy menu (native model) ---------------------------------------------
 
@@ -140,6 +141,7 @@ export function buildAccountMenu(def) {
   const items = [{ label: "Actions", kind: "heading" }, addAccount];
   if (typeof controller.refreshQuota === "function") items.push({ label: "Refresh quotas", color: "cyan", suspend: true, run: async () => { try { await controller.refreshQuota(); } catch {} return { refresh: true }; } });
   if (proxies) items.push({ label: "Manage proxies", color: "cyan", run: () => ({ push: () => buildProxyMenu() }) });
+  if (def.settings && (def.settings.groups || []).length) items.push({ label: "Settings", color: "cyan", run: () => ({ push: () => buildSettingsMenu(def) }) });
   extraActions.forEach((a) => {
     if (a.auto) items.push({ label: a.label, color: a.color || "cyan", run: () => ({ push: () => buildAutoMenu(def) }) });
     else items.push({ label: a.label, color: a.color || "cyan", suspend: true, run: async () => { try { await a.run(); } catch (e) { process.stderr.write(String(e) + "\n"); } return { refresh: true }; } });

@@ -48,7 +48,10 @@ export async function runMenu(rootBuilder) {
       if (inp.onClose) { try { inp.onClose(); } catch {} }
       try {
         if (result.bg) apply(result.bg);
-        else if (result.paste != null && String(result.paste).trim() !== "") apply(await inp.complete(String(result.paste).trim()));
+        else if (result.paste != null && String(result.paste).trim() !== "") {
+          if (inp.pendingLabel) process.stdout.write("\n" + inp.pendingLabel + "\n");
+          apply(await inp.complete(String(result.paste).trim()));
+        }
       } catch (e) { process.stderr.write(String(e) + "\n"); }
       continue;
     }
