@@ -53,9 +53,7 @@ export function buildAutoMenu(def) {
   const providerId = def.id;
   const { order, excluded, source, sources } = getAutoConfig(providerId);
   const current = sources.find((s) => s.id === source) || sources[0] || { id: "manual", label: "Manual" };
-  const items = [
-    { label: "Done", run: () => ({ close: true }) },
-  ];
+  const items = [];
   if (sources.length > 1) {
     items.push({
       label: "Sort: " + current.label, color: "cyan",
@@ -116,9 +114,8 @@ export function buildAccountMenu(def) {
   for (const view of views) {
     items.push({ label: `${view.email || view.id}${STATUS[view.status] ? " " + STATUS[view.status] : ""}`, hint: view.detail || "", run: () => ({ push: () => buildAccountDetail(def, view) }) });
   }
-  items.push({ label: "", separator: true });
-  if (views.length > 0) items.push({ label: "Delete all accounts", color: "red", suspend: true, run: async () => { if (await confirm("Delete ALL accounts? This cannot be undone.")) { for (const v of controller.list()) controller.remove(v.id); return { refresh: true }; } return { refresh: true }; } });
-  items.push({ label: "Done", run: () => ({ close: true }) });
+  if (views.length > 0) { items.push({ label: "", separator: true }); items.push({ label: "Delete all accounts", color: "red", suspend: true, run: async () => { if (await confirm("Delete ALL accounts? This cannot be undone.")) { for (const v of controller.list()) controller.remove(v.id); } return { refresh: true }; } }); }
 
-  return { title: def.label + " accounts", subtitle: "Select an action or account", items, providerLabel: def.label };
+  // No "Done" item — Esc backs out / exits (Done caused select() quirks + is redundant).
+  return { title: def.label + " accounts", subtitle: "Esc to exit · Enter an action or account", items, providerLabel: def.label };
 }
