@@ -123,19 +123,26 @@ export function createOpencodePlugin(def) {
         await client.auth.set({ path: { id: opencodeProvider }, body: { type: "oauth", refresh: "", access: "", expires: 0 } });
       }
     } catch (e) { log("auto-route seed failed: " + e); }
-    return {
+    const hooks = {
       auth: {
         provider: opencodeProvider,
         methods: authMethods(def),
         loader: async function () {
           return {
             apiKey: def.id,
-            fetch: function (input, init) {
-              return def.handle(new Request(input, init), { configDir: getConfigDir(), log });
+            fetch: function (req, init) {
+              return def.handle(new Request(req, init), { configDir: getConfigDir(), log });
             },
           };
         },
       },
     };
+    // A provider may contribute extra opencode hooks (e.g. an `event` handler for
+    // session recovery). Generic passthrough — core doesn't know what they do.
+    if (typeof def.opencodeHooks === "function") {
+      try { Object.assign(hooks, (await def.opencodeHooks(input)) || {}); }
+      catch (e) { log("opencodeHooks failed: " + e); }
+    }
+    return hooks;
   };
 }
