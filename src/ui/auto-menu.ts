@@ -92,7 +92,7 @@ export async function runAutoMenu(def) {
     const subtitleBySource = {
       manual: "Auto tries these top-to-bottom. Enter a model to reorder/include.",
       recommended: "Order follows the provider's recommended ranking. Enter a model to include/exclude.",
-      leaderboard: hasLeaderboardKey() ? "Order follows Artificial Analysis quality. Enter a model to include/exclude." : "No API key set — add leaderboard.apiKey to core-auth.json; falling back to recommended order.",
+      leaderboard: hasLeaderboardKey() ? "Order follows Artificial Analysis quality scores." : "Order follows a built-in quality ranking; add leaderboard.apiKey to core-auth.json for live scores.",
     };
     const r = await select(items, { message: def.label + " — Auto model ranking", subtitle: subtitleBySource[source], clearScreen: true });
     if (!r || r.type === "done" || r.type === "noop") return;

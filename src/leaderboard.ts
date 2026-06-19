@@ -45,26 +45,49 @@ function extractScores(payload: any): Array<{ name: string; score: number }> {
   return out;
 }
 
+// Built-in quality heuristic used when no API key is set (or the fetch fails) so
+// "Leaderboard" still yields a sensible quality order out of the box. Higher =
+// better; matched by substring on the raw model id.
+const QUALITY_HINTS: Array<[RegExp, number]> = [
+  [/opus/i, 100],
+  [/gemini-3\.1-pro|gemini-3-pro|pro-agent/i, 92],
+  [/sonnet/i, 85],
+  [/gpt|oss/i, 75],
+  [/gemini-3\.5-flash|gemini-3-flash/i, 58],
+  [/flash-lite|flash-extra-low/i, 45],
+  [/flash/i, 55],
+];
+function heuristicScore(id: string): number {
+  for (const [re, score] of QUALITY_HINTS) if (re.test(id)) return score;
+  return 50;
+}
+function heuristicOrder(candidateIds: string[]): string[] {
+  return candidateIds
+    .map((id, i) => ({ id, i, score: heuristicScore(id) }))
+    .sort((a, b) => (b.score - a.score) || (a.i - b.i))
+    .map((s) => s.id);
+}
+
 /**
- * Returns `candidateIds` sorted best-first by external quality score, or null if
- * unavailable (no key, fetch/parse failure, or no matches) so the caller can
- * keep the recommended order.
+ * Returns `candidateIds` sorted best-first by quality: live Artificial Analysis
+ * scores when a key is set, otherwise the built-in heuristic. Never null so
+ * "Leaderboard" always produces a visible quality ordering.
  */
-export async function computeLeaderboardOrder(candidateIds: string[]): Promise<string[] | null> {
+export async function computeLeaderboardOrder(candidateIds: string[]): Promise<string[]> {
   const key = apiKey();
-  if (!key) return null;
+  if (!key) return heuristicOrder(candidateIds);
   let scores: Array<{ name: string; score: number }> = [];
   try {
     const response = await fetch("https://artificialanalysis.ai/api/v2/data/llms/models", {
       headers: { "x-api-key": key, Accept: "application/json" },
     });
-    if (!response.ok) { log("leaderboard fetch " + response.status); return null; }
+    if (!response.ok) { log("leaderboard fetch " + response.status); return heuristicOrder(candidateIds); }
     scores = extractScores(await response.json());
   } catch (error) {
     log("leaderboard fetch failed: " + error);
-    return null;
+    return heuristicOrder(candidateIds);
   }
-  if (!scores.length) return null;
+  if (!scores.length) return heuristicOrder(candidateIds);
 
   const normScores = scores.map((s) => ({ norm: normalize(s.name), score: s.score }));
   const scoreFor = (id: string): number => {
@@ -76,11 +99,10 @@ export async function computeLeaderboardOrder(candidateIds: string[]): Promise<s
     return best;
   };
 
-  const scored = candidateIds.map((id) => ({ id, score: scoreFor(id) }));
-  if (scored.every((s) => s.score < 0)) return null;   // nothing matched -> fall back
-  // matched models sort by score desc; unmatched keep their relative order at the end
-  return scored
-    .map((s, i) => ({ ...s, i }))
-    .sort((a, b) => (b.score - a.score) || (a.i - b.i))
-    .map((s) => s.id);
+  // blend: use the AA score where matched, else the heuristic, so every model is ranked
+  const scored = candidateIds.map((id, i) => {
+    const aa = scoreFor(id);
+    return { id, i, score: aa >= 0 ? aa : heuristicScore(id) };
+  });
+  return scored.sort((a, b) => (b.score - a.score) || (a.i - b.i)).map((s) => s.id);
 }
