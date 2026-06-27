@@ -12,9 +12,9 @@ import { readConfig } from "./config.js";
 const START_TIME = new Date().toISOString().replace(/:/g, "-").split(".")[0];
 const NAME = "core-auth";
 
-// the shared ecosystem config (config/core.json, root core.json fallback)
+// the shared ecosystem config (config/settings.json, root settings.json fallback)
 function globalCore(): Record<string, any> {
-  for (const p of [join(getConfigDir(), "config", "core.json"), join(getConfigDir(), "core.json")]) {
+  for (const p of [join(getConfigDir(), "config", "settings.json"), join(getConfigDir(), "settings.json")]) {
     try { if (existsSync(p)) return JSON.parse(readFileSync(p, "utf8")); } catch { /* ignore */ }
   }
   return {};
