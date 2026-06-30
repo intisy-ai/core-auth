@@ -81,7 +81,10 @@ export function getAutoConfig(providerId: string): {
 
   const sources = getAutoSources(providerId);
   const validIds = sources.map((s) => s.id);
-  const source = stored.source && validIds.includes(stored.source) ? stored.source : "manual";
+  // Default to the live "leaderboard" quality sort when the provider offers it, else
+  // fall back to manual. A stored choice always wins (if still valid).
+  const fallbackSource = validIds.includes("leaderboard") ? "leaderboard" : "manual";
+  const source = stored.source && validIds.includes(stored.source) ? stored.source : fallbackSource;
 
   // manual = the stored hand-ordered list; any other source = its precomputed order
   const order = source === "manual"
