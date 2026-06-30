@@ -51,9 +51,13 @@ export function setActiveProvider(name: string): void {
 // model cache as { id, label } with a precomputed order in sortOrders.
 
 // Available sources for a provider: always manual, plus whatever the cache advertises.
+// "recommended" was removed as a source; filter it out defensively so a pre-existing
+// core-auth-models.json (written before the removal) can't keep surfacing it until the
+// next model refresh rewrites the cache.
 export function getAutoSources(providerId: string): Array<{ id: string; label: string }> {
   const cache = readModelCache(providerId);
-  const extra = (cache && Array.isArray(cache.sorts) ? cache.sorts : []).filter((s) => s && s.id);
+  const extra = (cache && Array.isArray(cache.sorts) ? cache.sorts : [])
+    .filter((s) => s && s.id && s.id !== "recommended");
   return [{ id: "manual", label: "Manual" }, ...extra];
 }
 
