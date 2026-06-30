@@ -2,8 +2,8 @@
 // Optional external quality ranking for the Auto "leaderboard" source.
 // Uses Artificial Analysis (https://artificialanalysis.ai) — requires the user's
 // OWN api key (cfg.leaderboard.apiKey or ARTIFICIAL_ANALYSIS_API_KEY). NEVER
-// hardcode a key: this library ships publicly. With no key / on any failure the
-// caller falls back to the provider's recommended order.
+// hardcode a key: this library ships publicly. With no key / on any failure it
+// falls back to a built-in quality heuristic (heuristicOrder, below).
 
 import { readConfig } from "./config.js";
 import { log } from "./log.js";

@@ -59,7 +59,7 @@ export async function resolveProviderModels(def, ctx, nowMs) {
     }
   }
   // 2. static catalog — providers that ship def.models (no fetch). ranking defaults
-  //    to declaration order so they still get the "recommended" sort for free.
+  //    to declaration order (the manual/catalog order; also the leaderboard input).
   if (!catalog && def.models && Object.keys(def.models).length > 0) {
     catalog = { models: def.models, ranking: Object.keys(def.models) };
   }

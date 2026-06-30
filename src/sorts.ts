@@ -1,27 +1,23 @@
 // @ts-nocheck
-// Generic "Auto" sort framework. Every provider gets, for free:
-//   - manual      : the user's hand-ordered list (handled in config.ts; always on)
-//   - recommended : the provider's natural ranking (when it has one)
-// and may OPT INTO more via def.sorts (none required):
+// Generic "Auto" sort framework. Every provider gets "manual" for free (the user's
+// hand-ordered list, handled in config.ts; always on) and may OPT INTO more via
+// def.sorts (none required):
 //   - "leaderboard" : built-in, core computes a quality order (leaderboard.ts)
 //   - { id, label, compute(ids) } : a custom sort the provider defines
-// computeSorts returns the available non-manual sources + their precomputed
-// orders, which get cached so editors (loader tab, oc auth menu) stay generic.
+// (The old automatic "recommended" = the provider's natural order was removed — it was
+// often inaccurate; "leaderboard" is the quality source now.)
+// computeSorts returns the available non-manual sources + their precomputed orders,
+// which get cached so editors (loader tab, oc auth menu) stay generic.
 
 import { computeLeaderboardOrder } from "./leaderboard.js";
 import { log } from "./log.js";
 
-const BUILTIN_LABEL = { recommended: "Recommended", leaderboard: "Leaderboard (quality)" };
+const BUILTIN_LABEL = { leaderboard: "Leaderboard (quality)" };
 
 export async function computeSorts(def, ranking) {
   const ids = Array.isArray(ranking) ? ranking : [];
   const sorts = [];                 // [{ id, label }] — offered sources beyond manual
   const sortOrders = {};            // { id: [modelId] } — precomputed order per source
-
-  if (ids.length) {
-    sorts.push({ id: "recommended", label: BUILTIN_LABEL.recommended });
-    sortOrders.recommended = ids.slice();
-  }
 
   for (const entry of (def && def.sorts) || []) {
     try {
