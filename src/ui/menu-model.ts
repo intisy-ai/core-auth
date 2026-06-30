@@ -85,6 +85,10 @@ export function buildAutoMenu(def) {
   const { order, excluded, source, sources } = getAutoConfig(providerId);
   const current = sources.find((s) => s.id === source) || sources[0] || { id: "manual", label: "Manual" };
   const items = [];
+  // Re-fetch the catalog and RECOMPUTE the sort orders (leaderboard etc.) in place — the
+  // displayed order is the cached sortOrders, so without this the list only updates on an
+  // app restart / login. Rebuilds the menu (refresh) so the new order shows immediately.
+  items.push({ label: "Refresh models", color: "cyan", suspend: true, run: async () => { try { await refreshModels(def); } catch {} return { refresh: true }; } });
   if (sources.length > 1) {
     items.push({
       label: "Sort: " + current.label, color: "cyan",
