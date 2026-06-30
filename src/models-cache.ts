@@ -10,6 +10,16 @@ import { log } from "./log.js";
 
 const MODELS_FILE = "core-auth-models.json";
 
+// Bump this whenever the SHAPE or semantics of the cache's DERIVED fields (sorts /
+// sortOrders — the advertised Auto sources and their orders) change. A cache written
+// by older code then has its derived fields discarded on read, so a removed/renamed
+// thing (e.g. the old "recommended" sort) can NEVER keep surfacing from a stale file
+// after an update — it's gone immediately, not only after the next refresh. The raw
+// catalog (models/ranking) is schema-independent and preserved across bumps so model
+// counts never blank out. This is the general guard against "a fixed issue still
+// appears because old cached state lingers."
+const CACHE_SCHEMA = 2;
+
 function cachePath() {
   return join(configFolder(), MODELS_FILE);
 }
@@ -21,16 +31,19 @@ function readAll() {
   return {};
 }
 
-// returns { models, ranking, defaultModelId, fetchedAt } | null
+// returns { models, ranking, defaultModelId, fetchedAt, sorts, sortOrders } | null
 export function readModelCache(providerId) {
   const entry = readAll()[providerId];
-  return entry && entry.models ? entry : null;
+  if (!entry || !entry.models) return null;
+  // stale schema: drop derived metadata (recomputed by the next refresh), keep catalog
+  if (entry._schema !== CACHE_SCHEMA) return { ...entry, sorts: [], sortOrders: {} };
+  return entry;
 }
 
 export function writeModelCache(providerId, entry) {
   try {
     const all = readAll();
-    all[providerId] = { ...entry, fetchedAt: entry.fetchedAt || 0 };
+    all[providerId] = { ...entry, _schema: CACHE_SCHEMA, fetchedAt: entry.fetchedAt || 0 };
     const dir = configFolder();
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(cachePath(), JSON.stringify(all, null, 2), "utf8");
