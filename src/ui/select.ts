@@ -11,10 +11,19 @@ function colorCode(color) {
   return "";
 }
 
+const BAR_WIDTH = 22;
+// Claude /usage-style bar: filled = fraction USED. Native ANSI (auth-login look).
+function barText(item) {
+  const frac = Math.max(0, Math.min(1, item.fraction || 0));
+  const filled = Math.round(frac * BAR_WIDTH);
+  const bar = `${ANSI.cyan}${"▓".repeat(filled)}${ANSI.dim}${"░".repeat(BAR_WIDTH - filled)}${ANSI.reset}`;
+  return `${ANSI.bold}${item.label}${ANSI.reset}  ${bar} ${Math.round(frac * 100)}% used`;
+}
+
 export async function select(items, options) {
   if (!isTTY()) throw new Error("Interactive select requires a TTY terminal");
 
-  const isSelectable = (i) => i && !i.disabled && !i.separator && i.kind !== "heading";
+  const isSelectable = (i) => i && !i.disabled && !i.separator && i.kind !== "heading" && i.kind !== "note" && i.kind !== "bar";
   const enabled = items.filter(isSelectable);
   if (enabled.length === 0) throw new Error("All items disabled");
   if (enabled.length === 1) return enabled[0].value;
@@ -56,6 +65,15 @@ export async function select(items, options) {
       if (item.separator) { writeLine(`${ANSI.dim}│${ANSI.reset}`); continue; }
       if (item.kind === "heading") {
         writeLine(`${ANSI.cyan}│${ANSI.reset}  ${truncateAnsi(`${ANSI.bold}${item.label}${ANSI.reset}`, Math.max(1, columns - 6))}`);
+        continue;
+      }
+      if (item.kind === "note") {
+        writeLine(`${ANSI.cyan}│${ANSI.reset}  ${ANSI.dim}${truncateAnsi(item.label, Math.max(1, columns - 6))}${ANSI.reset}`);
+        continue;
+      }
+      if (item.kind === "bar") {
+        writeLine(`${ANSI.cyan}│${ANSI.reset}  ${truncateAnsi(barText(item), Math.max(1, columns - 6))}`);
+        if (item.reset) writeLine(`${ANSI.cyan}│${ANSI.reset}  ${ANSI.dim}Resets ${item.reset}${ANSI.reset}`);
         continue;
       }
       const selected = i === cursor;

@@ -22,7 +22,8 @@ export async function runMenu(rootBuilder) {
   while (stack.length) {
     const menu = stack[stack.length - 1]();
     const items = menu.items.map((it, i) => ({
-      label: it.label, hint: it.hint, color: it.color, kind: it.kind, separator: it.separator, value: i,
+      label: it.label, hint: it.hint, color: it.color, kind: it.kind, separator: it.separator,
+      fraction: it.fraction, reset: it.reset, value: i,
     }));
     const choice = await select(items, { message: menu.title, subtitle: menu.subtitle, clearScreen: true });
     if (choice === null || choice === undefined) { stack.pop(); continue; }   // Esc = back / exit

@@ -150,9 +150,15 @@ function accountQuotaHint(view) {
   return "";
 }
 
-// One-line combined summary across all enabled accounts: how many are usable now, when
-// the next one frees up, and (when real quota exists) the average remaining per pool.
-function combinedQuotaLine(views) {
+function fmtReset(ms) {
+  try { return new Date(ms).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); }
+  catch { return ""; }
+}
+
+// One-line availability summary across enabled accounts: how many are usable now
+// and when the next one frees up. Rendered dim under the Accounts heading (kind
+// "note"); it's the honest signal for providers with no remaining-% quota API.
+function availabilityNote(views) {
   const now = Date.now();
   const enabled = views.filter((v) => v.enabled !== false);
   if (!enabled.length) return "";
@@ -162,17 +168,28 @@ function combinedQuotaLine(views) {
     const next = Math.min.apply(null, unavailable.map((v) => v.availableAt));
     if (isFinite(next)) line += " · next free in " + fmtDur(next - now);
   }
-  const pools = {};
-  for (const v of enabled) {
-    if (!Array.isArray(v.quota)) continue;
-    for (const q of v.quota) if (q && typeof q.remainingFraction === "number") (pools[q.label] = pools[q.label] || []).push(q.remainingFraction);
-  }
-  const poolKeys = Object.keys(pools);
-  if (poolKeys.length) {
-    const poolStr = poolKeys.map((k) => { const a = pools[k]; return k + " " + Math.round(a.reduce((x, y) => x + y, 0) / a.length * 100) + "% avg"; }).join(" · ");
-    line += "  ·  " + poolStr;
-  }
   return line;
+}
+
+// Real per-pool quota aggregated across accounts as Claude-/usage-style bar rows
+// ({ kind:"bar", label, fraction=USED 0..1, reset }). Empty when the provider
+// exposes no remaining-% quota (e.g. antigravity) — no bar is ever faked.
+function quotaBars(views) {
+  const pools = {};
+  for (const v of views) {
+    if (v.enabled === false || !Array.isArray(v.quota)) continue;
+    for (const q of v.quota) {
+      if (!q || typeof q.remainingFraction !== "number") continue;
+      const p = pools[q.label] || (pools[q.label] = { fracs: [], reset: null });
+      p.fracs.push(q.remainingFraction);
+      if (typeof q.resetTime === "number" && (p.reset == null || q.resetTime < p.reset)) p.reset = q.resetTime;
+    }
+  }
+  return Object.keys(pools).map((label) => {
+    const p = pools[label];
+    const remaining = p.fracs.reduce((a, b) => a + b, 0) / p.fracs.length;
+    return { kind: "bar", label, fraction: Math.max(0, Math.min(1, 1 - remaining)), reset: p.reset != null ? fmtReset(p.reset) : "" };
+  });
 }
 
 export function buildAccountMenu(def) {
@@ -205,8 +222,9 @@ export function buildAccountMenu(def) {
   });
   items.push({ label: "", separator: true });
   items.push({ label: `Accounts (${views.length})`, kind: "heading" });
-  const combined = combinedQuotaLine(views);
-  if (combined) items.push({ label: combined, kind: "heading" });
+  const note = availabilityNote(views);
+  if (note) items.push({ label: note, kind: "note" });
+  for (const bar of quotaBars(views)) items.push(bar);
   for (const view of views) {
     const hint = [view.detail, accountQuotaHint(view)].filter(Boolean).join(" · ");
     items.push({ label: `${view.email || view.id}${STATUS[view.status] ? " " + STATUS[view.status] : ""}`, hint: hint, run: () => ({ push: () => buildAccountDetail(def, view) }) });
