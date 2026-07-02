@@ -19,8 +19,11 @@ export async function runMenu(rootBuilder) {
     else if (a.pop) stack.pop();
     else if (a.close) stack.length = 0;
   };
+  let opened = false;
   while (stack.length) {
     const menu = stack[stack.length - 1]();
+    // once per session: let the menu fetch live data (e.g. quota) before first draw
+    if (!opened) { opened = true; if (typeof menu.onOpen === "function") { try { await menu.onOpen(); } catch {} } }
     const items = menu.items.map((it, i) => ({
       label: it.label, hint: it.hint, color: it.color, kind: it.kind, separator: it.separator,
       fraction: it.fraction, reset: it.reset, value: i,

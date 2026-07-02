@@ -122,6 +122,9 @@ function buildAccountDetail(def, view) {
   if (proxies) items.push({ label: "Select proxies", color: "cyan", suspend: true, run: async () => { await selectAccountProxies(view.id); return { pop: true }; } });
   extra.forEach((a) => items.push({ label: a.label, color: a.color || "cyan", suspend: true, run: async () => { try { await a.run(); } catch {} return { pop: true }; } }));
   items.push({ label: "Remove", color: "red", suspend: true, run: async () => { if (await confirm(`Remove ${label}?`)) { controller.remove(view.id); return { pop: true }; } return { refresh: true }; } });
+  // This account's own quota bars below the actions (only when the provider reports them).
+  const bars = accountBars(view);
+  if (bars.length) { items.push({ label: "", separator: true }); items.push({ label: "Quota", kind: "heading" }); for (const bar of bars) items.push(bar); }
   return { title: label + (STATUS[view.status] ? " " + STATUS[view.status] : ""), items };
 }
 
@@ -171,25 +174,46 @@ function availabilityNote(views) {
   return line;
 }
 
-// Real per-pool quota aggregated across accounts as Claude-/usage-style bar rows
-// ({ kind:"bar", label, fraction=USED 0..1, reset }). Empty when the provider
-// exposes no remaining-% quota (e.g. antigravity) — no bar is ever faked.
+// resetTime may be epoch ms (number) or an ISO string; normalize to epoch ms.
+function resetToMs(reset) {
+  if (typeof reset === "number") return reset;
+  if (typeof reset === "string" && reset) { const t = Date.parse(reset); return Number.isFinite(t) ? t : NaN; }
+  return NaN;
+}
+
+// One bar row ({ kind:"bar", label, fraction=USED 0..1, reset }) per quota pool.
+function barsFromPools(pools) {
+  return pools
+    .filter((p) => p && typeof p.remainingFraction === "number")
+    .map((p) => {
+      const ms = resetToMs(p.resetTime);
+      return { kind: "bar", label: p.label, fraction: Math.max(0, Math.min(1, 1 - p.remainingFraction)), reset: Number.isFinite(ms) ? fmtReset(ms) : "" };
+    });
+}
+
+// Per-account quota pools -> bar rows (for the account-detail menu).
+function accountBars(view) {
+  return Array.isArray(view.quota) ? barsFromPools(view.quota) : [];
+}
+
+// Real per-pool quota aggregated across accounts as Claude-/usage-style bar rows.
+// Empty when no enabled account reports remainingFraction (e.g. before the first
+// quota fetch, or a provider with no quota API) — no bar is ever faked.
 function quotaBars(views) {
   const pools = {};
   for (const v of views) {
     if (v.enabled === false || !Array.isArray(v.quota)) continue;
     for (const q of v.quota) {
       if (!q || typeof q.remainingFraction !== "number") continue;
-      const p = pools[q.label] || (pools[q.label] = { fracs: [], reset: null });
+      const p = pools[q.label] || (pools[q.label] = { label: q.label, fracs: [], reset: null });
       p.fracs.push(q.remainingFraction);
-      if (typeof q.resetTime === "number" && (p.reset == null || q.resetTime < p.reset)) p.reset = q.resetTime;
+      const ms = resetToMs(q.resetTime);
+      if (Number.isFinite(ms) && (p.reset == null || ms < p.reset)) p.reset = ms;
     }
   }
-  return Object.keys(pools).map((label) => {
-    const p = pools[label];
-    const remaining = p.fracs.reduce((a, b) => a + b, 0) / p.fracs.length;
-    return { kind: "bar", label, fraction: Math.max(0, Math.min(1, 1 - remaining)), reset: p.reset != null ? fmtReset(p.reset) : "" };
-  });
+  return barsFromPools(Object.values(pools).map((p) => ({
+    label: p.label, remainingFraction: p.fracs.reduce((a, b) => a + b, 0) / p.fracs.length, resetTime: p.reset,
+  })));
 }
 
 export function buildAccountMenu(def) {
@@ -223,7 +247,19 @@ export function buildAccountMenu(def) {
   items.push({ label: "", separator: true });
   const note = availabilityNote(views);
   items.push({ label: `Accounts (${views.length})`, hint: note || undefined, kind: "heading" });
-  for (const bar of quotaBars(views)) items.push(bar);
+  // Quota area — always says SOMETHING (never silently blank): bars when data
+  // exists, else an explanatory note for each reason it's empty.
+  const quotaSupported = typeof controller.refreshQuota === "function";
+  if (def.quotaDisabled === true) {
+    items.push({ label: "Quota display is disabled for this provider.", kind: "note" });
+  } else if (views.length === 0) {
+    items.push({ label: "Add an account to see quota.", kind: "note" });
+  } else {
+    const bars = quotaBars(views);
+    if (bars.length) for (const bar of bars) items.push(bar);
+    else if (quotaSupported) items.push({ label: "Loading quota…", kind: "note" });
+    else items.push({ label: "This provider does not report quota usage.", kind: "note" });
+  }
   for (const view of views) {
     const hint = [view.detail, accountQuotaHint(view)].filter(Boolean).join(" · ");
     items.push({ label: `${view.email || view.id}${STATUS[view.status] ? " " + STATUS[view.status] : ""}`, hint: hint, run: () => ({ push: () => buildAccountDetail(def, view) }) });
@@ -231,5 +267,10 @@ export function buildAccountMenu(def) {
   if (views.length > 0) { items.push({ label: "", separator: true }); items.push({ label: "Delete all accounts", color: "red", suspend: true, run: async () => { if (await confirm("Delete ALL accounts? This cannot be undone.")) { for (const v of controller.list()) controller.remove(v.id); } return { refresh: true }; } }); }
 
   // No "Done" item — Esc backs out / exits (Done caused select() quirks + is redundant).
-  return { title: def.label + " accounts", subtitle: "Esc to exit · Enter an action or account", items, providerLabel: def.label };
+  // onOpen: renderers call it once when the menu opens so real quota is fetched and
+  // the bars appear without a manual "Refresh quotas".
+  const onOpen = typeof controller.refreshQuota === "function"
+    ? async () => { try { await controller.refreshQuota(); } catch {} }
+    : undefined;
+  return { title: def.label + " accounts", subtitle: "Esc to exit · Enter an action or account", items, providerLabel: def.label, onOpen };
 }
