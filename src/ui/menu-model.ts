@@ -221,9 +221,8 @@ export function buildAccountMenu(def) {
     else items.push({ label: a.label, color: a.color || "cyan", suspend: true, run: async () => { try { await a.run(); } catch (e) { process.stderr.write(String(e) + "\n"); } return { refresh: true }; } });
   });
   items.push({ label: "", separator: true });
-  items.push({ label: `Accounts (${views.length})`, kind: "heading" });
   const note = availabilityNote(views);
-  if (note) items.push({ label: note, kind: "note" });
+  items.push({ label: `Accounts (${views.length})`, hint: note || undefined, kind: "heading" });
   for (const bar of quotaBars(views)) items.push(bar);
   for (const view of views) {
     const hint = [view.detail, accountQuotaHint(view)].filter(Boolean).join(" · ");

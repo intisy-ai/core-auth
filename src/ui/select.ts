@@ -64,7 +64,9 @@ export async function select(items, options) {
       if (!item) continue;
       if (item.separator) { writeLine(`${ANSI.dim}│${ANSI.reset}`); continue; }
       if (item.kind === "heading") {
-        writeLine(`${ANSI.cyan}│${ANSI.reset}  ${truncateAnsi(`${ANSI.bold}${item.label}${ANSI.reset}`, Math.max(1, columns - 6))}`);
+        let head = `${ANSI.bold}${item.label}${ANSI.reset}`;
+        if (item.hint) head += `  ${ANSI.dim}${item.hint}${ANSI.reset}`;
+        writeLine(`${ANSI.cyan}│${ANSI.reset}  ${truncateAnsi(head, Math.max(1, columns - 6))}`);
         continue;
       }
       if (item.kind === "note") {
