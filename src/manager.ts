@@ -39,7 +39,13 @@ export class AccountManager {
       const index = selectIndex(pool, lane, now, this.strategy, this.available);
       if (index < 0) return;
       const account = pool.accounts[index];
-      if (!this.available(account, lane, now)) return;   // hybrid may hand back a future account; caller waits instead
+      // No availability re-check: selectIndex already prefers an AVAILABLE account
+      // and only returns an unavailable (soonest-free) one as a LAST RESORT when
+      // every account is rate-limited for this lane. In that case we still claim it
+      // and let the caller attempt — a rate-limit window is a heuristic that may have
+      // lifted or been recorded inaccurately, so a last-ditch try beats failing
+      // outright; a genuine 429 just re-arms the backoff. (hybrid strategy only —
+      // sticky/round-robin return -1 when none are free and still hard-stop.)
       account.lastUsed = now;
       claimedId = account.id;
     }, this.store);
