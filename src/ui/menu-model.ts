@@ -170,17 +170,33 @@ function buildQuotaMenu(def) {
   return { title: def.label + " — Quota (all accounts)", subtitle: "Combined across accounts · Esc to go back", items, onOpen };
 }
 
-// Less-used provider actions, grouped off the main menu.
+// Less-used provider actions, grouped off the main menu into labeled sections.
 function buildManageMenu(def) {
   const controller = def.accounts;
   const proxies = !!def.proxies;
   const extraActions = typeof controller.actions === "function" ? controller.actions() : [];
-  const items = [{ label: "Back", run: () => ({ pop: true }) }, { label: "", separator: true }];
+  const items = [{ label: "Back", run: () => ({ pop: true }) }];
+
+  items.push({ label: "", separator: true });
+  items.push({ label: "Models", kind: "heading" });
   items.push({ label: "Refresh models", color: "cyan", suspend: true, run: async () => { try { await refreshModels(def); } catch {} return { refresh: true }; } });
   if (readModelCache(def.id)) items.push({ label: "Configure Auto models", color: "cyan", run: () => ({ push: () => buildAutoMenu(def) }) });
-  if (proxies) items.push({ label: "Manage proxies", color: "cyan", run: () => ({ push: () => buildProxyMenu() }) });
-  if (def.settings && (def.settings.groups || []).length) items.push({ label: "Settings", color: "cyan", run: () => ({ push: () => buildSettingsMenu(def) }) });
-  extraActions.forEach((a) => items.push({ label: a.label, color: a.color || "cyan", suspend: true, run: async () => { try { await a.run(); } catch (e) { process.stderr.write(String(e) + "\n"); } return { refresh: true }; } }));
+
+  if (proxies) {
+    items.push({ label: "", separator: true });
+    items.push({ label: "Network", kind: "heading" });
+    items.push({ label: "Manage proxies", color: "cyan", run: () => ({ push: () => buildProxyMenu() }) });
+  }
+  if (def.settings && (def.settings.groups || []).length) {
+    items.push({ label: "", separator: true });
+    items.push({ label: "Provider", kind: "heading" });
+    items.push({ label: "Settings", color: "cyan", run: () => ({ push: () => buildSettingsMenu(def) }) });
+  }
+  if (extraActions.length) {
+    items.push({ label: "", separator: true });
+    items.push({ label: "Accounts", kind: "heading" });
+    extraActions.forEach((a) => items.push({ label: a.label, color: a.color || "cyan", suspend: true, run: async () => { try { await a.run(); } catch (e) { process.stderr.write(String(e) + "\n"); } return { refresh: true }; } }));
+  }
   return { title: def.label + " — Manage", subtitle: "Esc to go back", items };
 }
 
@@ -260,21 +276,27 @@ export function buildAccountMenu(def) {
     ? { label: "Add account", color: "cyan", run: () => buildLoginInput(def) }
     : { label: "Add account", color: "cyan", suspend: true, run: async () => { try { await controller.login(); await refreshModels(def); } catch (e) { process.stderr.write(String(e) + "\n"); } return { refresh: true }; } };
 
-  // Slim main menu: a couple of actions + the accounts list. Global quota graphs
-  // live under "Quota"; the rarely-used actions under "Manage". Per-account bars
-  // show when you open an account (buildAccountDetail).
-  const items = [addAccount];
-  items.push({ label: "Quota", color: "cyan", run: () => ({ push: () => buildQuotaMenu(def) }) });
-  items.push({ label: "Manage", color: "cyan", run: () => ({ push: () => buildManageMenu(def) }) });
-  items.push({ label: "", separator: true });
+  // Main menu in labeled sections: Accounts (list + Add), Usage (global graphs),
+  // Settings & tools (Manage submenu + Delete). Per-account bars show on click
+  // (buildAccountDetail); the rarely-used actions live under Manage.
+  const items = [];
   const note = availabilityNote(views);
   items.push({ label: `Accounts (${views.length})`, hint: note || undefined, kind: "heading" });
-  if (!views.length) items.push({ label: "Add an account above to get started.", kind: "note" });
+  if (!views.length) items.push({ label: "No accounts yet — add one below.", kind: "note" });
   for (const view of views) {
     const hint = [view.detail, accountAvailabilityHint(view)].filter(Boolean).join(" · ");
     items.push({ label: `${view.email || view.id}${STATUS[view.status] ? " " + STATUS[view.status] : ""}`, hint, run: () => ({ push: () => buildAccountDetail(def, view) }) });
   }
-  if (views.length > 0) { items.push({ label: "", separator: true }); items.push({ label: "Delete all accounts", color: "red", suspend: true, run: async () => { if (await confirm("Delete ALL accounts? This cannot be undone.")) { for (const v of controller.list()) controller.remove(v.id); } return { refresh: true }; } }); }
+  items.push(addAccount);
+
+  items.push({ label: "", separator: true });
+  items.push({ label: "Usage", kind: "heading" });
+  items.push({ label: "Quota", hint: "all-account graphs", color: "cyan", run: () => ({ push: () => buildQuotaMenu(def) }) });
+
+  items.push({ label: "", separator: true });
+  items.push({ label: "Settings & tools", kind: "heading" });
+  items.push({ label: "Manage", hint: "models · proxies · settings", color: "cyan", run: () => ({ push: () => buildManageMenu(def) }) });
+  if (views.length > 0) items.push({ label: "Delete all accounts", color: "red", suspend: true, run: async () => { if (await confirm("Delete ALL accounts? This cannot be undone.")) { for (const v of controller.list()) controller.remove(v.id); } return { refresh: true }; } });
 
   // No "Done" item — Esc backs out / exits (Done caused select() quirks + is redundant).
   // onOpen: renderers call it once on open so quota is fetched in the background and
