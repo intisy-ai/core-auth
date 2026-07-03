@@ -12,10 +12,15 @@
 //   return chatError("Not authenticated — run `cc auth`.", { type: "authentication_error", status: 401 });
 export function chatError(message, opts) {
   const o = opts || {};
-  const status = typeof o.status === "number" ? o.status : 400;
   const type = o.type || "invalid_request_error";
-  return new Response(
-    JSON.stringify({ type: "error", error: { type, message } }),
-    { status, headers: { "content-type": "application/json" } },
-  );
+  const payload = { type: "error", error: { type, message } };
+  // Claude Code sends streaming requests; a plain JSON body then renders as a raw dump.
+  // Deliver the Anthropic SSE `error` event instead so the host shows a clean message
+  // (invalid_request_error is still terminal, so it won't be retried).
+  if (o.stream) {
+    const body = "event: error\ndata: " + JSON.stringify(payload) + "\n\n";
+    return new Response(body, { status: 200, headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
+  }
+  const status = typeof o.status === "number" ? o.status : 400;
+  return new Response(JSON.stringify(payload), { status, headers: { "content-type": "application/json" } });
 }
