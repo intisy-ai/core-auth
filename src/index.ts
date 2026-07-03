@@ -15,6 +15,7 @@ export { readConfig, writeConfig, activeProvider, setActiveProvider, getAutoConf
 export { readModelCache, resolveProviderModels } from "./models-cache.js";
 export { log } from "./log.js";
 export { notify, setOpencodeClient, notifyQueuePath } from "./notify.js";
+export { chatError } from "./errors.js";
 export { select } from "./ui/select.js";
 export { confirm } from "./ui/confirm.js";
 export { prompt } from "./ui/prompt.js";
