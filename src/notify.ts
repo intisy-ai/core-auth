@@ -36,7 +36,8 @@ export function notify(message, level) {
   try {
     if (!isClaude() && ocClient && ocClient.tui && typeof ocClient.tui.showToast === "function") {
       const variant = lvl === "success" || lvl === "warning" || lvl === "error" ? lvl : "info";
-      Promise.resolve(ocClient.tui.showToast({ message, variant })).catch(() => {});
+      // opencode's SDK expects the payload nested under `body` — a flat {message,variant} silently no-ops.
+      Promise.resolve(ocClient.tui.showToast({ body: { message, variant } })).catch(() => {});
       return;
     }
     const p = notifyQueuePath();
