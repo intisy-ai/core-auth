@@ -3,6 +3,7 @@
 
 import { getConfigDir } from "./env.js";
 import { log } from "./log.js";
+import { setOpencodeClient } from "./notify.js";
 import { listAccounts } from "./accounts.js";
 import { isTTY } from "./ui/ansi.js";
 import { runProviderMenu } from "./menu.js";
@@ -49,6 +50,8 @@ export function createOpencodePlugin(def) {
   const opencodeProvider = def.opencodeProvider || "anthropic";
   return async function (input) {
     await refreshModels(def, true);
+    // hand the opencode client to the notification layer so notify() can toast
+    try { setOpencodeClient(input && input.client); } catch { /* best-effort */ }
     // when accounts already exist, seed opencode's auth entry so it routes through our loader without the user running `oc auth login`
     try {
       const client = input && input.client;

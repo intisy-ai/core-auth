@@ -14,6 +14,7 @@ export { getConfigDir, configFolder, reposDir } from "./env.js";
 export { readConfig, writeConfig, activeProvider, setActiveProvider, getAutoConfig, setAutoConfig, getAutoCandidates } from "./config.js";
 export { readModelCache, resolveProviderModels } from "./models-cache.js";
 export { log } from "./log.js";
+export { notify, setOpencodeClient, notifyQueuePath } from "./notify.js";
 export { select } from "./ui/select.js";
 export { confirm } from "./ui/confirm.js";
 export { prompt } from "./ui/prompt.js";
