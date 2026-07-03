@@ -12,13 +12,18 @@
 //   return chatError("Not authenticated — run `cc auth`.", { type: "authentication_error", status: 401 });
 export function chatError(message, opts) {
   const o = opts || {};
-  const type = o.type || "invalid_request_error";
   const status = typeof o.status === "number" ? o.status : 400;
-  // The x-hub-chat-error marker lets a provider's Anthropic bridge recognize this as an
-  // already-formed terminal error and deliver it as a clean SSE `error` event, instead
-  // of translating it as a Gemini chunk or re-wrapping it (which leaks the raw JSON).
+  // The error body must match what the host's SDK parses, or it's dumped raw:
+  //   - anthropic (@ai-sdk/anthropic, Claude): { type:"error", error:{ type, message } }
+  //   - gemini    (@ai-sdk/google):            { error:{ code, message, status } }
+  // A provider on the Gemini path (antigravity) passes format:"gemini"; its Claude
+  // bridge converts back to the Anthropic shape (recognized via the x-hub-chat-error
+  // marker) so both hosts render a clean "…: message" instead of the raw JSON.
+  const payload = o.format === "gemini"
+    ? { error: { code: status, message, status: o.geminiStatus || (status === 429 ? "RESOURCE_EXHAUSTED" : "INVALID_ARGUMENT") } }
+    : { type: "error", error: { type: o.type || "invalid_request_error", message } };
   return new Response(
-    JSON.stringify({ type: "error", error: { type, message } }),
+    JSON.stringify(payload),
     { status, headers: { "content-type": "application/json", "x-hub-chat-error": "1" } },
   );
 }
