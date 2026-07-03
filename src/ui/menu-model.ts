@@ -165,6 +165,12 @@ function buildQuotaMenu(def) {
   if (typeof controller.refreshQuota === "function") items.push({ label: "Refresh quotas", color: "cyan", suspend: true, run: async () => { try { await controller.refreshQuota(true); } catch {} return { refresh: true }; } });
   items.push({ label: "", separator: true });
   pushQuotaArea(items, def, views);
+  // Provider-supplied footnote (e.g. a pool whose quota the API doesn't report) —
+  // provider-agnostic: core just renders whatever string the driver declares.
+  if (typeof def.quotaNote === "string" && def.quotaNote) {
+    items.push({ label: "", separator: true });
+    items.push({ label: def.quotaNote, kind: "note" });
+  }
   // refetch on open so the graphs are current even if the parent didn't just fetch
   const onOpen = typeof controller.refreshQuota === "function" ? async () => { try { await controller.refreshQuota(); } catch {} } : undefined;
   return { title: def.label + " — Quota (all accounts)", subtitle: "Combined across accounts · Esc to go back", items, onOpen };
