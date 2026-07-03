@@ -115,16 +115,15 @@ function buildAccountDetail(def, view) {
   const proxies = !!def.proxies;
   const label = view.email || view.id;
   const extra = typeof controller.accountActions === "function" ? controller.accountActions(view) : [];
-  const items = [
-    { label: "Back", run: () => ({ pop: true }) },
-    { label: view.enabled === false ? "Enable" : "Disable", color: view.enabled === false ? "green" : "yellow", run: () => { controller.enable(view.id, view.enabled === false); return { pop: true }; } },
-  ];
+  const items = [];
+  // This account's own quota bars at the top — this is where the graphs show.
+  const bars = accountBars(view);
+  if (bars.length) { items.push({ label: "Quota", kind: "heading" }); for (const bar of bars) items.push(bar); items.push({ label: "", separator: true }); }
+  items.push({ label: "Back", run: () => ({ pop: true }) });
+  items.push({ label: view.enabled === false ? "Enable" : "Disable", color: view.enabled === false ? "green" : "yellow", run: () => { controller.enable(view.id, view.enabled === false); return { pop: true }; } });
   if (proxies) items.push({ label: "Select proxies", color: "cyan", suspend: true, run: async () => { await selectAccountProxies(view.id); return { pop: true }; } });
   extra.forEach((a) => items.push({ label: a.label, color: a.color || "cyan", suspend: true, run: async () => { try { await a.run(); } catch {} return { pop: true }; } }));
   items.push({ label: "Remove", color: "red", suspend: true, run: async () => { if (await confirm(`Remove ${label}?`)) { controller.remove(view.id); return { pop: true }; } return { refresh: true }; } });
-  // This account's own quota bars below the actions (only when the provider reports them).
-  const bars = accountBars(view);
-  if (bars.length) { items.push({ label: "", separator: true }); items.push({ label: "Quota", kind: "heading" }); for (const bar of bars) items.push(bar); }
   return { title: label + (STATUS[view.status] ? " " + STATUS[view.status] : ""), items };
 }
 
@@ -138,19 +137,51 @@ function fmtDur(ms) {
   return Math.round(m / 60) + "h";
 }
 
-// Per-account quota/availability for the row hint: real per-pool remaining % when the
-// provider supplies quota, else availability ("free in Xs" / "available").
-function accountQuotaHint(view) {
-  if (Array.isArray(view.quota) && view.quota.length) {
-    const pools = view.quota
-      .filter((q) => q && typeof q.remainingFraction === "number")
-      .map((q) => q.label + " " + Math.round(q.remainingFraction * 100) + "%");
-    if (pools.length) return pools.join(" · ");
-  }
+// Compact availability hint for the account ROW ("free in Xs" / "available").
+// The usage bars live in the account's detail menu, not inline in the row.
+function accountAvailabilityHint(view) {
   const now = Date.now();
   if (typeof view.availableAt === "number" && view.availableAt > now) return "free in " + fmtDur(view.availableAt - now);
   if (view.status === "active") return "available";
   return "";
+}
+
+// Shared quota-area builder: pushes bars, or an explanatory note for whichever
+// reason there are none (never silently blank). Used by the Quota submenu.
+function pushQuotaArea(items, def, views) {
+  if (def.quotaDisabled === true) { items.push({ label: "Quota display is disabled for this provider.", kind: "note" }); return; }
+  if (!views.length) { items.push({ label: "Add an account to see quota.", kind: "note" }); return; }
+  const bars = quotaBars(views);
+  if (bars.length) { for (const bar of bars) items.push(bar); return; }
+  if (typeof def.accounts.refreshQuota === "function") items.push({ label: "Loading quota…", kind: "note" });
+  else items.push({ label: "This provider does not report quota usage.", kind: "note" });
+}
+
+// Global quota view: bars aggregated across ALL accounts (the combined graphs).
+function buildQuotaMenu(def) {
+  const controller = def.accounts;
+  const views = controller.list();
+  const items = [{ label: "Back", run: () => ({ pop: true }) }];
+  if (typeof controller.refreshQuota === "function") items.push({ label: "Refresh quotas", color: "cyan", suspend: true, run: async () => { try { await controller.refreshQuota(true); } catch {} return { refresh: true }; } });
+  items.push({ label: "", separator: true });
+  pushQuotaArea(items, def, views);
+  // refetch on open so the graphs are current even if the parent didn't just fetch
+  const onOpen = typeof controller.refreshQuota === "function" ? async () => { try { await controller.refreshQuota(); } catch {} } : undefined;
+  return { title: def.label + " — Quota (all accounts)", subtitle: "Combined across accounts · Esc to go back", items, onOpen };
+}
+
+// Less-used provider actions, grouped off the main menu.
+function buildManageMenu(def) {
+  const controller = def.accounts;
+  const proxies = !!def.proxies;
+  const extraActions = typeof controller.actions === "function" ? controller.actions() : [];
+  const items = [{ label: "Back", run: () => ({ pop: true }) }, { label: "", separator: true }];
+  items.push({ label: "Refresh models", color: "cyan", suspend: true, run: async () => { try { await refreshModels(def); } catch {} return { refresh: true }; } });
+  if (readModelCache(def.id)) items.push({ label: "Configure Auto models", color: "cyan", run: () => ({ push: () => buildAutoMenu(def) }) });
+  if (proxies) items.push({ label: "Manage proxies", color: "cyan", run: () => ({ push: () => buildProxyMenu() }) });
+  if (def.settings && (def.settings.groups || []).length) items.push({ label: "Settings", color: "cyan", run: () => ({ push: () => buildSettingsMenu(def) }) });
+  extraActions.forEach((a) => items.push({ label: a.label, color: a.color || "cyan", suspend: true, run: async () => { try { await a.run(); } catch (e) { process.stderr.write(String(e) + "\n"); } return { refresh: true }; } }));
+  return { title: def.label + " — Manage", subtitle: "Esc to go back", items };
 }
 
 function fmtReset(ms) {
@@ -218,10 +249,7 @@ function quotaBars(views) {
 
 export function buildAccountMenu(def) {
   const controller = def.accounts;
-  const proxies = !!def.proxies;
   const views = controller.list();
-  const extraActions = (typeof controller.actions === "function" ? controller.actions() : []).slice();
-  if (readModelCache(def.id)) extraActions.push({ label: "Configure Auto models", color: "cyan", auto: true });
 
   // Add account: providers with a URL-based loginFlow open the browser + show the
   // URL in-chrome and auto-capture via loopback where supported, with an in-tab
@@ -232,43 +260,25 @@ export function buildAccountMenu(def) {
     ? { label: "Add account", color: "cyan", run: () => buildLoginInput(def) }
     : { label: "Add account", color: "cyan", suspend: true, run: async () => { try { await controller.login(); await refreshModels(def); } catch (e) { process.stderr.write(String(e) + "\n"); } return { refresh: true }; } };
 
-  const items = [{ label: "Actions", kind: "heading" }, addAccount];
-  // Pull the provider's model catalog on demand (live fetch when authed, else static/
-  // cached) and write it into the host config — so models + "Configure Auto models"
-  // appear without waiting for an app restart.
-  items.push({ label: "Refresh models", color: "cyan", suspend: true, run: async () => { try { await refreshModels(def); } catch {} return { refresh: true }; } });
-  if (typeof controller.refreshQuota === "function") items.push({ label: "Refresh quotas", color: "cyan", suspend: true, run: async () => { try { await controller.refreshQuota(); } catch {} return { refresh: true }; } });
-  if (proxies) items.push({ label: "Manage proxies", color: "cyan", run: () => ({ push: () => buildProxyMenu() }) });
-  if (def.settings && (def.settings.groups || []).length) items.push({ label: "Settings", color: "cyan", run: () => ({ push: () => buildSettingsMenu(def) }) });
-  extraActions.forEach((a) => {
-    if (a.auto) items.push({ label: a.label, color: a.color || "cyan", run: () => ({ push: () => buildAutoMenu(def) }) });
-    else items.push({ label: a.label, color: a.color || "cyan", suspend: true, run: async () => { try { await a.run(); } catch (e) { process.stderr.write(String(e) + "\n"); } return { refresh: true }; } });
-  });
+  // Slim main menu: a couple of actions + the accounts list. Global quota graphs
+  // live under "Quota"; the rarely-used actions under "Manage". Per-account bars
+  // show when you open an account (buildAccountDetail).
+  const items = [addAccount];
+  items.push({ label: "Quota", color: "cyan", run: () => ({ push: () => buildQuotaMenu(def) }) });
+  items.push({ label: "Manage", color: "cyan", run: () => ({ push: () => buildManageMenu(def) }) });
   items.push({ label: "", separator: true });
   const note = availabilityNote(views);
   items.push({ label: `Accounts (${views.length})`, hint: note || undefined, kind: "heading" });
-  // Quota area — always says SOMETHING (never silently blank): bars when data
-  // exists, else an explanatory note for each reason it's empty.
-  const quotaSupported = typeof controller.refreshQuota === "function";
-  if (def.quotaDisabled === true) {
-    items.push({ label: "Quota display is disabled for this provider.", kind: "note" });
-  } else if (views.length === 0) {
-    items.push({ label: "Add an account to see quota.", kind: "note" });
-  } else {
-    const bars = quotaBars(views);
-    if (bars.length) for (const bar of bars) items.push(bar);
-    else if (quotaSupported) items.push({ label: "Loading quota…", kind: "note" });
-    else items.push({ label: "This provider does not report quota usage.", kind: "note" });
-  }
+  if (!views.length) items.push({ label: "Add an account above to get started.", kind: "note" });
   for (const view of views) {
-    const hint = [view.detail, accountQuotaHint(view)].filter(Boolean).join(" · ");
-    items.push({ label: `${view.email || view.id}${STATUS[view.status] ? " " + STATUS[view.status] : ""}`, hint: hint, run: () => ({ push: () => buildAccountDetail(def, view) }) });
+    const hint = [view.detail, accountAvailabilityHint(view)].filter(Boolean).join(" · ");
+    items.push({ label: `${view.email || view.id}${STATUS[view.status] ? " " + STATUS[view.status] : ""}`, hint, run: () => ({ push: () => buildAccountDetail(def, view) }) });
   }
   if (views.length > 0) { items.push({ label: "", separator: true }); items.push({ label: "Delete all accounts", color: "red", suspend: true, run: async () => { if (await confirm("Delete ALL accounts? This cannot be undone.")) { for (const v of controller.list()) controller.remove(v.id); } return { refresh: true }; } }); }
 
   // No "Done" item — Esc backs out / exits (Done caused select() quirks + is redundant).
-  // onOpen: renderers call it once when the menu opens so real quota is fetched and
-  // the bars appear without a manual "Refresh quotas".
+  // onOpen: renderers call it once on open so quota is fetched in the background and
+  // ready when the user opens Quota / an account (no bars clutter the main list).
   const onOpen = typeof controller.refreshQuota === "function"
     ? async () => { try { await controller.refreshQuota(); } catch {} }
     : undefined;
