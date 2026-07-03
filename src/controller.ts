@@ -22,7 +22,10 @@ function soonestAvailable(account, now) {
   return t;
 }
 
-// opts: { status?(account,now), detail?(account,now), quota?(account), login(), refreshQuota?() }
+// opts: { status?(account,now), detail?(account,now), quota?(account), availableAt?(account,now), login(), refreshQuota?() }
+// availableAt lets a provider report usability from its own signal (e.g. quota
+// pools) instead of the generic per-lane backoff — a single transient lane limit
+// shouldn't read as "the whole account is down" when other lanes still serve.
 export function accountControllerFromManager(manager, opts) {
   const options = opts || {};
   return {
@@ -36,7 +39,7 @@ export function accountControllerFromManager(manager, opts) {
         status: options.status ? options.status(account, now) : defaultStatus(account, now),
         detail: options.detail ? options.detail(account, now) : undefined,
         quota: options.quota ? options.quota(account) : undefined,
-        availableAt: soonestAvailable(account, now),
+        availableAt: options.availableAt ? options.availableAt(account, now) : soonestAvailable(account, now),
       }));
     },
     enable(id, on) { manager.mutate(id, (account) => { account.enabled = !!on; }); },
