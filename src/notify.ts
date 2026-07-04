@@ -12,6 +12,7 @@
 import { appendFileSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { homedir } from "os";
+import { log } from "./log.js";
 
 let ocClient = null;   // set by a provider's opencodeHooks
 
@@ -33,6 +34,10 @@ export function notifyQueuePath(dir) { return join(dir || configDir(), "config",
 // Never throws: a failed notification must not break the request path.
 export function notify(message, level) {
   const lvl = level || "info";
+  // Persistent record in the normal log (both apps). The toast/queue below is
+  // transient delivery only — the queue is read-and-cleared by the drain hook, so
+  // without this a notification would leave no trace after being shown once.
+  log("notify[" + lvl + "] " + message);
   try {
     if (!isClaude() && ocClient && ocClient.tui && typeof ocClient.tui.showToast === "function") {
       const variant = lvl === "success" || lvl === "warning" || lvl === "error" ? lvl : "info";
