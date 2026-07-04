@@ -27,8 +27,10 @@ function configDir() {
   return isClaude() ? join(homedir(), ".claude") : join(homedir(), ".config", "opencode");
 }
 
-// Shared queue the Claude drain hook reads (kept next to the other config).
-export function notifyQueuePath(dir) { return join(dir || configDir(), "config", "auth-notifications.jsonl"); }
+// Shared queue the Claude drain hook reads. It's TRANSIENT runtime state (appended
+// then read-and-cleared), so it lives under cache/, not config/ (config is for
+// config files only). Sibling of config/ and logs/ under the app dir.
+export function notifyQueuePath(dir) { return join(dir || configDir(), "cache", "auth-notifications.jsonl"); }
 
 // notify(message, level?) — level: "info" | "success" | "warning" | "error".
 // Never throws: a failed notification must not break the request path.
