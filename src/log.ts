@@ -1,6 +1,6 @@
 // @ts-nocheck
 // File logger, toggleable via auth.json `logging`. Console mirroring is GLOBAL,
-// off by default, toggled for every plugin via the shared config/core.json `logConsole`
+// off by default, toggled for every plugin via the shared config/settings.json `logConsole`
 // (or CORE_LOG_CONSOLE). Console lines go to stderr, prefixed [core-auth] + colored —
 // matching core's scheme (core-auth doesn't bundle core, so the logic is mirrored here).
 
