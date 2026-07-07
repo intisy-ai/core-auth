@@ -108,6 +108,34 @@ export function buildAutoMenu(def) {
   return { title: def.label + " — Auto model ranking", subtitle: sub, items };
 }
 
+// Read-only-ish catalog browser: the FULL model list (not the Auto ranking) with a
+// search filter, so a provider's models can be viewed/searched directly. Kept separate
+// from buildAutoMenu (which is about ordering/including for Auto). browseQuery lives at
+// module scope because only one menu is active at a time; the input prompt + refresh
+// re-filters in place (no menu stacking).
+let browseQuery = "";
+function buildModelsBrowse(def) {
+  const providerId = def.id;
+  const cache = readModelCache(providerId);
+  const models = (cache && cache.models) || {};
+  const order = (cache && cache.ranking && cache.ranking.length) ? cache.ranking : Object.keys(models);
+  const q = browseQuery.toLowerCase();
+  const matches = order.filter((id) => models[id] && !/-auto$/.test(id)
+    && (!q || (id + " " + ((models[id] && models[id].name) || "")).toLowerCase().indexOf(q) >= 0));
+
+  const items = [{ label: "Back", run: () => { browseQuery = ""; return { pop: true }; } }];
+  items.push({ label: browseQuery ? "Search: " + browseQuery : "Search…", color: "cyan",
+    run: () => ({ input: { title: "Search models", message: "Filter by name or id (empty to clear)", complete: (v) => { browseQuery = v || ""; return { refresh: true }; } } }) });
+  if (browseQuery) items.push({ label: "Clear search", run: () => { browseQuery = ""; return { refresh: true }; } });
+  items.push({ label: "", separator: true });
+  items.push({ label: "Models (" + matches.length + (browseQuery ? " match" + (matches.length === 1 ? "" : "es") : "") + ")", kind: "heading" });
+  if (!matches.length) items.push({ label: browseQuery ? "No models match." : "No models — Refresh models or log in.", kind: "note" });
+  for (const id of matches) {
+    items.push({ label: modelName(providerId, id), hint: id, run: () => ({ push: () => buildAutoModelEdit(def, id) }) });
+  }
+  return { title: def.label + " — Models", subtitle: "Browse + search this provider's models · Enter a model to include/exclude", items };
+}
+
 // ---- Account details --------------------------------------------------------
 
 function buildAccountDetail(def, view) {
@@ -187,11 +215,8 @@ function buildManageMenu(def) {
   const extraActions = typeof controller.actions === "function" ? controller.actions() : [];
   const items = [{ label: "Back", run: () => ({ pop: true }) }];
 
-  items.push({ label: "", separator: true });
-  items.push({ label: "Models", kind: "heading" });
-  items.push({ label: "Refresh models", color: "cyan", suspend: true, run: async () => { try { await refreshModels(def); } catch {} return { refresh: true }; } });
-  if (readModelCache(def.id)) items.push({ label: "Configure Auto models", color: "cyan", run: () => ({ push: () => buildAutoMenu(def) }) });
-
+  // Models moved to the provider menu's own Models section (Browse/Configure/Refresh)
+  // so they aren't duplicated here.
   if (proxies) {
     items.push({ label: "", separator: true });
     items.push({ label: "Network", kind: "heading" });
@@ -303,12 +328,14 @@ export function buildAccountMenu(def) {
   items.push({ label: "Usage", kind: "heading" });
   items.push({ label: "Quota", hint: "all-account graphs", color: "cyan", run: () => ({ push: () => buildQuotaMenu(def) }) });
 
-  // Surface the model list directly on the provider menu (not just behind Manage):
-  // one click to view + rank the provider's models. Only when a catalog is cached.
+  // Models live directly on the provider menu (one place, not duplicated in Manage):
+  // Browse (view + search the full catalog), Configure Auto models (ranking), Refresh.
   if (readModelCache(def.id)) {
     items.push({ label: "", separator: true });
     items.push({ label: "Models", kind: "heading" });
-    items.push({ label: "Configure Auto models", hint: "view + rank models", color: "cyan", run: () => ({ push: () => buildAutoMenu(def) }) });
+    items.push({ label: "Browse models", hint: "view + search", color: "cyan", run: () => { browseQuery = ""; return { push: () => buildModelsBrowse(def) }; } });
+    items.push({ label: "Configure Auto models", hint: "ranking / include-exclude", color: "cyan", run: () => ({ push: () => buildAutoMenu(def) }) });
+    items.push({ label: "Refresh models", color: "cyan", suspend: true, run: async () => { try { await refreshModels(def); } catch {} return { refresh: true }; } });
   }
 
   items.push({ label: "", separator: true });
