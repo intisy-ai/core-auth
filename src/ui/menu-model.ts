@@ -195,6 +195,9 @@ function accountAvailabilityHint(view) {
 function pushQuotaArea(items, def, views) {
   if (def.quotaDisabled === true) { items.push({ label: "Quota display is disabled for this provider.", kind: "note" }); return; }
   if (!views.length) { items.push({ label: "Add an account to see quota.", kind: "note" }); return; }
+  // Only enabled accounts contribute quota (quotaBars skips disabled). If none are
+  // enabled, nothing will ever load — say so instead of a perpetual "Loading quota…".
+  if (!views.some((v) => v.enabled !== false)) { items.push({ label: "No enabled accounts — enable or add one to see quota.", kind: "note" }); return; }
   const bars = quotaBars(views);
   if (bars.length) { for (const bar of bars) items.push(bar); return; }
   if (typeof def.accounts.refreshQuota === "function") items.push({ label: "Loading quota…", kind: "note" });
