@@ -130,6 +130,7 @@ function buildAccountDetail(def, view) {
 // ---- Top provider menu (accounts + actions) --------------------------------
 
 function fmtDur(ms) {
+  if (!isFinite(ms)) return "";
   const s = Math.max(0, Math.round(ms / 1000));
   if (s < 60) return s + "s";
   const m = Math.round(s / 60);
@@ -139,9 +140,12 @@ function fmtDur(ms) {
 
 // Compact availability hint for the account ROW ("free in Xs" / "available").
 // The usage bars live in the account's detail menu, not inline in the row.
+// availableAt is Infinity for disabled accounts (never auto-available) — guard on
+// isFinite so a disabled/never-limited row shows nothing (the [disabled] status
+// label already carries that state) instead of "free in Infinityh".
 function accountAvailabilityHint(view) {
   const now = Date.now();
-  if (typeof view.availableAt === "number" && view.availableAt > now) return "free in " + fmtDur(view.availableAt - now);
+  if (typeof view.availableAt === "number" && isFinite(view.availableAt) && view.availableAt > now) return "free in " + fmtDur(view.availableAt - now);
   if (view.status === "active") return "available";
   return "";
 }
@@ -298,6 +302,14 @@ export function buildAccountMenu(def) {
   items.push({ label: "", separator: true });
   items.push({ label: "Usage", kind: "heading" });
   items.push({ label: "Quota", hint: "all-account graphs", color: "cyan", run: () => ({ push: () => buildQuotaMenu(def) }) });
+
+  // Surface the model list directly on the provider menu (not just behind Manage):
+  // one click to view + rank the provider's models. Only when a catalog is cached.
+  if (readModelCache(def.id)) {
+    items.push({ label: "", separator: true });
+    items.push({ label: "Models", kind: "heading" });
+    items.push({ label: "Configure Auto models", hint: "view + rank models", color: "cyan", run: () => ({ push: () => buildAutoMenu(def) }) });
+  }
 
   items.push({ label: "", separator: true });
   items.push({ label: "Settings & tools", kind: "heading" });
