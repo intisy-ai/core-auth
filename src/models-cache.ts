@@ -56,6 +56,7 @@ export function writeModelCache(providerId, entry) {
 export async function resolveProviderModels(def, ctx, nowMs) {
   const providerId = def.id;
   let catalog = null;   // { models, ranking, defaultModelId }
+  let source = null;    // "live" (fetched now) | "static" (shipped fallback list)
 
   // 1. live fetch — providers that implement fetchModels and have an account
   if (typeof def.fetchModels === "function" && ctx && ctx.hasAccounts) {
@@ -63,6 +64,7 @@ export async function resolveProviderModels(def, ctx, nowMs) {
       const result = await def.fetchModels(ctx);
       if (result && result.models && Object.keys(result.models).length > 0) {
         catalog = { models: result.models, ranking: result.ranking || Object.keys(result.models), defaultModelId: result.defaultModelId };
+        source = "live";
       }
     } catch (e) {
       log("fetchModels failed for " + providerId + ": " + e);
@@ -72,6 +74,7 @@ export async function resolveProviderModels(def, ctx, nowMs) {
   //    to declaration order (the manual/catalog order; also the leaderboard input).
   if (!catalog && def.models && Object.keys(def.models).length > 0) {
     catalog = { models: def.models, ranking: Object.keys(def.models) };
+    source = "static";
   }
   // 3. last good cache; else empty (a fetch-only provider before first login)
   if (!catalog) {
@@ -96,6 +99,7 @@ export async function resolveProviderModels(def, ctx, nowMs) {
     models: catalog.models,
     ranking: catalog.ranking,
     defaultModelId: catalog.defaultModelId,
+    source: source || prev.source || "static",   // live vs static-fallback, for the UI badge
     sorts: prev.sorts || [],
     sortOrders: prev.sortOrders || {},
     fetchedAt: nowMs || 0,

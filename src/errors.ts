@@ -22,8 +22,13 @@ export function chatError(message, opts) {
   const payload = o.format === "gemini"
     ? { error: { code: status, message, status: o.geminiStatus || (status === 429 ? "RESOURCE_EXHAUSTED" : "INVALID_ARGUMENT") } }
     : { type: "error", error: { type: o.type || "invalid_request_error", message } };
-  return new Response(
-    JSON.stringify(payload),
-    { status, headers: { "content-type": "application/json", "x-hub-chat-error": "1" } },
-  );
+  const headers = { "content-type": "application/json", "x-hub-chat-error": "1" };
+  // Mark rate-limit exhaustion so the loader proxy can advance to the next fallback
+  // model instead of surfacing this as terminal — and carry the reset so the proxy's
+  // final (all-fallbacks-exhausted) message is consistent across providers.
+  if (o.rateLimited) {
+    headers["x-hub-rate-limited"] = "1";
+    if (typeof o.retryAfterMs === "number" && o.retryAfterMs > 0) headers["x-hub-retry-after-ms"] = String(Math.round(o.retryAfterMs));
+  }
+  return new Response(JSON.stringify(payload), { status, headers });
 }

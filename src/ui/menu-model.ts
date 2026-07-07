@@ -59,6 +59,15 @@ function modelName(providerId, id) {
   return (m && m.name) || id;
 }
 
+// Where the current catalog came from: a live fetch (def.fetchModels) vs the
+// provider's shipped static fallback list. Shown so users know if a model list is
+// dynamically fetched or the built-in default.
+function catalogSourceLabel(providerId) {
+  const cache = readModelCache(providerId);
+  if (!cache || !cache.source) return "";
+  return cache.source === "live" ? "live fetch" : "static fallback";
+}
+
 // ---- Auto editor (model ranking) -------------------------------------------
 
 function buildAutoModelEdit(def, id) {
@@ -102,9 +111,11 @@ export function buildAutoMenu(def) {
     const inc = !excluded.includes(id);
     items.push({ label: (inc ? "[x] " : "[ ] ") + (i + 1) + ". " + modelName(providerId, id), hint: inc ? "" : "excluded", run: () => ({ push: () => buildAutoModelEdit(def, id) }) });
   });
-  const sub = source === "manual"
+  const srcLabel = catalogSourceLabel(providerId);
+  const sub = (source === "manual"
     ? "Tries these top-to-bottom, skipping rate-limited ones. Enter a model to reorder/include."
-    : "Order is automatic (" + current.label + "). Enter a model to include/exclude.";
+    : "Order is automatic (" + current.label + "). Enter a model to include/exclude.")
+    + (srcLabel ? " · models: " + srcLabel : "");
   return { title: def.label + " — Auto model ranking", subtitle: sub, items };
 }
 
@@ -128,7 +139,8 @@ function buildModelsBrowse(def) {
     run: () => ({ input: { title: "Search models", message: "Filter by name or id (empty to clear)", complete: (v) => { browseQuery = v || ""; return { refresh: true }; } } }) });
   if (browseQuery) items.push({ label: "Clear search", run: () => { browseQuery = ""; return { refresh: true }; } });
   items.push({ label: "", separator: true });
-  items.push({ label: "Models (" + matches.length + (browseQuery ? " match" + (matches.length === 1 ? "" : "es") : "") + ")", kind: "heading" });
+  const src = catalogSourceLabel(providerId);
+  items.push({ label: "Models (" + matches.length + (browseQuery ? " match" + (matches.length === 1 ? "" : "es") : "") + ")" + (src ? " · " + src : ""), kind: "heading" });
   if (!matches.length) items.push({ label: browseQuery ? "No models match." : "No models — Refresh models or log in.", kind: "note" });
   for (const id of matches) {
     items.push({ label: modelName(providerId, id), hint: id, run: () => ({ push: () => buildAutoModelEdit(def, id) }) });
