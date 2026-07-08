@@ -108,7 +108,7 @@ export function buildAutoMenu(def) {
   // Re-fetch the catalog and RECOMPUTE the sort orders (leaderboard etc.) in place — the
   // displayed order is the cached sortOrders, so without this the list only updates on an
   // app restart / login. Rebuilds the menu (refresh) so the new order shows immediately.
-  items.push({ label: "Refresh models", color: "cyan", suspend: true, run: async () => { try { await refreshModels(def); } catch {} return { refresh: true }; } });
+  items.push({ label: "Refresh models", color: "cyan", suspend: true, run: async () => { var msg; try { var c = await refreshModels(def); var n = c ? Object.keys(c).length : 0; msg = n > 0 ? ("Models refreshed (" + n + ")") : "No models returned. Log in first?"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } });
   if (sources.length > 1) {
     items.push({
       label: "Sort: " + current.label, color: "cyan",
@@ -365,7 +365,7 @@ export function buildAccountMenu(def) {
     items.push({ label: "Models", kind: "heading" });
     items.push({ label: "Browse models", hint: "view + search", color: "cyan", run: () => { browseQuery = ""; return { push: () => buildModelsBrowse(def) }; } });
     items.push({ label: "Configure Auto models", hint: "ranking / include-exclude", color: "cyan", run: () => ({ push: () => buildAutoMenu(def) }) });
-    items.push({ label: "Refresh models", color: "cyan", suspend: true, run: async () => { try { await refreshModels(def); } catch {} return { refresh: true }; } });
+    items.push({ label: "Refresh models", color: "cyan", suspend: true, run: async () => { var msg; try { var c = await refreshModels(def); var n = c ? Object.keys(c).length : 0; msg = n > 0 ? ("Models refreshed (" + n + ")") : "No models returned. Log in first?"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } });
   }
 
   items.push({ label: "", separator: true });
