@@ -160,31 +160,49 @@ function baseKeyFromName(text: string): string {
  * order between different models. With no live data (offline, no cache) the catalog
  * order is preserved (variants still effort-ordered within a base) — never fabricated.
  */
+// version-tolerant score lookup for a normalized base key: exact/substring base-key
+// match wins; else a digit-stripped FAMILY match so "Claude Opus 4.6" still ranks by
+// the live opus family even if OpenRouter only lists Opus 4.8. -1 = no live score.
+function scoreForKey(key: string, scores: Score[]): number {
+  if (!scores.length) return -1;
+  const stripVer = (n: string): string => n.replace(/[0-9]+/g, "");
+  let best = -1;
+  for (const s of scores) {
+    if (s.norm === key || s.norm.includes(key) || key.includes(s.norm)) best = Math.max(best, s.score);
+  }
+  if (best >= 0) return best;
+  const fk = stripVer(key);
+  if (fk.length < 4) return -1;
+  for (const s of scores) {
+    const fs = stripVer(s.norm);
+    if (fs && (fs === fk || fs.includes(fk) || fk.includes(fs))) best = Math.max(best, s.score);
+  }
+  return best;
+}
+
+// Per-model live quality scores { id: number } for the given catalog ids (only ids
+// with a live score are included). Used to DISPLAY the score next to models; the
+// caller persists it in the model cache so both the provider browser and the loader's
+// mapping picker can show it without re-fetching.
+export async function computeLeaderboardScores(
+  candidateIds: string[],
+  nameOf: (id: string) => string = (id) => id,
+): Promise<Record<string, number>> {
+  const scores = await getScores();
+  const out: Record<string, number> = {};
+  for (const id of candidateIds) {
+    const s = scoreForKey(baseKeyFromName(nameOf(id)), scores);
+    if (s >= 0) out[id] = s;
+  }
+  return out;
+}
+
 export async function computeLeaderboardOrder(
   candidateIds: string[],
   nameOf: (id: string) => string = (id) => id,
 ): Promise<string[]> {
   const scores = await getScores();
-  const stripVer = (n: string): string => n.replace(/[0-9]+/g, "");
-
-  // version-tolerant: exact/substring base-key match wins; else a digit-stripped FAMILY
-  // match so "Claude Opus 4.6" still ranks by the live opus family even if OpenRouter
-  // only lists Opus 4.8. -1 = no live score for this model.
-  const scoreFor = (key: string): number => {
-    if (!scores.length) return -1;
-    let best = -1;
-    for (const s of scores) {
-      if (s.norm === key || s.norm.includes(key) || key.includes(s.norm)) best = Math.max(best, s.score);
-    }
-    if (best >= 0) return best;
-    const fk = stripVer(key);
-    if (fk.length < 4) return -1;
-    for (const s of scores) {
-      const fs = stripVer(s.norm);
-      if (fs && (fs === fk || fs.includes(fk) || fk.includes(fs))) best = Math.max(best, s.score);
-    }
-    return best;
-  };
+  const scoreFor = (key: string): number => scoreForKey(key, scores);
 
   const scored = candidateIds.map((id, i) => {
     const name = nameOf(id);

@@ -113,7 +113,7 @@ export function buildAutoMenu(def) {
   // Re-fetch the catalog and RECOMPUTE the sort orders (leaderboard etc.) in place — the
   // displayed order is the cached sortOrders, so without this the list only updates on an
   // app restart / login. Rebuilds the menu (refresh) so the new order shows immediately.
-  items.push({ label: "Refresh models", color: "cyan", suspend: true, run: async () => { var msg; try { var c = await refreshModels(def); var n = c ? Object.keys(c).length : 0; msg = n > 0 ? ("Models refreshed (" + n + ")") : "No models returned. Log in first?"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } });
+  items.push({ label: "Refresh models", color: "cyan", run: async () => { var msg; try { var c = await refreshModels(def); var n = c ? Object.keys(c).length : 0; msg = n > 0 ? ("Models refreshed (" + n + ")") : "No models returned. Log in first?"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } });
   if (sources.length > 1) {
     items.push({
       label: "Sort: " + current.label, color: "cyan",
@@ -158,8 +158,11 @@ function buildModelsBrowse(def) {
   const src = catalogSourceLabel(providerId);
   items.push({ label: "Models (" + matches.length + (browseQuery ? " match" + (matches.length === 1 ? "" : "es") : "") + ")" + (src ? " · " + src : ""), kind: "heading" });
   if (!matches.length) items.push({ label: browseQuery ? "No models match." : "No models — log in or Refresh to fetch this provider's catalog.", kind: "note" });
+  const scores = (cat && cat.scores) || {};
   for (const id of matches) {
-    items.push({ label: (models[id] && models[id].name) || id, hint: id, run: () => ({ push: () => buildAutoModelEdit(def, id) }) });
+    // hint carries the leaderboard quality score (when known) + the raw id
+    const s = typeof scores[id] === "number" ? "score " + Math.round(scores[id]) + " · " : "";
+    items.push({ label: (models[id] && models[id].name) || id, hint: s + id, run: () => ({ push: () => buildAutoModelEdit(def, id) }) });
   }
   return { title: def.label + " — Models", subtitle: "Browse + search this provider's models · Enter a model to include/exclude", items };
 }
@@ -225,7 +228,9 @@ function buildQuotaMenu(def) {
   const controller = def.accounts;
   const views = controller.list();
   const items = [{ label: "Back", run: () => ({ pop: true }) }];
-  if (typeof controller.refreshQuota === "function") items.push({ label: "Refresh quotas", color: "cyan", suspend: true, run: async () => { try { await controller.refreshQuota(true); } catch {} return { refresh: true }; } });
+  // Non-suspend: a quota refetch needs no terminal, so it refreshes the menu IN PLACE
+  // (with a flash) instead of dropping out of the TUI and closing the account menu.
+  if (typeof controller.refreshQuota === "function") items.push({ label: "Refresh quotas", color: "cyan", run: async () => { var msg; try { await controller.refreshQuota(true); msg = "Quota refreshed"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } });
   items.push({ label: "", separator: true });
   pushQuotaArea(items, def, views);
   // Provider-supplied footnote (e.g. a pool whose quota the API doesn't report) —
@@ -371,7 +376,7 @@ export function buildAccountMenu(def) {
     items.push({ label: "Browse models", hint: "view + search", color: "cyan", run: () => { browseQuery = ""; return { push: () => buildModelsBrowse(def) }; } });
     items.push({ label: "Configure Auto models", hint: "ranking / include-exclude", color: "cyan", run: () => ({ push: () => buildAutoMenu(def) }) });
     // Refresh does a LIVE fetch, which needs an account — only offer it once logged in.
-    if (views.length > 0) items.push({ label: "Refresh models", color: "cyan", suspend: true, run: async () => { var msg; try { var c = await refreshModels(def); var n = c ? Object.keys(c).length : 0; msg = n > 0 ? ("Models refreshed (" + n + ")") : "No models returned. Log in first?"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } });
+    if (views.length > 0) items.push({ label: "Refresh models", color: "cyan", run: async () => { var msg; try { var c = await refreshModels(def); var n = c ? Object.keys(c).length : 0; msg = n > 0 ? ("Models refreshed (" + n + ")") : "No models returned. Log in first?"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } });
   }
 
   items.push({ label: "", separator: true });

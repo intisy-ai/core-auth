@@ -88,8 +88,8 @@ export async function refreshModels(def, forceOpencodeMerge = false): Promise<Re
     if (cache) {
       const catalogModels = (cache.models || models || {}) as Record<string, { name?: string }>;
       const nameOf = (id: string) => (catalogModels[id] && catalogModels[id].name) || id;
-      const { sorts, sortOrders } = await computeSorts(def, cache.ranking || [], nameOf);
-      writeModelCache(def.id, { ...cache, sorts, sortOrders });
+      const { sorts, sortOrders, scores } = await computeSorts(def, cache.ranking || [], nameOf);
+      writeModelCache(def.id, { ...cache, sorts, sortOrders, scores });
     }
     if (forceOpencodeMerge || isOpencodeHost()) mergeModels(def.opencodeProvider || "anthropic", models, def.opencodeNpm);
   } catch (e) { log("model refresh/merge failed: " + e); }

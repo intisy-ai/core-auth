@@ -27,7 +27,7 @@ function readAll() {
   return {};
 }
 
-// returns { models, ranking, defaultModelId, fetchedAt, sorts, sortOrders } | null
+// returns { models, ranking, defaultModelId, fetchedAt, sorts, sortOrders, scores } | null
 // NOTE: derived fields (sorts/sortOrders) are returned AS CACHED — we do NOT wipe them
 // on read. Wiping would hide still-valid sources (e.g. leaderboard) until the next
 // refresh. Stale RETIRED sources are filtered surgically in config.getAutoSources by id.
@@ -102,6 +102,7 @@ export async function resolveProviderModels(def, ctx, nowMs) {
     source: source || prev.source || "static",   // live vs static-fallback, for the UI badge
     sorts: prev.sorts || [],
     sortOrders: prev.sortOrders || {},
+    scores: prev.scores || {},
     fetchedAt: nowMs || 0,
   });
   return catalog.models;
