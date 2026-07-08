@@ -13,10 +13,12 @@ export function openBrowser(url) {
     if (platform === "win32") {
       // NOT `cmd /c start` — cmd treats & as a command separator and %xx as env-var
       // expansion, so an OAuth URL (full of & and %) gets truncated and the browser
-      // opens a DIFFERENT url than the one we display. PowerShell Start-Process with a
-      // single-quoted url is fully literal, so the exact url reaches the browser.
+      // opens a DIFFERENT url. Pass the whole `Start-Process '<url>'` command to
+      // PowerShell as a base64 -EncodedCommand (UTF-16LE): this bypasses ALL argv/shell
+      // quoting, so the exact url — & and %xx intact — reaches the default browser.
+      const psCmd = "Start-Process '" + String(url).replace(/'/g, "''") + "'";
       command = "powershell";
-      args = ["-NoProfile", "-NonInteractive", "-Command", "Start-Process", "'" + String(url).replace(/'/g, "''") + "'"];
+      args = ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(psCmd, "utf16le").toString("base64")];
     } else {
       command = platform === "darwin" ? "open" : "xdg-open";
       args = [url];

@@ -48,6 +48,38 @@ function buildProxyMenu() {
   return { title: "Proxies", subtitle: "mode: " + mode + " · Esc to go back", items };
 }
 
+// Per-account proxy selection as a NATIVE menu model (rendered in-tab). Replaces the
+// old suspend selectAccountProxies() which dropped into a raw-terminal picker that
+// fought the loader's own input loop and froze the TUI. Toggle which proxies this
+// account uses; add a new global proxy; refresh the provider-sourced list.
+function fmtProxyScore(n) { return typeof n === "number" ? n.toFixed(2) : "?"; }
+function buildAccountProxyMenu(accountId) {
+  const selected = new Set(proxyManager.getAccountSelection(accountId));
+  const all = proxyManager.accountProxies(accountId) || [];
+  const items = [
+    { label: "Back", run: () => ({ pop: true }) },
+    { label: "Add proxy", color: "green", run: () => ({ input: { title: "Proxy URL", message: "host:port or http://… (added for all accounts, enabled here)", complete: (url) => { if (url) { const clean = proxyManager.addManual(url); proxyManager.setAccountSelection(accountId, [...selected, clean]); } return { refresh: true }; } } }) },
+    { label: "Refresh from providers", color: "cyan", run: async () => { var msg; try { const n = await proxyManager.refresh(); msg = "Fetched " + n + " proxies"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } },
+    { label: "", separator: true },
+  ];
+  if (!all.length) items.push({ label: "No proxies yet — add one or refresh from providers.", kind: "note" });
+  for (const p of all) {
+    const owned = p.owner === accountId;
+    const on = owned || selected.has(p.url);
+    items.push({
+      label: (on ? "[x] " : "[ ] ") + p.url + (owned ? " (this account)" : ""),
+      hint: p.provider + " · score " + fmtProxyScore(p.score), color: on ? "green" : undefined,
+      run: () => {
+        if (owned) return { refresh: true };   // account-owned proxies are always on
+        if (selected.has(p.url)) selected.delete(p.url); else selected.add(p.url);
+        proxyManager.setAccountSelection(accountId, [...selected]);
+        return { refresh: true };
+      },
+    });
+  }
+  return { title: "Proxies for " + accountId, subtitle: "[x] = used by this account · Esc to go back", items };
+}
+
 const STATUS = {
   active: "[active]", "rate-limited": "[rate-limited]", "cooling-down": "[cooling]",
   "verification-required": "[needs verification]", disabled: "[disabled]",
@@ -123,9 +155,12 @@ export function buildAutoMenu(def) {
   if (source === "manual") items.push({ label: "Reset to default order", color: "yellow", run: () => { setAutoConfig(providerId, { order: [] }); return { refresh: true }; } });
   items.push({ label: "", separator: true });
   items.push({ label: "Models (top = preferred)", kind: "heading" });
+  const autoScores = (catalogFor(def) && catalogFor(def).scores) || {};
   order.forEach((id, i) => {
     const inc = !excluded.includes(id);
-    items.push({ label: (inc ? "[x] " : "[ ] ") + (i + 1) + ". " + modelName(providerId, id), hint: inc ? "" : "excluded", run: () => ({ push: () => buildAutoModelEdit(def, id) }) });
+    const s = typeof autoScores[id] === "number" ? "score " + Math.round(autoScores[id]) : "";
+    const hint = [inc ? "" : "excluded", s].filter(Boolean).join(" · ");
+    items.push({ label: (inc ? "[x] " : "[ ] ") + (i + 1) + ". " + modelName(providerId, id), hint, run: () => ({ push: () => buildAutoModelEdit(def, id) }) });
   });
   const srcLabel = catalogSourceLabel(providerId);
   const sub = (source === "manual"
@@ -180,7 +215,7 @@ function buildAccountDetail(def, view) {
   if (bars.length) { items.push({ label: "Quota", kind: "heading" }); for (const bar of bars) items.push(bar); items.push({ label: "", separator: true }); }
   items.push({ label: "Back", run: () => ({ pop: true }) });
   items.push({ label: view.enabled === false ? "Enable" : "Disable", color: view.enabled === false ? "green" : "yellow", run: () => { controller.enable(view.id, view.enabled === false); return { pop: true }; } });
-  if (proxies) items.push({ label: "Select proxies", color: "cyan", suspend: true, run: async () => { await selectAccountProxies(view.id); return { pop: true }; } });
+  if (proxies) items.push({ label: "Select proxies", hint: "which proxies this account uses", color: "cyan", run: () => ({ push: () => buildAccountProxyMenu(view.id) }) });
   extra.forEach((a) => items.push({ label: a.label, color: a.color || "cyan", suspend: true, run: async () => { try { await a.run(); } catch {} return { pop: true }; } }));
   items.push({ label: "Remove", color: "red", suspend: true, run: async () => { if (await confirm(`Remove ${label}?`)) { controller.remove(view.id); return { pop: true }; } return { refresh: true }; } });
   return { title: label + (STATUS[view.status] ? " " + STATUS[view.status] : ""), items };
