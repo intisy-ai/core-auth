@@ -36,7 +36,7 @@ function buildProxyMenu() {
     { label: "Back", run: () => ({ pop: true }) },
     { label: "Mode: " + mode, color: "cyan", run: () => { const order = ["automatic", "manual", "disabled"]; const i = order.indexOf(mode); proxyManager.setMode(order[(i + 1) % order.length]); return { refresh: true }; } },
     { label: "Add proxy", color: "green", run: () => ({ input: { title: "Proxy URL", message: "Enter a proxy (host:port or http://...)", complete: (url) => { proxyManager.addManual(url); return { refresh: true }; } } }) },
-    { label: "Refresh from providers", color: "cyan", suspend: true, run: async () => { try { await proxyManager.refresh(); } catch {} return { refresh: true }; } },
+    { label: "Refresh from providers", color: "cyan", run: async () => { var msg; try { const n = await proxyManager.refresh(); msg = "Fetched " + n + " proxies"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } },
   ];
   for (const provider of Object.keys(grouped)) {
     const list = grouped[provider] || [];
@@ -206,6 +206,9 @@ function buildModelsBrowse(def) {
 
 function buildAccountDetail(def, view) {
   const controller = def.accounts;
+  // Re-fetch the live view each rebuild so a Refresh quota / token action updates the
+  // bars in place (the pushed builder captured the original snapshot).
+  view = (typeof controller.list === "function" && controller.list().find((v) => v.id === view.id)) || view;
   const proxies = !!def.proxies;
   const label = view.email || view.id;
   const extra = typeof controller.accountActions === "function" ? controller.accountActions(view) : [];
@@ -215,8 +218,10 @@ function buildAccountDetail(def, view) {
   if (bars.length) { items.push({ label: "Quota", kind: "heading" }); for (const bar of bars) items.push(bar); items.push({ label: "", separator: true }); }
   items.push({ label: "Back", run: () => ({ pop: true }) });
   items.push({ label: view.enabled === false ? "Enable" : "Disable", color: view.enabled === false ? "green" : "yellow", run: () => { controller.enable(view.id, view.enabled === false); return { pop: true }; } });
-  if (proxies) items.push({ label: "Select proxies", hint: "which proxies this account uses", color: "cyan", run: () => ({ push: () => buildAccountProxyMenu(view.id) }) });
-  extra.forEach((a) => items.push({ label: a.label, color: a.color || "cyan", suspend: true, run: async () => { try { await a.run(); } catch {} return { pop: true }; } }));
+  if (proxies) items.push({ label: "Select proxies", color: "cyan", run: () => ({ push: () => buildAccountProxyMenu(view.id) }) });
+  // Provider account actions (Verify / Refresh token / Refresh quota) are network calls —
+  // run in-tab (non-suspend) with a result flash, staying on this menu so the bars refresh.
+  extra.forEach((a) => items.push({ label: a.label, color: a.color || "cyan", run: async () => { try { await a.run(); return { refresh: true, flash: (a.label || "Done") + " ✓" }; } catch (e) { return { refresh: true, flash: "Failed: " + (e && e.message || e) }; } } }));
   items.push({ label: "Remove", color: "red", suspend: true, run: async () => { if (await confirm(`Remove ${label}?`)) { controller.remove(view.id); return { pop: true }; } return { refresh: true }; } });
   return { title: label + (STATUS[view.status] ? " " + STATUS[view.status] : ""), items };
 }
@@ -301,7 +306,7 @@ function buildManageMenu(def) {
   if (extraActions.length) {
     items.push({ label: "", separator: true });
     items.push({ label: "Accounts", kind: "heading" });
-    extraActions.forEach((a) => items.push({ label: a.label, color: a.color || "cyan", suspend: true, run: async () => { try { await a.run(); } catch (e) { process.stderr.write(String(e) + "\n"); } return { refresh: true }; } }));
+    extraActions.forEach((a) => items.push({ label: a.label, color: a.color || "cyan", run: async () => { try { await a.run(); return { refresh: true, flash: (a.label || "Done") + " ✓" }; } catch (e) { return { refresh: true, flash: "Failed: " + (e && e.message || e) }; } } }));
   }
   return { title: def.label + " — Manage", subtitle: "Esc to go back", items };
 }

@@ -10,20 +10,21 @@ export function openBrowser(url) {
   try {
     const platform = process.platform;
     let command, args;
+    const spawnOpts = { detached: true, stdio: "ignore" };
     if (platform === "win32") {
-      // NOT `cmd /c start` — cmd treats & as a command separator and %xx as env-var
-      // expansion, so an OAuth URL (full of & and %) gets truncated and the browser
-      // opens a DIFFERENT url. Pass the whole `Start-Process '<url>'` command to
-      // PowerShell as a base64 -EncodedCommand (UTF-16LE): this bypasses ALL argv/shell
-      // quoting, so the exact url — & and %xx intact — reaches the default browser.
-      const psCmd = "Start-Process '" + String(url).replace(/'/g, "''") + "'";
-      command = "powershell";
-      args = ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(psCmd, "utf16le").toString("base64")];
+      // `cmd /c start "" "<url>"` — the SAME opener that always worked; the only bug was
+      // that an unquoted url let cmd treat & as a command separator (and %xx as env
+      // expansion), truncating the OAuth url. Passing the whole command verbatim with the
+      // url DOUBLE-QUOTED stops that: inside quotes cmd leaves & and %xx untouched, so the
+      // exact url reaches the default browser. (title arg is the empty "" before the url.)
+      command = "cmd";
+      args = ["/c", 'start "" "' + String(url).replace(/"/g, "") + '"'];
+      spawnOpts.windowsVerbatimArguments = true;
     } else {
       command = platform === "darwin" ? "open" : "xdg-open";
       args = [url];
     }
-    const child = spawn(command, args, { detached: true, stdio: "ignore" });
+    const child = spawn(command, args, spawnOpts);
     child.on("error", () => {});
     child.unref();
   } catch {}
