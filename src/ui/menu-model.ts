@@ -355,7 +355,7 @@ export function buildAccountMenu(def) {
 
   items.push({ label: "", separator: true });
   items.push({ label: "Settings & tools", kind: "heading" });
-  items.push({ label: "Manage", hint: "models · proxies · settings", color: "cyan", run: () => ({ push: () => buildManageMenu(def) }) });
+  items.push({ label: "Manage", hint: "proxies · settings", color: "cyan", run: () => ({ push: () => buildManageMenu(def) }) });
   if (views.length > 0) items.push({ label: "Delete all accounts", color: "red", suspend: true, run: async () => { if (await confirm("Delete ALL accounts? This cannot be undone.")) { for (const v of controller.list()) controller.remove(v.id); } return { refresh: true }; } });
 
   // No "Done" item — Esc backs out / exits (Done caused select() quirks + is redundant).
