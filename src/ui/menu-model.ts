@@ -65,8 +65,13 @@ function modelName(providerId, id) {
 // the provider ships no static list AND nothing has been fetched (e.g. antigravity before login).
 function catalogFor(def) {
   const cache = readModelCache(def.id);
-  if (cache && cache.models && Object.keys(cache.models).length) return cache;
-  if (def && def.models && Object.keys(def.models).length) return { models: def.models, ranking: Object.keys(def.models), source: "static" };
+  const hasStatic = !!(def && def.models && Object.keys(def.models).length);
+  // A live-fetched cache is authoritative. A "static"-sourced cache is just a shipped
+  // list written to disk in a past session — if the provider no longer ships static
+  // models, that cache is stale/false and must be ignored (don't resurrect removed
+  // hardcoded models). So only trust a cache that is live, or static when we still ship it.
+  if (cache && cache.models && Object.keys(cache.models).length && (cache.source !== "static" || hasStatic)) return cache;
+  if (hasStatic) return { models: def.models, ranking: Object.keys(def.models), source: "static" };
   return null;
 }
 
