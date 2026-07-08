@@ -59,6 +59,17 @@ function modelName(providerId, id) {
   return (m && m.name) || id;
 }
 
+// The catalog to DISPLAY: the fetched/cached list when present, otherwise the provider's
+// shipped static fallback (def.models). This lets models be browsed WITHOUT logging in —
+// only "Refresh models" (a live fetch) genuinely needs an account. Returns null only when
+// the provider ships no static list AND nothing has been fetched (e.g. antigravity before login).
+function catalogFor(def) {
+  const cache = readModelCache(def.id);
+  if (cache && cache.models && Object.keys(cache.models).length) return cache;
+  if (def && def.models && Object.keys(def.models).length) return { models: def.models, ranking: Object.keys(def.models), source: "static" };
+  return null;
+}
+
 // Where the current catalog came from: a live fetch (def.fetchModels) vs the
 // provider's shipped static fallback list. Shown so users know if a model list is
 // dynamically fetched or the built-in default.
@@ -127,9 +138,9 @@ export function buildAutoMenu(def) {
 let browseQuery = "";
 function buildModelsBrowse(def) {
   const providerId = def.id;
-  const cache = readModelCache(providerId);
-  const models = (cache && cache.models) || {};
-  const order = (cache && cache.ranking && cache.ranking.length) ? cache.ranking : Object.keys(models);
+  const cat = catalogFor(def);
+  const models = (cat && cat.models) || {};
+  const order = (cat && cat.ranking && cat.ranking.length) ? cat.ranking : Object.keys(models);
   const q = browseQuery.toLowerCase();
   const matches = order.filter((id) => models[id] && !/-auto$/.test(id)
     && (!q || (id + " " + ((models[id] && models[id].name) || "")).toLowerCase().indexOf(q) >= 0));
@@ -141,9 +152,9 @@ function buildModelsBrowse(def) {
   items.push({ label: "", separator: true });
   const src = catalogSourceLabel(providerId);
   items.push({ label: "Models (" + matches.length + (browseQuery ? " match" + (matches.length === 1 ? "" : "es") : "") + ")" + (src ? " · " + src : ""), kind: "heading" });
-  if (!matches.length) items.push({ label: browseQuery ? "No models match." : "No models — Refresh models or log in.", kind: "note" });
+  if (!matches.length) items.push({ label: browseQuery ? "No models match." : "No models — log in or Refresh to fetch this provider's catalog.", kind: "note" });
   for (const id of matches) {
-    items.push({ label: modelName(providerId, id), hint: id, run: () => ({ push: () => buildAutoModelEdit(def, id) }) });
+    items.push({ label: (models[id] && models[id].name) || id, hint: id, run: () => ({ push: () => buildAutoModelEdit(def, id) }) });
   }
   return { title: def.label + " — Models", subtitle: "Browse + search this provider's models · Enter a model to include/exclude", items };
 }
@@ -339,13 +350,17 @@ export function buildAccountMenu(def) {
   }
   items.push(addAccount);
 
-  items.push({ label: "", separator: true });
-  items.push({ label: "Usage", kind: "heading" });
-  items.push({ label: "Quota", hint: "all-account graphs", color: "cyan", run: () => ({ push: () => buildQuotaMenu(def) }) });
+  // Quota is per-account, so it only makes sense once you're logged in — gate on accounts
+  // (unlike Models, which are browsable from the static catalog without an account).
+  if (views.length > 0) {
+    items.push({ label: "", separator: true });
+    items.push({ label: "Usage", kind: "heading" });
+    items.push({ label: "Quota", hint: "all-account graphs", color: "cyan", run: () => ({ push: () => buildQuotaMenu(def) }) });
+  }
 
   // Models live directly on the provider menu (one place, not duplicated in Manage):
   // Browse (view + search the full catalog), Configure Auto models (ranking), Refresh.
-  if (readModelCache(def.id)) {
+  if (catalogFor(def)) {
     items.push({ label: "", separator: true });
     items.push({ label: "Models", kind: "heading" });
     items.push({ label: "Browse models", hint: "view + search", color: "cyan", run: () => { browseQuery = ""; return { push: () => buildModelsBrowse(def) }; } });
