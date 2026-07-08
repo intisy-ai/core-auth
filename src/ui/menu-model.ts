@@ -370,7 +370,8 @@ export function buildAccountMenu(def) {
     items.push({ label: "Models", kind: "heading" });
     items.push({ label: "Browse models", hint: "view + search", color: "cyan", run: () => { browseQuery = ""; return { push: () => buildModelsBrowse(def) }; } });
     items.push({ label: "Configure Auto models", hint: "ranking / include-exclude", color: "cyan", run: () => ({ push: () => buildAutoMenu(def) }) });
-    items.push({ label: "Refresh models", color: "cyan", suspend: true, run: async () => { var msg; try { var c = await refreshModels(def); var n = c ? Object.keys(c).length : 0; msg = n > 0 ? ("Models refreshed (" + n + ")") : "No models returned. Log in first?"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } });
+    // Refresh does a LIVE fetch, which needs an account — only offer it once logged in.
+    if (views.length > 0) items.push({ label: "Refresh models", color: "cyan", suspend: true, run: async () => { var msg; try { var c = await refreshModels(def); var n = c ? Object.keys(c).length : 0; msg = n > 0 ? ("Models refreshed (" + n + ")") : "No models returned. Log in first?"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } });
   }
 
   items.push({ label: "", separator: true });
