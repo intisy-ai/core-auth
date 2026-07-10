@@ -5,13 +5,12 @@
 // loader show the exact same content/logic as `oc auth login` without duplicating it.
 //
 // An item's run() returns a navigation action the renderer interprets:
-//   { push: Menu }  open a submenu      { pop: true }  go back
+//   { push: Menu }  open a submenu      { pop: true|n }  go back (n levels)
 //   { close: true } exit the whole menu { refresh: true } rebuild current menu
 //   (void)          stay (renderer rebuilds the menu to reflect changed state)
-// Items with `suspend: true` need a clean terminal (login, proxy pickers, confirm
-// prompts); the loader renderer runs those via runBlocking, select() runs inline.
+// Items with `suspend: true` need a clean terminal (login, proxy pickers); the
+// loader renderer runs those via runBlocking, select() runs inline.
 
-import { confirm } from "./confirm.js";
 import { proxyManager } from "../proxy/manager.js";
 import { selectAccountProxies } from "./proxy-menu.js";
 import { getAutoConfig, setAutoConfig } from "../config.js";
@@ -19,13 +18,27 @@ import { readModelCache } from "../models-cache.js";
 import { buildLoginInput } from "./url-auth.js";
 import { buildSettingsMenu } from "./settings-menu.js";
 import { refreshModels } from "../refresh.js";
+import { leaderboardSourceShort } from "../leaderboard.js";
+
+// ---- Confirmation (in-tab) ---------------------------------------------------
+
+// In-tab Yes/No menu replacing the terminal confirm() prompt for destructive
+// actions: a raw-stdin prompt can't run while the loader TUI owns the terminal
+// (it froze), and a submenu keeps the flash/spinner feedback. popAfter = levels
+// to unwind on Yes (2 = this confirm + the menu whose subject was just deleted).
+function buildConfirmMenu(question, onYes, popAfter = 2) {
+  return { title: question, items: [
+    { label: "Cancel", run: () => ({ pop: true }) },
+    { label: "Yes", color: "red", run: async () => { await onYes(); return { pop: popAfter }; } },
+  ] };
+}
 
 // ---- Proxy menu (native model) ---------------------------------------------
 
 function buildProxyDetail(url) {
   return { title: url, items: [
     { label: "Back", run: () => ({ pop: true }) },
-    { label: "Remove this proxy", color: "red", suspend: true, run: async () => { if (await confirm("Remove " + url + "?")) { proxyManager.remove(url); return { pop: true }; } return { refresh: true }; } },
+    { label: "Remove this proxy", color: "red", run: () => ({ push: () => buildConfirmMenu("Remove " + url + "?", () => proxyManager.remove(url)) }) },
   ] };
 }
 
@@ -155,10 +168,12 @@ export function buildAutoMenu(def) {
   if (source === "manual") items.push({ label: "Reset to default order", color: "yellow", run: () => { setAutoConfig(providerId, { order: [] }); return { refresh: true }; } });
   items.push({ label: "", separator: true });
   items.push({ label: "Models (top = preferred)", kind: "heading" });
-  const autoScores = (catalogFor(def) && catalogFor(def).scores) || {};
+  const autoCat = catalogFor(def) || {};
+  const autoScores = autoCat.scores || {};
+  const autoTag = leaderboardSourceShort(autoCat.scoreSource || "");
   order.forEach((id, i) => {
     const inc = !excluded.includes(id);
-    const s = typeof autoScores[id] === "number" ? "score " + Math.round(autoScores[id]) : "";
+    const s = typeof autoScores[id] === "number" ? "score " + Math.round(autoScores[id]) + (autoTag ? " · " + autoTag : "") : "";
     const hint = [inc ? "" : "excluded", s].filter(Boolean).join(" · ");
     items.push({ label: (inc ? "[x] " : "[ ] ") + (i + 1) + ". " + modelName(providerId, id), hint, run: () => ({ push: () => buildAutoModelEdit(def, id) }) });
   });
@@ -166,7 +181,8 @@ export function buildAutoMenu(def) {
   const sub = (source === "manual"
     ? "Tries these top-to-bottom, skipping rate-limited ones. Enter a model to reorder/include."
     : "Order is automatic (" + current.label + "). Enter a model to include/exclude.")
-    + (srcLabel ? " · models: " + srcLabel : "");
+    + (srcLabel ? " · models: " + srcLabel : "")
+    + (autoCat.scoreSource ? " · scores: " + autoCat.scoreSource : "");
   return { title: def.label + " — Auto model ranking", subtitle: sub, items };
 }
 
@@ -194,12 +210,14 @@ function buildModelsBrowse(def) {
   items.push({ label: "Models (" + matches.length + (browseQuery ? " match" + (matches.length === 1 ? "" : "es") : "") + ")" + (src ? " · " + src : ""), kind: "heading" });
   if (!matches.length) items.push({ label: browseQuery ? "No models match." : "No models — log in or Refresh to fetch this provider's catalog.", kind: "note" });
   const scores = (cat && cat.scores) || {};
+  const scoreTag = leaderboardSourceShort((cat && cat.scoreSource) || "");
   for (const id of matches) {
-    // hint carries the leaderboard quality score (when known) + the raw id
-    const s = typeof scores[id] === "number" ? "score " + Math.round(scores[id]) + " · " : "";
+    // hint carries the leaderboard quality score + its source tag (when known) + the raw id
+    const s = typeof scores[id] === "number" ? "score " + Math.round(scores[id]) + (scoreTag ? " · " + scoreTag : "") + " · " : "";
     items.push({ label: (models[id] && models[id].name) || id, hint: s + id, run: () => ({ push: () => buildAutoModelEdit(def, id) }) });
   }
-  return { title: def.label + " — Models", subtitle: "Browse + search this provider's models · Enter a model to include/exclude", items };
+  const scoreSub = (cat && cat.scoreSource) ? " · scores: " + cat.scoreSource : "";
+  return { title: def.label + " — Models", subtitle: "Browse + search this provider's models · Enter a model to include/exclude" + scoreSub, items };
 }
 
 // ---- Account details --------------------------------------------------------
@@ -222,7 +240,7 @@ function buildAccountDetail(def, view) {
   // Provider account actions (Verify / Refresh token / Refresh quota) are network calls —
   // run in-tab (non-suspend) with a result flash, staying on this menu so the bars refresh.
   extra.forEach((a) => items.push({ label: a.label, color: a.color || "cyan", run: async () => { try { await a.run(); return { refresh: true, flash: (a.label || "Done") + " ✓" }; } catch (e) { return { refresh: true, flash: "Failed: " + (e && e.message || e) }; } } }));
-  items.push({ label: "Remove", color: "red", suspend: true, run: async () => { if (await confirm(`Remove ${label}?`)) { controller.remove(view.id); return { pop: true }; } return { refresh: true }; } });
+  items.push({ label: "Remove", color: "red", run: () => ({ push: () => buildConfirmMenu(`Remove ${label}?`, () => controller.remove(view.id)) }) });
   return { title: label + (STATUS[view.status] ? " " + STATUS[view.status] : ""), items };
 }
 
@@ -422,7 +440,7 @@ export function buildAccountMenu(def) {
   items.push({ label: "", separator: true });
   items.push({ label: "Settings & tools", kind: "heading" });
   items.push({ label: "Manage", hint: "proxies · settings", color: "cyan", run: () => ({ push: () => buildManageMenu(def) }) });
-  if (views.length > 0) items.push({ label: "Delete all accounts", color: "red", suspend: true, run: async () => { if (await confirm("Delete ALL accounts? This cannot be undone.")) { for (const v of controller.list()) controller.remove(v.id); } return { refresh: true }; } });
+  if (views.length > 0) items.push({ label: "Delete all accounts", color: "red", run: () => ({ push: () => buildConfirmMenu("Delete ALL accounts? This cannot be undone.", () => { for (const v of controller.list()) controller.remove(v.id); }, 1) }) });
 
   // No "Done" item — Esc backs out / exits (Done caused select() quirks + is redundant).
   // onOpen: renderers call it once on open so quota is fetched in the background and

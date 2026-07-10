@@ -42,7 +42,7 @@ export function accountControllerFromManager(manager, opts) {
         availableAt: options.availableAt ? options.availableAt(account, now) : soonestAvailable(account, now),
       }));
     },
-    enable(id, on) { manager.mutate(id, (account) => { account.enabled = !!on; }); },
+    enable(id, on) { manager.mutate(id, (account) => { account.enabled = !!on; if (on) account.disabledReason = null; }); },
     remove(id) { manager.remove(id); },
     login: options.login || (async () => null),
     refreshQuota: options.refreshQuota,

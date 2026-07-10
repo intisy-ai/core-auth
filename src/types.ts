@@ -37,7 +37,8 @@ export interface CoreAccount {
   enabled?: boolean;                  // user-disabled accounts are skipped by selection
   rateLimitResetTimes?: Record<string, number>;  // lane -> epoch ms the lane is rate-limited until
   coolingDownUntil?: number;          // epoch ms; transient backoff across all lanes
-  cooldownReason?: string | null;
+  cooldownReason?: string | null;     // transient (raw error text) — never shown in UI rows
+  disabledReason?: string | null;     // why the SYSTEM disabled the account (actionable, shown in UI)
   meta?: Record<string, unknown>;     // provider extras, opaque to the harness
 }
 

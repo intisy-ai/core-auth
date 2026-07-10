@@ -16,7 +16,7 @@ export async function runMenu(rootBuilder) {
   const apply = (a) => {
     if (!a) return;                          // stay -> rebuild
     if (a.push) stack.push(a.push);          // push provides a builder fn
-    else if (a.pop) stack.pop();
+    else if (a.pop) { const n = a.pop === true ? 1 : Math.max(1, a.pop | 0); for (let i = 0; i < n && stack.length; i++) stack.pop(); }
     else if (a.close) stack.length = 0;
   };
   let opened = false;

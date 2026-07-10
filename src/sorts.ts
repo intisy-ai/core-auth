@@ -9,7 +9,7 @@
 // computeSorts returns the available non-manual sources + their precomputed orders,
 // which get cached so editors (loader tab, oc auth menu) stay generic.
 
-import { computeLeaderboardOrder, computeLeaderboardScores } from "./leaderboard.js";
+import { computeLeaderboardOrder, computeLeaderboardScores, leaderboardSource } from "./leaderboard.js";
 import { log } from "./log.js";
 
 const BUILTIN_LABEL = { leaderboard: "Leaderboard (quality)" };
@@ -21,6 +21,7 @@ export async function computeSorts(def, ranking, nameOf = (id) => id) {
   const sorts = [];                 // [{ id, label }] — offered sources beyond manual
   const sortOrders = {};            // { id: [modelId] } — precomputed order per source
   let scores = {};                  // { id: number } — live leaderboard quality scores
+  let scoreSource = "";             // provenance of those scores (e.g. "Artificial Analysis via OpenRouter")
 
   for (const entry of (def && def.sorts) || []) {
     try {
@@ -29,6 +30,7 @@ export async function computeSorts(def, ranking, nameOf = (id) => id) {
         sorts.push({ id: "leaderboard", label: BUILTIN_LABEL.leaderboard });
         sortOrders.leaderboard = await computeLeaderboardOrder(ids, nameOf);
         scores = await computeLeaderboardScores(ids, nameOf);
+        scoreSource = await leaderboardSource();
       } else if (entry && typeof entry === "object" && entry.id && typeof entry.compute === "function") {
         sorts.push({ id: entry.id, label: entry.label || entry.id });
         const order = await entry.compute(ids);
@@ -39,5 +41,5 @@ export async function computeSorts(def, ranking, nameOf = (id) => id) {
     }
   }
 
-  return { sorts, sortOrders, scores };
+  return { sorts, sortOrders, scores, scoreSource };
 }

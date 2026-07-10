@@ -103,6 +103,7 @@ export async function resolveProviderModels(def, ctx, nowMs) {
     sorts: prev.sorts || [],
     sortOrders: prev.sortOrders || {},
     scores: prev.scores || {},
+    scoreSource: prev.scoreSource || "",
     fetchedAt: nowMs || 0,
   });
   return catalog.models;

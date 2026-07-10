@@ -71,7 +71,7 @@ export class AccountManager {
       return refreshed.access;
     } catch (error) {
       if (error instanceof TokenRefreshError && error.revoked) {
-        this.mutate(id, (a) => { a.enabled = false; a.cooldownReason = "refresh token revoked"; });
+        this.mutate(id, (a) => { a.enabled = false; a.disabledReason = "refresh token revoked"; });
       }
       throw error;
     }

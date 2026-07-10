@@ -52,6 +52,12 @@ function normalize(name: string): string {
 }
 
 type Score = { norm: string; score: number };
+type ScoreSet = { scores: Score[]; source: string };
+
+// Human-readable provenance of the score data (both routes carry Artificial
+// Analysis' intelligence index — the source says HOW we obtained it).
+const SOURCE_AA = "Artificial Analysis";
+const SOURCE_OPENROUTER = "Artificial Analysis via OpenRouter";
 
 // ---- score sources ----------------------------------------------------------
 
@@ -95,7 +101,7 @@ async function fetchAA(key: string): Promise<Score[]> {
 
 // ---- cache ------------------------------------------------------------------
 
-function readCache(): { fetchedAt: number; scores: Score[] } | null {
+function readCache(): { fetchedAt: number; scores: Score[]; source?: string } | null {
   for (const p of [cachePath(), legacyCachePath()]) {
     try {
       const raw = JSON.parse(readFileSync(p, "utf8"));
@@ -105,28 +111,39 @@ function readCache(): { fetchedAt: number; scores: Score[] } | null {
   return null;
 }
 
-function writeCache(scores: Score[]): void {
+function writeCache(scores: Score[], source: string): void {
   try {
     const p = cachePath();
     if (!existsSync(dirname(p))) mkdirSync(dirname(p), { recursive: true });
-    writeFileSync(p, JSON.stringify({ fetchedAt: Date.now(), scores }, null, 2), "utf8");
+    writeFileSync(p, JSON.stringify({ fetchedAt: Date.now(), source, scores }, null, 2), "utf8");
     try { if (existsSync(legacyCachePath())) rmSync(legacyCachePath()); } catch {} // drop old core- prefixed file
   } catch (e) { log("leaderboard cache write failed: " + e); }
 }
 
 // Fresh cache -> use it. Else fetch (AA key first if set, else OpenRouter), cache, return.
 // On failure, fall back to any stale cache; finally to empty (caller keeps catalog order).
-async function getScores(): Promise<Score[]> {
+async function getScores(): Promise<ScoreSet> {
   const cached = readCache();
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached.scores;
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return { scores: cached.scores, source: cached.source || "" };
   let scores: Score[] = [];
+  let source = "";
   try {
     const key = apiKey();
-    if (key) scores = await fetchAA(key);
-    if (!scores.length) scores = await fetchOpenRouter();
+    if (key) { scores = await fetchAA(key); source = SOURCE_AA; }
+    if (!scores.length) { scores = await fetchOpenRouter(); source = SOURCE_OPENROUTER; }
   } catch (e) { log("leaderboard fetch failed: " + e); }
-  if (scores.length) { writeCache(scores); return scores; }
-  return cached ? cached.scores : [];
+  if (scores.length) { writeCache(scores, source); return { scores, source }; }
+  return cached ? { scores: cached.scores, source: cached.source || "" } : { scores: [], source: "" };
+}
+
+// Full name of the source backing the current scores ("" when no data yet).
+export async function leaderboardSource(): Promise<string> {
+  return (await getScores()).source;
+}
+
+// Compact tag for row hints ("score 50 · AA"); full name goes in a subtitle.
+export function leaderboardSourceShort(source: string): string {
+  return source ? "AA" : "";
 }
 
 // ---- public order -----------------------------------------------------------
@@ -188,7 +205,7 @@ export async function computeLeaderboardScores(
   candidateIds: string[],
   nameOf: (id: string) => string = (id) => id,
 ): Promise<Record<string, number>> {
-  const scores = await getScores();
+  const { scores } = await getScores();
   const out: Record<string, number> = {};
   for (const id of candidateIds) {
     const s = scoreForKey(baseKeyFromName(nameOf(id)), scores);
@@ -201,7 +218,7 @@ export async function computeLeaderboardOrder(
   candidateIds: string[],
   nameOf: (id: string) => string = (id) => id,
 ): Promise<string[]> {
-  const scores = await getScores();
+  const { scores } = await getScores();
   const scoreFor = (key: string): number => scoreForKey(key, scores);
 
   const scored = candidateIds.map((id, i) => {
