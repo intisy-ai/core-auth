@@ -367,8 +367,12 @@ function barsFromPools(pools) {
   return pools
     .filter((p) => p && typeof p.remainingFraction === "number")
     .map((p) => {
+      // Every bar gets a Resets line: a pool without a (future) reset timestamp
+      // is an idle/rolling window that restarts on next use — say so instead of
+      // rendering nothing (which read as a glitch next to labeled siblings).
       const ms = resetToMs(p.resetTime);
-      return { kind: "bar", label: p.label, fraction: Math.max(0, Math.min(1, 1 - p.remainingFraction)), reset: Number.isFinite(ms) ? fmtReset(ms) : "" };
+      const fresh = Number.isFinite(ms) && ms > Date.now();
+      return { kind: "bar", label: p.label, fraction: Math.max(0, Math.min(1, 1 - p.remainingFraction)), reset: fresh ? fmtReset(ms) : "after next use" };
     });
 }
 
