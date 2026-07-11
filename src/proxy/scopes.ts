@@ -42,3 +42,16 @@ export function candidatesForScope(store, key, accountId, now = Date.now()) {
     .filter((p) => countAssignments(store, p.url) < MAX_ACCOUNTS_PER_PROXY && !isIpLimited(p, now))
     .sort((a, b) => scoreOf(store, a) - scoreOf(store, b));
 }
+
+// Is a proxy the account ALREADY holds still valid to re-use in this scope? Same
+// checks as candidatesForScope MINUS the per-proxy cap — the account occupies its
+// own slot, so the cap (which gates NEW assignments) must not evict it. Without
+// this, an account on a cap-full proxy fails its own sticky check and churns (or,
+// with a one-proxy pool, deadlocks to direct).
+export function stickyUsable(store, key, url, now = Date.now()) {
+  if (effectiveMode(store, key) === "disabled") return false;
+  const p = proxiesInScope(store, key).find((x) => x.url === url);
+  if (!p || isIpLimited(p, now)) return false;
+  if (effectiveMode(store, key) === "manual" && !(store.manualSelection[key] || []).includes(url)) return false;
+  return true;
+}

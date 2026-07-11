@@ -2,7 +2,7 @@
 import { loadProxyStore, updateProxyStore } from "./store.js";
 import { fetchEnabledProxies } from "./providers.js";
 import { scoreOf, countAssignments, MAX_ACCOUNTS_PER_PROXY } from "./scoring.js";
-import { effectiveMode, resolveChain, candidatesForScope, proxiesInScope } from "./scopes.js";
+import { effectiveMode, resolveChain, candidatesForScope, proxiesInScope, stickyUsable } from "./scopes.js";
 
 export class ProxyManager {
   load() { return loadProxyStore(); }
@@ -49,9 +49,11 @@ export class ProxyManager {
     const chain = resolveChain(store, accountId, providerId);
     if (!chain.length) return null;
     const current = store.assignments[accountId];
-    // keep a sticky assignment only if it's still a usable candidate in some chain scope
+    // keep a sticky assignment if it's still usable in some chain scope — the
+    // account already holds this slot, so the per-proxy cap must NOT evict it
+    // (that would churn, or deadlock to direct with a one-proxy pool).
     if (current) {
-      for (const key of chain) if (candidatesForScope(store, key, accountId).some((p) => p.url === current)) return current;
+      for (const key of chain) if (stickyUsable(store, key, current)) return current;
     }
     for (const key of chain) {
       const cands = candidatesForScope(store, key, accountId);

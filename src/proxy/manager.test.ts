@@ -16,6 +16,22 @@ async function fresh() {
   return (await import("./manager.js")).proxyManager;
 }
 
+describe("ProxyManager sticky at cap", () => {
+  it("re-selects a held slot on a cap-full proxy instead of evicting to direct", async () => {
+    const pm = await fresh();
+    pm.setMode("default", "automatic");
+    pm.addManual("http://only", { type: "global" });   // single proxy, cap = 3
+    // three accounts fill the proxy to its cap
+    expect(pm.selectForAccount("a1", "p")).toBe("http://only");
+    expect(pm.selectForAccount("a2", "p")).toBe("http://only");
+    expect(pm.selectForAccount("a3", "p")).toBe("http://only");
+    // a1 re-selecting must keep its slot — NOT fall through to direct (null)
+    expect(pm.selectForAccount("a1", "p")).toBe("http://only");
+    // a NEW 4th account is correctly capped out -> direct
+    expect(pm.selectForAccount("a4", "p")).toBe(null);
+  });
+});
+
 describe("ProxyManager scoped selection", () => {
   it("prefers account scope, falls through to global when account all IP-limited", async () => {
     const pm = await fresh();
