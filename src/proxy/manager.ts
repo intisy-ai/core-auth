@@ -2,7 +2,7 @@
 import { loadProxyStore, updateProxyStore } from "./store.js";
 import { fetchEnabledProxies } from "./providers.js";
 import { scoreOf, countAssignments, MAX_ACCOUNTS_PER_PROXY } from "./scoring.js";
-import { scopeKey, effectiveMode, resolveChain, candidatesForScope, proxiesInScope } from "./scopes.js";
+import { effectiveMode, resolveChain, candidatesForScope, proxiesInScope } from "./scopes.js";
 
 export class ProxyManager {
   load() { return loadProxyStore(); }
@@ -81,7 +81,7 @@ export class ProxyManager {
   }
 
   reportRateLimit(url, opts) {
-    if (!opts || !opts.ipSuspected) return;   // only IP-suspected limits reflect proxy quality
+    if (!opts || opts.ipSuspected !== true) return;   // only IP-suspected limits reflect proxy quality
     updateProxyStore((s) => {
       const p = s.proxies.find((x) => x.url === url);
       if (p) { p.stats = p.stats || {}; p.stats.ipRateLimitHits = (p.stats.ipRateLimitHits || 0) + 1; p.stats.lastRateLimitAt = Date.now(); }
