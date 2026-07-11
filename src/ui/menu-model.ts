@@ -12,6 +12,7 @@
 // loader renderer runs those via runBlocking, select() runs inline.
 
 import { proxyManager } from "../proxy/manager.js";
+import { qualityLabel } from "../proxy/scoring.js";
 import { selectAccountProxies } from "./proxy-menu.js";
 import { getAutoConfig, setAutoConfig } from "../config.js";
 import { readModelCache } from "../models-cache.js";
@@ -33,32 +34,78 @@ function buildConfirmMenu(question, onYes, popAfter = 2) {
   ] };
 }
 
-// ---- Proxy menu (native model) ---------------------------------------------
+// ---- Proxy menu (native model, scope-tabbed) -------------------------------
+// The proxy view is tabbed across three scopes — global, the current provider,
+// and each logged-in account — matching the ProxyManager's scope hierarchy
+// (account -> provider -> global -> direct). proxyScopeKey is module-scope
+// state (only one proxy menu is ever open at a time), like browseQuery above.
 
-function buildProxyDetail(url) {
-  return { title: url, items: [
-    { label: "Back", run: () => ({ pop: true }) },
-    { label: "Remove this proxy", color: "red", run: () => ({ push: () => buildConfirmMenu("Remove " + url + "?", () => proxyManager.remove(url)) }) },
-  ] };
+let proxyScopeKey = "global";
+
+function proxyScopeLabel(key) {
+  if (key === "global") return "Global (all providers)";
+  const i = key.indexOf(":");
+  return (key.slice(0, i) === "provider" ? "Provider: " : "Account: ") + key.slice(i + 1);
 }
 
-function buildProxyMenu() {
-  const mode = proxyManager.getMode();
-  const grouped = proxyManager.byProvider() || {};
+// scope keys offered in the selector: global + the current provider + every account
+function proxyScopeKeys(def) {
+  const keys = ["global"];
+  if (def && def.id) keys.push("provider:" + def.id);
+  try { for (const v of (def.accounts.list ? def.accounts.list() : [])) keys.push("account:" + v.id); } catch {}
+  return keys;
+}
+
+function parseScopeForKey(key) {
+  if (key === "global") return { type: "global" };
+  const i = key.indexOf(":");
+  return { type: key.slice(0, i), id: key.slice(i + 1) };
+}
+
+function buildProxyMenu(def) {
+  const keys = proxyScopeKeys(def);
+  if (!keys.includes(proxyScopeKey)) proxyScopeKey = "global";
+  const mode = proxyManager.getMode(proxyScopeKey);
   const items = [
     { label: "Back", run: () => ({ pop: true }) },
-    { label: "Mode: " + mode, color: "cyan", run: () => { const order = ["automatic", "manual", "disabled"]; const i = order.indexOf(mode); proxyManager.setMode(order[(i + 1) % order.length]); return { refresh: true }; } },
-    { label: "Add proxy", color: "green", run: () => ({ input: { title: "Proxy URL", message: "Enter a proxy (host:port or http://...)", complete: (url) => { proxyManager.addManual(url); return { refresh: true }; } } }) },
-    { label: "Refresh from providers", color: "cyan", run: async () => { var msg; try { const n = await proxyManager.refresh(); msg = "Fetched " + n + " proxies"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } },
+    { label: "Scope: " + proxyScopeLabel(proxyScopeKey), color: "cyan", run: () => { const i = keys.indexOf(proxyScopeKey); proxyScopeKey = keys[(i + 1) % keys.length]; return { refresh: true }; } },
+    { label: "Mode: " + mode, color: "cyan", run: () => { const order = ["automatic", "manual", "disabled"]; const i = order.indexOf(mode); proxyManager.setMode(proxyScopeKey, order[(i + 1) % order.length]); return { refresh: true }; } },
+    { label: "Add proxy to this scope", color: "green", run: () => ({ input: { title: "Proxy URL", message: "host:port or http://...", complete: (url) => { if (url) proxyManager.addManual(url, parseScopeForKey(proxyScopeKey)); return { refresh: true }; } } }) },
+    { label: "Refresh from providers (global)", color: "cyan", run: async () => { var msg; try { const n = await proxyManager.refresh(); msg = "Fetched " + n; } catch (e) { msg = "Failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } },
+    { label: "", separator: true },
   ];
-  for (const provider of Object.keys(grouped)) {
-    const list = grouped[provider] || [];
-    if (!list.length) continue;
-    items.push({ label: "", separator: true });
-    items.push({ label: provider + " (" + list.length + ")", kind: "heading" });
-    for (const p of list) items.push({ label: p.url, hint: "score " + (typeof p.score === "number" ? p.score.toFixed(2) : "?") + " · in-use " + (p.inUse || 0), run: ((u) => () => ({ push: () => buildProxyDetail(u) }))(p.url) });
+  const sel = new Set(proxyManager.getScopeSelection(proxyScopeKey));
+  const rows = proxyManager.proxiesForScope(proxyScopeKey);
+  items.push({ label: proxyScopeLabel(proxyScopeKey) + " proxies (" + rows.length + ")", kind: "heading" });
+  if (!rows.length) items.push({ label: "None — add one above.", kind: "note" });
+  for (const p of rows) {
+    const q = qualityLabel(p);
+    const ipHits = (p.stats && p.stats.ipRateLimitHits) || 0;
+    const tick = mode === "manual" ? (sel.has(p.url) ? "[x] " : "[ ] ") : "";
+    const hint = "quality " + q + " · in-use " + (p.inUse || 0) + (ipHits ? " · " + ipHits + " IP-limits" : "");
+    items.push({ label: tick + p.url, hint, run: () => ({ push: () => buildProxyDetail(p.url, proxyScopeKey) }) });
   }
-  return { title: "Proxies", subtitle: "mode: " + mode + " · Esc to go back", items };
+  // wider scopes shown read-only so you can see the fall-through path
+  if (proxyScopeKey !== "global") {
+    const glob = proxyManager.proxiesForScope("global");
+    if (glob.length) {
+      items.push({ label: "", separator: true });
+      items.push({ label: "Falls through to Global (" + glob.length + ", read-only)", kind: "heading" });
+      for (const p of glob) items.push({ label: p.url, hint: "quality " + qualityLabel(p), kind: "note" });
+    }
+  }
+  return { title: "Proxies", subtitle: "Scope: " + proxyScopeLabel(proxyScopeKey) + " · mode " + mode, items };
+}
+
+function buildProxyDetail(url, scopeKey) {
+  const sel = new Set(proxyManager.getScopeSelection(scopeKey));
+  const mode = proxyManager.getMode(scopeKey);
+  const items = [
+    { label: "Back", run: () => ({ pop: true }) },
+  ];
+  if (mode === "manual") items.push({ label: sel.has(url) ? "Deselect (manual)" : "Select (manual)", color: "cyan", run: () => { if (sel.has(url)) sel.delete(url); else sel.add(url); proxyManager.setScopeSelection(scopeKey, [...sel]); return { refresh: true }; } });
+  items.push({ label: "Remove", color: "red", run: () => ({ push: () => buildConfirmMenu("Remove " + url + "?", () => proxyManager.remove(url)) }) });
+  return { title: url, items };
 }
 
 // Per-account proxy selection as a NATIVE menu model (rendered in-tab). Replaces the
@@ -319,7 +366,7 @@ function buildManageMenu(def) {
   if (proxies) {
     items.push({ label: "", separator: true });
     items.push({ label: "Network", kind: "heading" });
-    items.push({ label: "Manage proxies", color: "cyan", run: () => ({ push: () => buildProxyMenu() }) });
+    items.push({ label: "Manage proxies", color: "cyan", run: () => ({ push: () => buildProxyMenu(def) }) });
   }
   if (def.settings && (def.settings.groups || []).length) {
     items.push({ label: "", separator: true });
