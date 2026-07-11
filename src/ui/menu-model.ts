@@ -237,8 +237,13 @@ function buildAccountDetail(def, view) {
   items.push({ label: "Back", run: () => ({ pop: true }) });
   items.push({ label: view.enabled === false ? "Enable" : "Disable", color: view.enabled === false ? "green" : "yellow", run: () => { controller.enable(view.id, view.enabled === false); return { pop: true }; } });
   if (proxies) items.push({ label: "Select proxies", color: "cyan", run: () => ({ push: () => buildAccountProxyMenu(view.id) }) });
-  // Provider account actions (Verify / Refresh token / Refresh quota) are network calls —
-  // run in-tab (non-suspend) with a result flash, staying on this menu so the bars refresh.
+  // Refresh quota is a CORE action: every provider that implements refreshQuotaOne
+  // gets it here, uniformly, without declaring its own accountAction.
+  if (typeof controller.refreshQuotaOne === "function") {
+    items.push({ label: "Refresh quota", color: "cyan", run: async () => { try { await controller.refreshQuotaOne(view.id); return { refresh: true, flash: "Refresh quota ✓" }; } catch (e) { return { refresh: true, flash: "Failed: " + (e && e.message || e) }; } } });
+  }
+  // Provider account actions (Verify / Refresh token) are network calls — run
+  // in-tab (non-suspend) with a result flash, staying on this menu so the bars refresh.
   extra.forEach((a) => items.push({ label: a.label, color: a.color || "cyan", run: async () => { try { await a.run(); return { refresh: true, flash: (a.label || "Done") + " ✓" }; } catch (e) { return { refresh: true, flash: "Failed: " + (e && e.message || e) }; } } }));
   items.push({ label: "Remove", color: "red", run: () => ({ push: () => buildConfirmMenu(`Remove ${label}?`, () => controller.remove(view.id)) }) });
   return { title: label + (STATUS[view.status] ? " " + STATUS[view.status] : ""), items };

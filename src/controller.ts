@@ -22,7 +22,7 @@ function soonestAvailable(account, now) {
   return t;
 }
 
-// opts: { status?(account,now), detail?(account,now), quota?(account), availableAt?(account,now), login(), refreshQuota?() }
+// opts: { status?(account,now), detail?(account,now), quota?(account), availableAt?(account,now), login(), refreshQuota?(), refreshQuotaOne?(id) }
 // availableAt lets a provider report usability from its own signal (e.g. quota
 // pools) instead of the generic per-lane backoff — a single transient lane limit
 // shouldn't read as "the whole account is down" when other lanes still serve.
@@ -46,6 +46,7 @@ export function accountControllerFromManager(manager, opts) {
     remove(id) { manager.remove(id); },
     login: options.login || (async () => null),
     refreshQuota: options.refreshQuota,
+    refreshQuotaOne: options.refreshQuotaOne,   // per-account refresh; renders as a core account-detail action
     actions: options.actions,
     accountActions: options.accountActions,
   };
