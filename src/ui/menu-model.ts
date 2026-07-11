@@ -13,7 +13,6 @@
 
 import { proxyManager } from "../proxy/manager.js";
 import { qualityLabel } from "../proxy/scoring.js";
-import { selectAccountProxies } from "./proxy-menu.js";
 import { getAutoConfig, setAutoConfig } from "../config.js";
 import { readModelCache } from "../models-cache.js";
 import { buildLoginInput } from "./url-auth.js";
