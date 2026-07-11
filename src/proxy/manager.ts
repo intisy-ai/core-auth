@@ -1,124 +1,87 @@
 // @ts-nocheck
-import { loadProxyStore, saveProxyStore, updateProxyStore } from "./store.js";
+import { loadProxyStore, updateProxyStore } from "./store.js";
 import { fetchEnabledProxies } from "./providers.js";
-
-const MAX_ACCOUNTS_PER_PROXY = 3;
-
-function countAssignments(store, url) {
-  return Object.values(store.assignments || {}).filter((u) => u === url).length;
-}
-
-// lower is better
-function scoreOf(store, proxy) {
-  const s = proxy.stats || {};
-  const checks = s.checks || 0;
-  const failRate = checks ? (s.failures || 0) / checks : 0.5;
-  const inUse = countAssignments(store, proxy.url);
-  return (s.avgLatencyMs || 2000) / 1000
-    + failRate * 10
-    + (s.ipRateLimitHits || 0) * 20
-    + inUse * 5
-    - (proxy.provider === "manual" ? 10 : 0);
-}
+import { scoreOf, countAssignments, MAX_ACCOUNTS_PER_PROXY } from "./scoring.js";
+import { scopeKey, effectiveMode, resolveChain, candidatesForScope, proxiesInScope } from "./scopes.js";
 
 export class ProxyManager {
   load() { return loadProxyStore(); }
 
-  getMode() { return this.load().mode || "disabled"; }
-  setMode(mode) { updateProxyStore((s) => { s.mode = mode; }); }
+  getMode(key = "default") { return effectiveMode(this.load(), key); }
+  setMode(key, mode) { updateProxyStore((s) => { s.modes = s.modes || { default: "disabled" }; s.modes[key] = mode; }); }
 
   enableProvider(name, on, key) {
-    updateProxyStore((s) => { s.providers[name] = { ...(s.providers[name] || {}), enabled: !!on, ...(key !== undefined ? { key } : {}) }; });
+    updateProxyStore((s) => { s.providers = s.providers || {}; s.providers[name] = { ...(s.providers[name] || {}), enabled: !!on, ...(key !== undefined ? { key } : {}) }; });
   }
   providersConfig() { return this.load().providers || {}; }
 
-  // proxies sorted best-first (lowest score)
+  // all proxies best-first, annotated with score + inUse (for the UI)
   list() {
     const store = this.load();
     return [...store.proxies].map((p) => ({ ...p, score: scoreOf(store, p), inUse: countAssignments(store, p.url) })).sort((a, b) => a.score - b.score);
   }
-  // global view (account-only proxies are excluded; they show in their account's menu)
-  byProvider() {
-    const groups = {};
-    for (const p of this.list()) if (!p.owner) (groups[p.provider] = groups[p.provider] || []).push(p);
-    return groups;
+  proxiesForScope(key) {
+    const store = this.load();
+    return proxiesInScope(store, key).map((p) => ({ ...p, score: scoreOf(store, p), inUse: countAssignments(store, p.url) })).sort((a, b) => a.score - b.score);
   }
-  // proxies visible to one account: all global + the account's own
-  accountProxies(accountId) {
-    return this.list().filter((p) => !p.owner || p.owner === accountId);
-  }
-  get(url) { return this.list().find((p) => p.url === url) || null; }
+  get(url) { const store = this.load(); const p = store.proxies.find((x) => x.url === url); return p ? { ...p, score: scoreOf(store, p), inUse: countAssignments(store, p.url) } : null; }
 
-  // owner set -> account-only (visible + auto-used for that account only); else global
-  addManual(url, owner) {
+  addManual(url, scope) {
     const clean = url.startsWith("http") ? url : "http://" + url;
-    updateProxyStore((s) => { if (!s.proxies.find((p) => p.url === clean)) s.proxies.push({ url: clean, provider: "manual", owner: owner || undefined, addedAt: Date.now(), stats: { checks: 0, failures: 0, avgLatencyMs: 0, ipRateLimitHits: 0, lastOkAt: 0 } }); });
+    const sc = scope && scope.type ? scope : { type: "global" };
+    updateProxyStore((s) => { if (!s.proxies.find((p) => p.url === clean)) s.proxies.push({ url: clean, provider: "manual", scope: sc, addedAt: Date.now(), stats: { checks: 0, failures: 0, avgLatencyMs: 0, ipRateLimitHits: 0, lastOkAt: 0 } }); });
     return clean;
   }
   remove(url) {
     updateProxyStore((s) => {
       s.proxies = s.proxies.filter((p) => p.url !== url);
       for (const [acc, u] of Object.entries(s.assignments)) if (u === url) delete s.assignments[acc];
-      for (const acc of Object.keys(s.manualSelection)) s.manualSelection[acc] = (s.manualSelection[acc] || []).filter((u) => u !== url);
+      for (const key of Object.keys(s.manualSelection)) s.manualSelection[key] = (s.manualSelection[key] || []).filter((u) => u !== url);
     });
   }
 
-  // manual-mode per-account selection (urls from the pool)
-  getAccountSelection(accountId) { return this.load().manualSelection[accountId] || []; }
-  setAccountSelection(accountId, urls) { updateProxyStore((s) => { s.manualSelection[accountId] = urls; }); }
+  getScopeSelection(key) { return this.load().manualSelection[key] || []; }
+  setScopeSelection(key, urls) { updateProxyStore((s) => { s.manualSelection[key] = urls; }); }
 
-  // pick a proxy url for an account per mode; sticks until freed (rate-limit) or cap-bound
-  selectForAccount(accountId) {
+  // walk account -> provider -> global; sticky per account; fall through on empty/exhausted
+  selectForAccount(accountId, providerId) {
     const store = this.load();
-    if (store.mode === "disabled") return null;
-
-    if (store.mode === "manual") {
-      const owned = store.proxies.filter((p) => p.owner === accountId).map((p) => p.url);
-      const pool = [...new Set([...(store.manualSelection[accountId] || []), ...owned])].filter((u) => store.proxies.find((p) => p.url === u));
-      if (!pool.length) return null;
-      const current = store.assignments[accountId];
-      if (current && pool.includes(current)) return current;
-      const chosen = pool[0];
-      updateProxyStore((s) => { s.assignments[accountId] = chosen; });
-      return chosen;
-    }
-
-    // automatic — global proxies + this account's own, under the per-proxy cap
+    const chain = resolveChain(store, accountId, providerId);
+    if (!chain.length) return null;
     const current = store.assignments[accountId];
-    if (current && store.proxies.find((p) => p.url === current)) return current;
-    const candidates = store.proxies.filter((p) => (!p.owner || p.owner === accountId) && countAssignments(store, p.url) < MAX_ACCOUNTS_PER_PROXY).sort((a, b) => scoreOf(store, a) - scoreOf(store, b));
-    if (!candidates.length) return null;
-    const chosen = candidates[0].url;
-    updateProxyStore((s) => { s.assignments[accountId] = chosen; });
-    return chosen;
+    // keep a sticky assignment only if it's still a usable candidate in some chain scope
+    if (current) {
+      for (const key of chain) if (candidatesForScope(store, key, accountId).some((p) => p.url === current)) return current;
+    }
+    for (const key of chain) {
+      const cands = candidatesForScope(store, key, accountId);
+      if (cands.length) { const chosen = cands[0].url; updateProxyStore((s) => { s.assignments[accountId] = chosen; }); return chosen; }
+    }
+    return null;
   }
 
-  // pick a proxy for login traffic before an account exists (no id to bind yet);
-  // returns the best globally-available proxy, or null when none/disabled
-  pickForLogin() {
+  pickForLogin(providerId) {
     const store = this.load();
-    if (store.mode === "disabled") return null;
-    const candidates = store.proxies
-      .filter((p) => !p.owner && countAssignments(store, p.url) < MAX_ACCOUNTS_PER_PROXY)
-      .sort((a, b) => scoreOf(store, a) - scoreOf(store, b));
-    return candidates.length ? candidates[0].url : null;
+    const chain = resolveChain(store, null, providerId);   // no account scope yet
+    for (const key of chain) { const cands = candidatesForScope(store, key, null); if (cands.length) return cands[0].url; }
+    return null;
   }
 
-  // stick the login proxy to the account so refresh + requests reuse it; in manual
-  // mode also record it in the account's selection so selectForAccount keeps it
   bindAccountProxy(accountId, url) {
     if (!url) return;
     updateProxyStore((s) => {
-      if (s.mode === "manual") {
-        const selection = s.manualSelection[accountId] || [];
-        if (!selection.includes(url)) selection.push(url);
-        s.manualSelection[accountId] = selection;
+      const key = "account:" + accountId;
+      if (effectiveMode(s, key) === "manual") {
+        const sel = s.manualSelection[key] || [];
+        if (!sel.includes(url)) sel.push(url);
+        s.manualSelection[key] = sel;
       }
       s.assignments[accountId] = url;
     });
   }
 
-  reportRateLimit(url) {
+  reportRateLimit(url, opts) {
+    if (!opts || !opts.ipSuspected) return;   // only IP-suspected limits reflect proxy quality
     updateProxyStore((s) => {
       const p = s.proxies.find((x) => x.url === url);
       if (p) { p.stats = p.stats || {}; p.stats.ipRateLimitHits = (p.stats.ipRateLimitHits || 0) + 1; p.stats.lastRateLimitAt = Date.now(); }
@@ -141,7 +104,7 @@ export class ProxyManager {
     const fetched = await fetchEnabledProxies(this.providersConfig());
     updateProxyStore((s) => {
       const have = new Set(s.proxies.map((p) => p.url));
-      for (const f of fetched) if (!have.has(f.url)) { s.proxies.push({ url: f.url, provider: f.provider, addedAt: Date.now(), stats: { checks: 0, failures: 0, avgLatencyMs: 0, ipRateLimitHits: 0, lastOkAt: 0 } }); have.add(f.url); }
+      for (const f of fetched) if (!have.has(f.url)) { s.proxies.push({ url: f.url, provider: f.provider, scope: { type: "global" }, addedAt: Date.now(), stats: { checks: 0, failures: 0, avgLatencyMs: 0, ipRateLimitHits: 0, lastOkAt: 0 } }); have.add(f.url); }
     });
     return fetched.length;
   }
