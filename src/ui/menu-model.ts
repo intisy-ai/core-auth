@@ -108,36 +108,13 @@ function buildProxyDetail(url, scopeKey) {
   return { title: url, items };
 }
 
-// Per-account proxy selection as a NATIVE menu model (rendered in-tab). Replaces the
-// old suspend selectAccountProxies() which dropped into a raw-terminal picker that
-// fought the loader's own input loop and froze the TUI. Toggle which proxies this
-// account uses; add a new global proxy; refresh the provider-sourced list.
-function fmtProxyScore(n) { return typeof n === "number" ? n.toFixed(2) : "?"; }
-function buildAccountProxyMenu(accountId) {
-  const selected = new Set(proxyManager.getAccountSelection(accountId));
-  const all = proxyManager.accountProxies(accountId) || [];
-  const items = [
-    { label: "Back", run: () => ({ pop: true }) },
-    { label: "Add proxy", color: "green", run: () => ({ input: { title: "Proxy URL", message: "host:port or http://… (added for all accounts, enabled here)", complete: (url) => { if (url) { const clean = proxyManager.addManual(url); proxyManager.setAccountSelection(accountId, [...selected, clean]); } return { refresh: true }; } } }) },
-    { label: "Refresh from providers", color: "cyan", run: async () => { var msg; try { const n = await proxyManager.refresh(); msg = "Fetched " + n + " proxies"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } },
-    { label: "", separator: true },
-  ];
-  if (!all.length) items.push({ label: "No proxies yet — add one or refresh from providers.", kind: "note" });
-  for (const p of all) {
-    const owned = p.owner === accountId;
-    const on = owned || selected.has(p.url);
-    items.push({
-      label: (on ? "[x] " : "[ ] ") + p.url + (owned ? " (this account)" : ""),
-      hint: p.provider + " · score " + fmtProxyScore(p.score), color: on ? "green" : undefined,
-      run: () => {
-        if (owned) return { refresh: true };   // account-owned proxies are always on
-        if (selected.has(p.url)) selected.delete(p.url); else selected.add(p.url);
-        proxyManager.setAccountSelection(accountId, [...selected]);
-        return { refresh: true };
-      },
-    });
-  }
-  return { title: "Proxies for " + accountId, subtitle: "[x] = used by this account · Esc to go back", items };
+// Per-account "Select proxies" now routes into the unified scope-tabbed proxy view
+// (buildProxyMenu), pre-focused on this account's scope — the spec's single control
+// surface. (Replaces the old standalone picker that called removed ProxyManager
+// methods.) `def` supplies the provider id + account list for the scope selector.
+function buildAccountProxyMenu(accountId, def) {
+  proxyScopeKey = "account:" + accountId;
+  return buildProxyMenu(def);
 }
 
 const STATUS = {
@@ -283,7 +260,7 @@ function buildAccountDetail(def, view) {
   if (bars.length) { items.push({ label: "Quota", kind: "heading" }); for (const bar of bars) items.push(bar); items.push({ label: "", separator: true }); }
   items.push({ label: "Back", run: () => ({ pop: true }) });
   items.push({ label: view.enabled === false ? "Enable" : "Disable", color: view.enabled === false ? "green" : "yellow", run: () => { controller.enable(view.id, view.enabled === false); return { pop: true }; } });
-  if (proxies) items.push({ label: "Select proxies", color: "cyan", run: () => ({ push: () => buildAccountProxyMenu(view.id) }) });
+  if (proxies) items.push({ label: "Select proxies", color: "cyan", run: () => ({ push: () => buildAccountProxyMenu(view.id, def) }) });
   // Refresh quota is a CORE action: every provider that implements refreshQuotaOne
   // gets it here, uniformly, without declaring its own accountAction.
   if (typeof controller.refreshQuotaOne === "function") {
