@@ -45,8 +45,8 @@ export async function runProxyMenu() {
   if (!isTTY()) return;
   const expanded = new Set();   // provider categories are collapsed by default
   while (true) {
-    const mode = proxyManager.getMode();
-    const grouped = proxyManager.byProvider();
+    const mode = proxyManager.getMode("default");
+    const grouped = { Global: proxyManager.proxiesForScope("global") };
     const items = [
       { label: "Mode: " + mode, value: { t: "mode" }, color: "cyan" },
       { label: "Add manual proxy", value: { t: "add" }, color: "cyan" },
@@ -65,8 +65,8 @@ export async function runProxyMenu() {
     const action = await select(items, { message: "Proxies", subtitle: "mode: " + mode + " · Enter a provider to expand", clearScreen: true });
     if (!action || action.t === "back" || action.t === "noop") return;
     if (action.t === "toggle") { if (expanded.has(action.provider)) expanded.delete(action.provider); else expanded.add(action.provider); }
-    else if (action.t === "mode") { const m = await select([{ label: "automatic", value: "automatic" }, { label: "manual", value: "manual" }, { label: "disabled", value: "disabled" }], { message: "Proxy mode", clearScreen: true }); if (m) proxyManager.setMode(m); }
-    else if (action.t === "add") { const url = await prompt("Proxy URL (host:port or http://...):"); if (url) proxyManager.addManual(url); }
+    else if (action.t === "mode") { const m = await select([{ label: "automatic", value: "automatic" }, { label: "manual", value: "manual" }, { label: "disabled", value: "disabled" }], { message: "Proxy mode", clearScreen: true }); if (m) proxyManager.setMode("default", m); }
+    else if (action.t === "add") { const url = await prompt("Proxy URL (host:port or http://...):"); if (url) proxyManager.addManual(url, { type: "global" }); }
     else if (action.t === "refresh") { process.stdout.write("Fetching…\n"); const n = await proxyManager.refresh(); process.stdout.write("Fetched " + n + " proxies.\n"); }
     else if (action.t === "providers") await providerMenu();
     else if (action.t === "proxy") { const p = proxyManager.get(action.url); if (p) await proxyStats(p); }
@@ -78,14 +78,14 @@ export async function runProxyMenu() {
 export async function selectAccountProxies(accountId) {
   if (!isTTY()) return;
   while (true) {
-    const selected = new Set(proxyManager.getAccountSelection(accountId));
-    const all = proxyManager.accountProxies(accountId);
+    const selected = new Set(proxyManager.getScopeSelection("account:" + accountId));
+    const all = [...proxyManager.proxiesForScope("global"), ...proxyManager.proxiesForScope("account:" + accountId)];
     const items = [
       { label: "Done", value: { t: "done" } },
       { label: "Add proxy", value: { t: "add" }, color: "cyan" },
     ];
     for (const p of all) {
-      const owned = p.owner === accountId;
+      const owned = !!(p.scope && p.scope.type === "account" && p.scope.id === accountId);
       const on = owned || selected.has(p.url);
       items.push({ label: (on ? "[x] " : "[ ] ") + p.url + (owned ? " (this account)" : ""), hint: p.provider + " · score " + fmtScore(p.score), value: { t: "toggle", url: p.url, owned } });
     }
@@ -95,11 +95,11 @@ export async function selectAccountProxies(accountId) {
       const url = await prompt("Proxy URL (host:port or http://...):");
       if (!url) continue;
       const scope = await select([{ label: "Global (all accounts)", value: "global" }, { label: "This account only", value: "account" }], { message: "Proxy visibility", clearScreen: true });
-      if (scope === "account") proxyManager.addManual(url, accountId);
-      else if (scope === "global") { const clean = proxyManager.addManual(url); proxyManager.setAccountSelection(accountId, [...selected, clean]); }
+      if (scope === "account") proxyManager.addManual(url, { type: "account", id: accountId });
+      else if (scope === "global") { const clean = proxyManager.addManual(url, { type: "global" }); proxyManager.setScopeSelection("account:" + accountId, [...selected, clean]); }
     } else if (result.t === "toggle") {
       if (result.owned) { if (await confirm("Remove this account-only proxy?")) proxyManager.remove(result.url); }
-      else { if (selected.has(result.url)) selected.delete(result.url); else selected.add(result.url); proxyManager.setAccountSelection(accountId, [...selected]); }
+      else { if (selected.has(result.url)) selected.delete(result.url); else selected.add(result.url); proxyManager.setScopeSelection("account:" + accountId, [...selected]); }
     }
   }
 }

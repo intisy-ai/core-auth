@@ -21,6 +21,8 @@ export { confirm } from "./ui/confirm.js";
 export { prompt } from "./ui/prompt.js";
 export { isTTY } from "./ui/ansi.js";
 export { proxyManager, ProxyManager } from "./proxy/manager.js";
+export { qualityLabel, isIpLimited, IP_LIMIT_COOLDOWN_MS, MAX_ACCOUNTS_PER_PROXY } from "./proxy/scoring.js";
+export { scopeKey, parseScopeKey, effectiveMode, resolveChain, proxiesInScope, candidatesForScope } from "./proxy/scopes.js";
 export { runProxyMenu, selectAccountProxies } from "./ui/proxy-menu.js";
 export { runProviderMenu } from "./menu.js";
 export { buildAccountMenu, buildAutoMenu } from "./ui/menu-model.js";
