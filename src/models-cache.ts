@@ -3,27 +3,21 @@
 // def.fetchModels) and writes them here; both the OpenCode merge and the Claude
 // loader's Providers tab read this file instead of a hardcoded list.
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { configFolder } from "./env.js";
 import { log } from "./log.js";
 
 const MODELS_FILE = "models.json";
-const LEGACY_MODELS_FILE = "core-auth-models.json"; // pre-rename; read once, then deleted on write (no core- prefixed files)
 
 function cachePath() {
   return join(configFolder(), MODELS_FILE);
 }
-function legacyPath() {
-  return join(configFolder(), LEGACY_MODELS_FILE);
-}
 
 function readAll() {
-  for (const p of [cachePath(), legacyPath()]) {
-    try {
-      if (existsSync(p)) return JSON.parse(readFileSync(p, "utf8")) || {};
-    } catch {}
-  }
+  try {
+    if (existsSync(cachePath())) return JSON.parse(readFileSync(cachePath(), "utf8")) || {};
+  } catch {}
   return {};
 }
 
@@ -43,7 +37,6 @@ export function writeModelCache(providerId, entry) {
     const dir = configFolder();
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(cachePath(), JSON.stringify(all, null, 2), "utf8");
-    try { if (existsSync(legacyPath())) rmSync(legacyPath()); } catch {} // drop the old core- prefixed file
   } catch (e) {
     log("model cache write failed: " + (e && e.message));
   }

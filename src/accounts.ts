@@ -7,7 +7,6 @@ import { randomBytes } from "crypto";
 import { configFolder } from "./env.js";
 
 const DEFAULT_FILE = "accounts.json";
-const LEGACY_FILE = "core-auth-accounts.json"; // pre-rename; read-only fallback so existing logins migrate
 const LOCK_STALE_MS = 15 * 1000;
 const LOCK_WAIT_MS = 5 * 1000;
 const LOCK_POLL_MS = 25;
@@ -25,43 +24,56 @@ function sleepSync(ms) {
   try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch {}
 }
 
-// best-effort exclusive lock; degrades to running unlocked rather than deadlocking if it can't be acquired.
-function withLock(opts, fn) {
-  ensureDir(opts);
-  const lockPath = storeFile(opts) + ".lock";
-  const deadline = Date.now() + LOCK_WAIT_MS;
-  let handle = null;
-  while (handle === null) {
+// Thrown by withLock when the lock couldn't be acquired within LOCK_WAIT_MS. Callers
+// must treat this as a hard failure (retry later / surface to the user) -- there is no
+// unlocked fallback.
+export class LockTimeoutError extends Error {
+  constructor(lockPath) {
+    super("withLock: timed out waiting for lock: " + lockPath);
+    this.name = "LockTimeoutError";
+    this.lockPath = lockPath;
+  }
+}
+
+function acquireLockSync(lockPath, deadline) {
+  for (;;) {
     try {
-      handle = openSync(lockPath, "wx");
+      return openSync(lockPath, "wx");
     } catch (error) {
-      if (!error || error.code !== "EEXIST") break;
+      // Any error other than "lock file already exists" is unexpected (permissions,
+      // disk full, ...) -- surface it immediately rather than pretending we're unlocked.
+      if (!error || error.code !== "EEXIST") throw error;
       try {
+        // Stale lock (holder crashed mid-write without cleaning up): reclaim it.
         if (Date.now() - statSync(lockPath).mtimeMs > LOCK_STALE_MS) { unlinkSync(lockPath); continue; }
       } catch {}
-      if (Date.now() > deadline) break;
+      if (Date.now() > deadline) throw new LockTimeoutError(lockPath);
       sleepSync(LOCK_POLL_MS);
     }
   }
+}
+
+// Cross-process exclusive lock via an atomic lock-file (open(...,"wx") fails if it
+// already exists). FAIL-CLOSED: if the lock can't be acquired before the deadline (or
+// on any other unexpected fs error), this THROWS -- it never runs `fn()` unlocked.
+// Running unlocked would let two writers both read-modify-write the store and have the
+// second `renameSync` silently clobber the first (a lost update: corrupted tokens /
+// rate-limit state). The happy path (lock free) is unchanged from before.
+export function withLock(opts, fn) {
+  ensureDir(opts);
+  const lockPath = storeFile(opts) + ".lock";
+  const handle = acquireLockSync(lockPath, Date.now() + LOCK_WAIT_MS);
   try {
     return fn();
   } finally {
-    if (handle !== null) {
-      try { closeSync(handle); } catch {}
-      try { unlinkSync(lockPath); } catch {}
-    }
+    try { closeSync(handle); } catch {}
+    try { unlinkSync(lockPath); } catch {}
   }
 }
 
 function readStore(opts) {
   try {
-    let file = storeFile(opts);
-    // migrate: if the renamed store isn't there yet, read the legacy file (the next
-    // write goes to the new name). Only for the default store, not a custom opts.file.
-    if (!existsSync(file) && !(opts && opts.file)) {
-      const legacy = join((opts && opts.dir) || configFolder(), LEGACY_FILE);
-      if (existsSync(legacy)) file = legacy;
-    }
+    const file = storeFile(opts);
     if (existsSync(file)) return JSON.parse(readFileSync(file, "utf8")) || {};
   } catch {}
   return { version: 1, providers: {} };

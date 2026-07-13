@@ -13,7 +13,7 @@
 import { readConfig } from "./config.js";
 import { getConfigDir } from "./env.js";
 import { log } from "./log.js";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/models";
@@ -22,9 +22,6 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function cachePath(): string {
   return join(getConfigDir(), "config", "leaderboard.json");
-}
-function legacyCachePath(): string {
-  return join(getConfigDir(), "config", "core-auth-leaderboard.json"); // pre-rename; removed on write
 }
 
 function apiKey(): string {
@@ -102,12 +99,10 @@ async function fetchAA(key: string): Promise<Score[]> {
 // ---- cache ------------------------------------------------------------------
 
 function readCache(): { fetchedAt: number; scores: Score[]; source?: string } | null {
-  for (const p of [cachePath(), legacyCachePath()]) {
-    try {
-      const raw = JSON.parse(readFileSync(p, "utf8"));
-      if (raw && Array.isArray(raw.scores) && typeof raw.fetchedAt === "number") return raw;
-    } catch { /* none / unreadable */ }
-  }
+  try {
+    const raw = JSON.parse(readFileSync(cachePath(), "utf8"));
+    if (raw && Array.isArray(raw.scores) && typeof raw.fetchedAt === "number") return raw;
+  } catch { /* none / unreadable */ }
   return null;
 }
 
@@ -116,7 +111,6 @@ function writeCache(scores: Score[], source: string): void {
     const p = cachePath();
     if (!existsSync(dirname(p))) mkdirSync(dirname(p), { recursive: true });
     writeFileSync(p, JSON.stringify({ fetchedAt: Date.now(), source, scores }, null, 2), "utf8");
-    try { if (existsSync(legacyCachePath())) rmSync(legacyCachePath()); } catch {} // drop old core- prefixed file
   } catch (e) { log("leaderboard cache write failed: " + e); }
 }
 

@@ -1,7 +1,6 @@
 // @ts-nocheck
 // core-auth config: the active provider and harness settings, stored in
-// config/auth.json (preferred) with a top-level fallback. (Renamed from the old
-// core-auth.json — read as a legacy fallback so existing configs keep working.)
+// config/auth.json (preferred) with a top-level fallback.
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -13,13 +12,12 @@ function paths() {
   return {
     preferred: join(dir, "config", "auth.json"),
     fallback: join(dir, "auth.json"),
-    legacy: [join(dir, "config", "core-auth.json"), join(dir, "core-auth.json")],
   };
 }
 
 export function readConfig(): Record<string, any> {
-  const { preferred, fallback, legacy } = paths();
-  const p = [preferred, fallback, ...legacy].find((c) => existsSync(c)) || null;
+  const { preferred, fallback } = paths();
+  const p = [preferred, fallback].find((c) => existsSync(c)) || null;
   try { return p ? JSON.parse(readFileSync(p, "utf8")) : {}; } catch { return {}; }
 }
 
@@ -52,7 +50,7 @@ export function setActiveProvider(name: string): void {
 
 // Sort source ids that USED to exist but were removed from the code. A cache written
 // by older code may still advertise them; filter them out by id so a retired source can
-// never keep surfacing from a stale core-auth-models.json after an update — WITHOUT
+// never keep surfacing from a stale models.json after an update — WITHOUT
 // wiping the whole derived cache (which would also hide still-valid sources like
 // "leaderboard" until the next refresh). When you retire a sort source, add its id here.
 const RETIRED_SOURCES = new Set<string>(["recommended"]);
