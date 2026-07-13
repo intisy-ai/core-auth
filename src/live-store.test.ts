@@ -44,6 +44,23 @@ describe("createLiveStore", () => {
     expect(store.listKeys("nope")).toEqual([]);
   });
 
+  it("listKeys excludes its own .lock and .tmp bookkeeping artifacts, even when they'd match the prefix", () => {
+    const store = createLiveStore(configDir);
+    store.put("accounts.json", "{}");
+
+    // Simulate the artifacts `withLock`/`put` leave behind: a lock file left by a
+    // holder, and an in-flight temp-write that hasn't been renamed into place yet.
+    const configSub = join(configDir, "config");
+    writeFileSync(join(configSub, "accounts.json.lock"), "");
+    writeFileSync(join(configSub, "accounts.json.deadbeef1234.tmp"), "{}");
+
+    // Reproduces the bug: listKeys('') used to return
+    // ['accounts.json', 'accounts.json.lock', 'accounts.json.deadbeef1234.tmp'].
+    expect(store.listKeys("")).toEqual(["accounts.json"]);
+    // A prefix that only matches the artifacts must not surface them either.
+    expect(store.listKeys("accounts.json.")).toEqual([]);
+  });
+
   it("put/get/exists/delete each go through the cross-process lock: a held lock fails closed", () => {
     const store = createLiveStore(configDir);
     store.put("accounts.json", "v1");

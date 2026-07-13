@@ -17,6 +17,13 @@ const pkgRoot = fileURLToPath(new URL("..", import.meta.url));
 const distAccounts = join(pkgRoot, "dist", "accounts.js");
 const srcAccounts = join(pkgRoot, "src", "accounts.ts");
 const workerUrl = new URL("./accounts.lock-worker.mjs", import.meta.url);
+const holdWorkerUrl = new URL("./accounts.lock-hold-worker.mjs", import.meta.url);
+const contendWorkerUrl = new URL("./accounts.lock-contend-worker.mjs", import.meta.url);
+
+// LOCK_WAIT_MS in accounts.ts -- kept in sync manually since it isn't exported. The
+// held-lock cross-thread test below must hold the lock for longer than this so the
+// contender genuinely times out rather than racing a lock that's released early.
+const LOCK_WAIT_MS = 5000;
 
 // The cross-thread concurrency test below runs a real worker_thread against the BUILT
 // dist/accounts.js (worker_threads can't run vitest's on-the-fly TS transform) so it
@@ -88,9 +95,56 @@ describe("cross-thread concurrency", () => {
     });
   }
 
-  it("two concurrent updateAccounts on the same provider don't lose an update", async () => {
+  // Happy path only: both writers hit an unlocked/quickly-released lock, so neither
+  // waits anywhere near LOCK_WAIT_MS. This does NOT exercise the degrade-to-unlocked
+  // bug (it would pass on the old buggy code too) -- see the held-lock test below for
+  // the genuine regression guard on the timeout->fail-closed path.
+  it("two fast concurrent updateAccounts on the same provider both land (no timeout involved)", async () => {
     await Promise.all([runWorker(dir, "worker-a"), runWorker(dir, "worker-b")]);
     const pool = loadAccounts("lock-test-provider", { dir });
     expect(pool.accounts.map((a: any) => a.id).sort()).toEqual(["worker-a", "worker-b"]);
+  }, 20000);
+
+  // The genuine regression guard: one real OS thread holds the store's lock file past
+  // LOCK_WAIT_MS while a second thread concurrently attempts updateAccounts on the SAME
+  // store. On the OLD buggy withLock, the second thread's wait loop would `break` at the
+  // deadline and run fn() anyway -- unlocked -- succeeding and silently writing
+  // "contender" alongside "seed". The fix must make it fail closed: throw
+  // LockTimeoutError and leave the on-disk store untouched.
+  it("lock held by another thread past LOCK_WAIT_MS: a concurrent updateAccounts throws LockTimeoutError instead of degrading to unlocked", async () => {
+    saveAccounts("lock-test-provider", { accounts: [{ id: "seed" }], activeIndex: 0, activeIndexByLane: {} }, { dir });
+
+    const holdMs = LOCK_WAIT_MS + 2000;
+    const holder = new Worker(holdWorkerUrl, { workerData: { dir, holdMs } });
+
+    // Wait for the holder to confirm it actually holds the lock before starting the
+    // contender -- deterministic sequencing instead of a timing-based guess.
+    const lockedMsg = await new Promise<any>((resolve, reject) => {
+      holder.once("message", resolve);
+      holder.once("error", reject);
+    });
+    expect(lockedMsg.locked).toBe(true);
+
+    const contender = new Worker(contendWorkerUrl, { workerData: { dir } });
+    const result = await new Promise<any>((resolve, reject) => {
+      contender.once("message", resolve);
+      contender.once("error", reject);
+    });
+    await contender.terminate();
+
+    expect(result.ok).toBe(false);
+    expect(result.name).toBe("LockTimeoutError");
+
+    // Let the holder finish releasing the lock and clean it up.
+    const releasedMsg = await new Promise<any>((resolve, reject) => {
+      holder.once("message", resolve);
+      holder.once("error", reject);
+    });
+    expect(releasedMsg.released).toBe(true);
+    await holder.terminate();
+
+    // fn() must never have run unlocked: the seed write is untouched, no "contender".
+    const pool = loadAccounts("lock-test-provider", { dir });
+    expect(pool.accounts.map((a: any) => a.id)).toEqual(["seed"]);
   }, 20000);
 });

@@ -68,10 +68,16 @@ export function createLiveStore(configDir: string): LiveStoreLike {
     },
     // A directory listing, not a single file's contents -- no per-key lock applies.
     // `put`'s rename is atomic, so a listing can only ever observe fully-written files.
+    // Excludes the adapter's own lock (`<key>.lock`) and in-flight temp-write
+    // (`<key>.<hex>.tmp`, see `put` above) artifacts -- those are bookkeeping, not
+    // stored keys, and must never surface to a consumer's `get()`. Matches the JVM
+    // `FileStore.listKeys`, which excludes `.lock`/`.tmp` the same way.
     listKeys(prefix: string): string[] {
       try {
         if (!existsSync(dir)) return [];
-        return readdirSync(dir).filter((f) => f.startsWith(prefix));
+        return readdirSync(dir).filter(
+          (f) => f.startsWith(prefix) && !f.endsWith(".lock") && !f.endsWith(".tmp"),
+        );
       } catch {
         return [];
       }
