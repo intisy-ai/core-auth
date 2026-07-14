@@ -1,0 +1,42 @@
+// core-auth's Java module -- self-contained Gradle build living alongside core-auth's TS (../src,
+// ../package.json). Mirrors core-proxy/java/build.gradle's subprojects{} shape exactly (plain
+// java-library + JUnit, Java 8 baseline) -- deliberately not ai-java's root build.gradle (its
+// io.github.intisy.online-gradle/github-gradle plugins are ai-java-repo-specific publishing
+// concerns, out of scope here).
+//
+// This block applies to EVERY project this settings.gradle knows about, including the two
+// vendored core-proxy projects aliased in via project(...).projectDir (:core-proxy-routing,
+// :core-proxy-teavm) -- those directories only declare their own dependencies{} blocks and rely
+// on their owning build's subprojects{} for the plugin/JUnit/compat wiring, same as they do inside
+// core-proxy's own standalone build. :teavm's own build.gradle (this module's, and core-proxy's
+// vendored one) runs afterward and overrides sourceCompatibility to 17 for itself.
+subprojects {
+    apply plugin: "java-library"
+
+    group = "io.github.intisy"
+    version = "0.1.0"
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    // Validate the MAIN compilation against the Java 8 API surface (not just source syntax).
+    // compileTestJava is excluded: tests may legitimately use newer JDK APIs (e.g. List.of).
+    tasks.matching { it.name == "compileJava" }.configureEach {
+        options.release = 8
+    }
+
+    dependencies {
+        testImplementation "org.junit.jupiter:junit-jupiter:5.10.1"
+    }
+
+    test {
+        useJUnitPlatform()
+    }
+}

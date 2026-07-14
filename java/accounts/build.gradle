@@ -1,0 +1,10 @@
+// AccountManager/AccountStore/AuthConfig/OAuth/Selection engine. Depends on core-proxy's :routing
+// module for the shared SPIs (Store/HttpClient/JsonCodec/Clock/Random) rather than duplicating
+// them -- `api` (not `implementation`) so those SPI types are visible on this module's own
+// consumers' compile classpath too (e.g. :teavm's CoreAuthJs declares AccountManager fields typed
+// against Store/HttpClient/JsonCodec directly). Zero OTHER dependencies by design (no gson/
+// java.net/java.nio/reflection/threads) so this module stays TeaVM-transpilable, matching
+// :routing's own zero-dependency policy.
+dependencies {
+    api project(":routing")
+}

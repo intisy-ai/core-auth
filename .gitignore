@@ -3,3 +3,9 @@ dist/
 .idea/
 *.log
 package-lock.json
+
+java/**/build/
+java/.gradle/
+java/**/.gradle/
+java/.idea/
+*.iml

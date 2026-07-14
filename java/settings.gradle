@@ -1,0 +1,27 @@
+rootProject.name = "core-auth-java"
+
+// :accounts    - AccountManager/AccountStore/AuthConfig/OAuth/Selection engine (Java 8, only
+//                dependency is core-proxy's :routing SPIs -- no gson/net/nio/reflect/threads so
+//                it stays TeaVM-transpilable).
+// :auth-teavm  - TeaVM JS export surface over :accounts (CoreAuthJs) -> generateJavaScript emits
+//                an ES2015 module (core-auth.js). Reuses core-proxy's :teavm js-base
+//                (SimpleJsonCodec/JsStoreBridge/JsHttpClientBridge) instead of duplicating it.
+//                Named "auth-teavm" (not "teavm") to avoid colliding with core-proxy's own
+//                ":teavm" project path, aliased in below.
+include ":accounts"
+include ":auth-teavm"
+
+// core-proxy is vendored as a git submodule at java/core-proxy (mirrors how app-proxy projects
+// nest core-proxy elsewhere in this ecosystem). Its :routing and :teavm projects are included
+// directly into THIS build under THEIR OWN path names (":routing", ":teavm"), aliased to their
+// real location via projectDir -- required because core-proxy/java/teavm/build.gradle itself
+// references its sibling project as `project(":routing")`; keeping the same path names here
+// (rather than renaming them, e.g. ":core-proxy-routing") lets that reference resolve unchanged
+// when core-proxy's projects are folded into this settings.gradle, and lets :accounts/:auth-teavm
+// below depend on them with a plain project(":routing")/project(":teavm") reference -- exactly
+// like core-proxy's own settings.gradle wires them together.
+include ":routing"
+project(":routing").projectDir = file("core-proxy/java/routing")
+
+include ":teavm"
+project(":teavm").projectDir = file("core-proxy/java/teavm")
