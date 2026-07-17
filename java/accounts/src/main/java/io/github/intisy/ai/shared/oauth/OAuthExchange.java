@@ -64,9 +64,13 @@ public final class OAuthExchange {
             throw new TokenRefreshError(message, revoked);
         }
 
-        Map<String, Object> payload = asMap(json.parse(response.body == null ? "" : response.body));
-        if (payload == null) {
-            throw new TokenRefreshError("OAuth code exchange returned an unparseable body: " + response.body, false);
+        Map<String, Object> payload;
+        try {
+            Map<String, Object> parsed = asMap(json.parse(response.body == null ? "" : response.body));
+            if (parsed == null) throw new IllegalArgumentException("response body is not a JSON object");
+            payload = parsed;
+        } catch (Exception e) {
+            throw new TokenRefreshError("OAuth code exchange returned an unparseable body: " + response.body, e);
         }
         String access = stringField(payload, "access_token");
         Double expiresIn = numberField(payload, "expires_in");

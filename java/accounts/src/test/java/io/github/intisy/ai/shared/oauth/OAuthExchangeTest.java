@@ -80,4 +80,17 @@ class OAuthExchangeTest {
                 () -> OAuthExchange.exchangeCode("c", "v", "cb", cfg, false, http, JSON, 0L));
         assertTrue(e.getMessage().contains("400"), e.getMessage());
     }
+
+    @Test
+    void unparseableSuccessBodyThrowsTokenRefreshError() {
+        Captor http = new Captor();
+        http.status = 200;
+        http.body = "not json at all";
+        OAuthConfig cfg = new OAuthConfig();
+        cfg.tokenUrl = "https://token.example/oauth/token";
+        cfg.clientId = "client-123";
+        TokenRefreshError e = assertThrows(TokenRefreshError.class,
+                () -> OAuthExchange.exchangeCode("c", "v", "cb", cfg, false, http, JSON, 0L));
+        assertTrue(e.getMessage().contains("unparseable"), e.getMessage());
+    }
 }
