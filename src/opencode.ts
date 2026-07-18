@@ -18,7 +18,11 @@ import { refreshModels } from "./refresh.js";
 // only reads an env flag, never the loader's config schema.
 export function proxyFetchTarget(env) {
   if (env && env.HUB_OC_PROXY === "1") {
-    return { mode: "proxy", port: parseInt(env.HUB_PROXY_PORT || "34568", 10) };
+    const parsed = parseInt(env.HUB_PROXY_PORT || "34568", 10);
+    // A misconfigured (non-numeric) port would otherwise make toProxyUrl build
+    // "http://127.0.0.1:NaN/..." and throw on every request; degrade to default.
+    const port = Number.isFinite(parsed) && parsed > 0 ? parsed : 34568;
+    return { mode: "proxy", port };
   }
   return { mode: "handle" };
 }

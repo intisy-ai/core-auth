@@ -19,6 +19,11 @@ describe("proxyFetchTarget", () => {
   it("honours HUB_PROXY_PORT when routing to the proxy", () => {
     expect(proxyFetchTarget({ HUB_OC_PROXY: "1", HUB_PROXY_PORT: "40000" })).toEqual({ mode: "proxy", port: 40000 });
   });
+
+  it("degrades a non-numeric/invalid HUB_PROXY_PORT to the default rather than producing NaN", () => {
+    expect(proxyFetchTarget({ HUB_OC_PROXY: "1", HUB_PROXY_PORT: "nonsense" })).toEqual({ mode: "proxy", port: 34568 });
+    expect(proxyFetchTarget({ HUB_OC_PROXY: "1", HUB_PROXY_PORT: "0" })).toEqual({ mode: "proxy", port: 34568 });
+  });
 });
 
 describe("toProxyUrl", () => {
