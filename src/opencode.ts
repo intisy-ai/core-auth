@@ -9,6 +9,27 @@ import { isTTY } from "./ui/ansi.js";
 import { runProviderMenu } from "./menu.js";
 import { refreshModels } from "./refresh.js";
 
+// Opt-in proxy routing (parity with the claude-code-loader proxy path). By
+// DEFAULT OpenCode routes in-process: loader.fetch calls def.handle() directly,
+// so this is behaviour-neutral unless the oc wrapper turns it on. When the
+// wrapper sets HUB_OC_PROXY=1 (+ HUB_PROXY_PORT for the opencode-proxy daemon),
+// requests are forwarded to that local daemon instead, which resolves the
+// provider chain and calls handle() itself. core-auth stays app-agnostic: it
+// only reads an env flag, never the loader's config schema.
+export function proxyFetchTarget(env) {
+  if (env && env.HUB_OC_PROXY === "1") {
+    return { mode: "proxy", port: parseInt(env.HUB_PROXY_PORT || "34568", 10) };
+  }
+  return { mode: "handle" };
+}
+
+// Rewrite a provider request URL onto the local proxy daemon, preserving the
+// path + query (e.g. /v1/messages) so the daemon's routing profile matches it.
+export function toProxyUrl(originalUrl, port) {
+  const u = new URL(originalUrl);
+  return "http://127.0.0.1:" + port + u.pathname + u.search;
+}
+
 // `oc auth login` for a provider with an account controller (in a TTY) opens our
 // interactive account-management TUI (runProviderMenu: list/add/remove/verify),
 // where "Add account" runs the driver's own OAuth login (loopback listener +
@@ -67,7 +88,12 @@ export function createOpencodePlugin(def) {
           return {
             apiKey: def.id,
             fetch: function (req, init) {
-              return def.handle(new Request(req, init), { configDir: getConfigDir(), log });
+              const request = new Request(req, init);
+              const target = proxyFetchTarget(process.env);
+              if (target.mode === "proxy") {
+                return fetch(new Request(toProxyUrl(request.url, target.port), request));
+              }
+              return def.handle(request, { configDir: getConfigDir(), log });
             },
           };
         },
