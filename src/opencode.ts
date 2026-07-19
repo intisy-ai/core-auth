@@ -98,15 +98,22 @@ export function createOpencodePlugin(def) {
               if (target.mode === "proxy") {
                 return fetch(new Request(toProxyUrl(request.url, target.port), request));
               }
-              // NATIVE in-process FRONT-DOOR owns app<->IR: prefer the provider's IR-native handleIr,
-              // decoding/encoding Anthropic<->IR here (parity with core-proxy's server front-door). A
-              // provider without handleIr still routes through its legacy handle() until T4 removes it
-              // (coexist-then-remove -- nothing breaks mid-migration).
+              // NATIVE in-process FRONT-DOOR owns app<->IR: decode the Anthropic wire to IR, call the
+              // provider's IR-native handleIr, encode the IR result back (parity with core-proxy's
+              // server front-door). Every ecosystem provider is IR-native post-T4; a provider that
+              // supplies neither handleIr nor a legacy handle() is a packaging error, surfaced as a
+              // 503 rather than crashing on an undefined call.
               const ctx = { configDir: getConfigDir(), log };
               if (typeof def.handleIr === "function") {
                 return handleOpencodeViaIr(def, request, ctx);
               }
-              return def.handle(request, ctx);
+              if (typeof def.handle === "function") {
+                return def.handle(request, ctx);
+              }
+              return new Response(
+                JSON.stringify({ error: { type: "loader_error", message: def.id + " has no IR handler" } }),
+                { status: 503, headers: { "content-type": "application/json" } },
+              );
             },
           };
         },

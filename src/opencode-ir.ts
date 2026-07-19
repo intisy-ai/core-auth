@@ -53,11 +53,15 @@ export async function handleOpencodeViaIr(def, request, ctx) {
   try {
     ir = await translators.anthropic.decodeRequest(bodyText || "{}");
   } catch (error) {
-    // A body that will not decode through the IR falls back to the provider's legacy wire handle()
-    // (the same malformed-body tolerance the pre-IR path had). This fallback is removed together with
-    // handle() in T4, once every provider is IR-native.
-    log("IR decode failed, falling back to the raw wire path: " + error);
-    return def.handle(request, ctx);
+    // A body that will not decode through the IR is a malformed request. A legacy provider that still
+    // carries a wire handle() gets it verbatim (the old malformed-body tolerance); an IR-native
+    // provider has no wire path, so surface a 400 rather than crash on an undefined call.
+    log("IR decode failed: " + error);
+    if (typeof def.handle === "function") return def.handle(request, ctx);
+    return new Response(
+      JSON.stringify({ error: { type: "invalid_request_error", message: "request body is not valid JSON" } }),
+      { status: 400, headers: { "content-type": "application/json" } },
+    );
   }
 
   try {
