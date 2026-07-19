@@ -8,6 +8,7 @@ import { listAccounts } from "./accounts.js";
 import { isTTY } from "./ui/ansi.js";
 import { runProviderMenu } from "./menu.js";
 import { refreshModels } from "./refresh.js";
+import { handleOpencodeViaIr } from "./opencode-ir.js";
 
 // Opt-in proxy routing (parity with the claude-code-loader proxy path). By
 // DEFAULT OpenCode routes in-process: loader.fetch calls def.handle() directly,
@@ -97,7 +98,15 @@ export function createOpencodePlugin(def) {
               if (target.mode === "proxy") {
                 return fetch(new Request(toProxyUrl(request.url, target.port), request));
               }
-              return def.handle(request, { configDir: getConfigDir(), log });
+              // NATIVE in-process FRONT-DOOR owns app<->IR: prefer the provider's IR-native handleIr,
+              // decoding/encoding Anthropic<->IR here (parity with core-proxy's server front-door). A
+              // provider without handleIr still routes through its legacy handle() until T4 removes it
+              // (coexist-then-remove -- nothing breaks mid-migration).
+              const ctx = { configDir: getConfigDir(), log };
+              if (typeof def.handleIr === "function") {
+                return handleOpencodeViaIr(def, request, ctx);
+              }
+              return def.handle(request, ctx);
             },
           };
         },
