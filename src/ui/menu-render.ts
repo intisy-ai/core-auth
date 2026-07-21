@@ -3,7 +3,7 @@
 // its pushed submenus via a builder stack, rebuilding each loop so state changes
 // show. STANDALONE renderer (oc auth login); the loader has its own renderer for
 // the same model. An item's run() may also return { input: {...} } to collect a
-// line of text (paste a login code, a proxy URL) — handled here via prompt().
+// line of text (paste a login code, a proxy URL), handled here via prompt().
 
 import { createInterface } from "node:readline/promises";
 import { select } from "./select.js";

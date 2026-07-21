@@ -34,8 +34,8 @@ function buildConfirmMenu(question, onYes, popAfter = 2) {
 }
 
 // ---- Proxy menu (native model, scope-tabbed) -------------------------------
-// The proxy view is tabbed across three scopes — global, the current provider,
-// and each logged-in account — matching the ProxyManager's scope hierarchy
+// The proxy view is tabbed across three scopes: global, the current provider,
+// and each logged-in account, matching the ProxyManager's scope hierarchy
 // (account -> provider -> global -> direct). proxyScopeKey is module-scope
 // state (only one proxy menu is ever open at a time), like browseQuery above.
 
@@ -107,10 +107,9 @@ function buildProxyDetail(url, scopeKey) {
   return { title: url, items };
 }
 
-// Per-account "Select proxies" now routes into the unified scope-tabbed proxy view
-// (buildProxyMenu), pre-focused on this account's scope — the spec's single control
-// surface. (Replaces the old standalone picker that called removed ProxyManager
-// methods.) `def` supplies the provider id + account list for the scope selector.
+// Per-account "Select proxies" routes into the unified scope-tabbed proxy view
+// (buildProxyMenu), pre-focused on this account's scope. `def` supplies the
+// provider id + account list for the scope selector.
 function buildAccountProxyMenu(accountId, def) {
   proxyScopeKey = "account:" + accountId;
   return buildProxyMenu(def);
@@ -128,14 +127,14 @@ function modelName(providerId, id) {
 }
 
 // The catalog to DISPLAY: the fetched/cached list when present, otherwise the provider's
-// shipped static fallback (def.models). This lets models be browsed WITHOUT logging in —
+// shipped static fallback (def.models). This lets models be browsed WITHOUT logging in;
 // only "Refresh models" (a live fetch) genuinely needs an account. Returns null only when
 // the provider ships no static list AND nothing has been fetched (e.g. antigravity before login).
 function catalogFor(def) {
   const cache = readModelCache(def.id);
   const hasStatic = !!(def && def.models && Object.keys(def.models).length);
   // A live-fetched cache is authoritative. A "static"-sourced cache is just a shipped
-  // list written to disk in a past session — if the provider no longer ships static
+  // list written to disk in a past session. If the provider doesn't currently ship static
   // models, that cache is stale/false and must be ignored (don't resurrect removed
   // hardcoded models). So only trust a cache that is live, or static when we still ship it.
   if (cache && cache.models && Object.keys(cache.models).length && (cache.source !== "static" || hasStatic)) return cache;
@@ -178,7 +177,7 @@ export function buildAutoMenu(def) {
   const { order, excluded, source, sources } = getAutoConfig(providerId);
   const current = sources.find((s) => s.id === source) || sources[0] || { id: "manual", label: "Manual" };
   const items = [];
-  // Re-fetch the catalog and RECOMPUTE the sort orders (leaderboard etc.) in place — the
+  // Re-fetch the catalog and RECOMPUTE the sort orders (leaderboard etc.) in place: the
   // displayed order is the cached sortOrders, so without this the list only updates on an
   // app restart / login. Rebuilds the menu (refresh) so the new order shows immediately.
   items.push({ label: "Refresh models", color: "cyan", run: async () => { var msg; try { var c = await refreshModels(def); var n = c ? Object.keys(c).length : 0; msg = n > 0 ? ("Models refreshed (" + n + ")") : "No models returned. Log in first?"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } });
@@ -254,7 +253,7 @@ function buildAccountDetail(def, view) {
   const label = view.email || view.id;
   const extra = typeof controller.accountActions === "function" ? controller.accountActions(view) : [];
   const items = [];
-  // This account's own quota bars at the top — this is where the graphs show.
+  // This account's own quota bars at the top; this is where the graphs show.
   const bars = accountBars(view);
   if (bars.length) { items.push({ label: "Quota", kind: "heading" }); for (const bar of bars) items.push(bar); items.push({ label: "", separator: true }); }
   items.push({ label: "Back", run: () => ({ pop: true }) });
@@ -265,7 +264,7 @@ function buildAccountDetail(def, view) {
   if (typeof controller.refreshQuotaOne === "function") {
     items.push({ label: "Refresh quota", color: "cyan", run: async () => { try { await controller.refreshQuotaOne(view.id); return { refresh: true, flash: "Refresh quota ✓" }; } catch (e) { return { refresh: true, flash: "Failed: " + (e && e.message || e) }; } } });
   }
-  // Provider account actions (Verify / Refresh token) are network calls — run
+  // Provider account actions (Verify / Refresh token) are network calls; run
   // in-tab (non-suspend) with a result flash, staying on this menu so the bars refresh.
   extra.forEach((a) => items.push({ label: a.label, color: a.color || "cyan", run: async () => { try { await a.run(); return { refresh: true, flash: (a.label || "Done") + " ✓" }; } catch (e) { return { refresh: true, flash: "Failed: " + (e && e.message || e) }; } } }));
   items.push({ label: "Remove", color: "red", run: () => ({ push: () => buildConfirmMenu(`Remove ${label}?`, () => controller.remove(view.id)) }) });
@@ -285,7 +284,7 @@ function fmtDur(ms) {
 
 // Compact availability hint for the account ROW ("free in Xs" / "available").
 // The usage bars live in the account's detail menu, not inline in the row.
-// availableAt is Infinity for disabled accounts (never auto-available) — guard on
+// availableAt is Infinity for disabled accounts (never auto-available); guard on
 // isFinite so a disabled/never-limited row shows nothing (the [disabled] status
 // label already carries that state) instead of "free in Infinityh".
 function accountAvailabilityHint(view) {
@@ -301,7 +300,7 @@ function pushQuotaArea(items, def, views) {
   if (def.quotaDisabled === true) { items.push({ label: "Quota display is disabled for this provider.", kind: "note" }); return; }
   if (!views.length) { items.push({ label: "Add an account to see quota.", kind: "note" }); return; }
   // Only enabled accounts contribute quota (quotaBars skips disabled). If none are
-  // enabled, nothing will ever load — say so instead of a perpetual "Loading quota…".
+  // enabled, nothing will ever load; say so instead of a perpetual "Loading quota…".
   if (!views.some((v) => v.enabled !== false)) { items.push({ label: "No enabled accounts — enable or add one to see quota.", kind: "note" }); return; }
   const bars = quotaBars(views);
   if (bars.length) { for (const bar of bars) items.push(bar); return; }
@@ -319,7 +318,7 @@ function buildQuotaMenu(def) {
   if (typeof controller.refreshQuota === "function") items.push({ label: "Refresh quotas", color: "cyan", run: async () => { var msg; try { await controller.refreshQuota(true); msg = "Quota refreshed"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } });
   items.push({ label: "", separator: true });
   pushQuotaArea(items, def, views);
-  // Provider-supplied footnote (e.g. a pool whose quota the API doesn't report) —
+  // Provider-supplied footnote (e.g. a pool whose quota the API doesn't report);
   // provider-agnostic: core just renders whatever string the driver declares.
   if (typeof def.quotaNote === "string" && def.quotaNote) {
     items.push({ label: "", separator: true });
@@ -391,7 +390,7 @@ function barsFromPools(pools) {
     .filter((p) => p && typeof p.remainingFraction === "number")
     .map((p) => {
       // Every bar gets a Resets line: a pool without a (future) reset timestamp
-      // is an idle/rolling window that restarts on next use — say so instead of
+      // is an idle/rolling window that restarts on next use; say so instead of
       // rendering nothing (which read as a glitch next to labeled siblings).
       const ms = resetToMs(p.resetTime);
       const fresh = Number.isFinite(ms) && ms > Date.now();
@@ -406,7 +405,7 @@ function accountBars(view) {
 
 // Real per-pool quota aggregated across accounts as Claude-/usage-style bar rows.
 // Empty when no enabled account reports remainingFraction (e.g. before the first
-// quota fetch, or a provider with no quota API) — no bar is ever faked.
+// quota fetch, or a provider with no quota API); no bar is ever faked.
 function quotaBars(views) {
   const pools = {};
   for (const v of views) {
@@ -430,7 +429,7 @@ export function buildAccountMenu(def) {
 
   // Add account: providers with a URL-based loginFlow open the browser + show the
   // URL in-chrome and auto-capture via loopback where supported, with an in-tab
-  // pasted code as the fallback (buildLoginInput — an async, NON-suspend action so
+  // pasted code as the fallback (buildLoginInput, an async, NON-suspend action so
   // the renderer keeps the TUI live instead of dropping to the raw terminal).
   // Providers without a loginFlow fall back to their own login() (suspend).
   const addAccount = typeof def.loginFlow === "function"
@@ -450,7 +449,7 @@ export function buildAccountMenu(def) {
   }
   items.push(addAccount);
 
-  // Quota is per-account, so it only makes sense once you're logged in — gate on accounts
+  // Quota is per-account, so it only makes sense once you're logged in; gate on accounts
   // (unlike Models, which are browsable from the static catalog without an account).
   if (views.length > 0) {
     items.push({ label: "", separator: true });
@@ -465,7 +464,7 @@ export function buildAccountMenu(def) {
     items.push({ label: "Models", kind: "heading" });
     items.push({ label: "Browse models", hint: "view + search", color: "cyan", run: () => { browseQuery = ""; return { push: () => buildModelsBrowse(def) }; } });
     items.push({ label: "Configure Auto models", hint: "ranking / include-exclude", color: "cyan", run: () => ({ push: () => buildAutoMenu(def) }) });
-    // Refresh does a LIVE fetch, which needs an account — only offer it once logged in.
+    // Refresh does a LIVE fetch, which needs an account; only offer it once logged in.
     if (views.length > 0) items.push({ label: "Refresh models", color: "cyan", run: async () => { var msg; try { var c = await refreshModels(def); var n = c ? Object.keys(c).length : 0; msg = n > 0 ? ("Models refreshed (" + n + ")") : "No models returned. Log in first?"; } catch (e) { msg = "Refresh failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } });
   }
 
@@ -474,7 +473,7 @@ export function buildAccountMenu(def) {
   items.push({ label: "Manage", hint: "proxies · settings", color: "cyan", run: () => ({ push: () => buildManageMenu(def) }) });
   if (views.length > 0) items.push({ label: "Delete all accounts", color: "red", run: () => ({ push: () => buildConfirmMenu("Delete ALL accounts? This cannot be undone.", () => { for (const v of controller.list()) controller.remove(v.id); }, 1) }) });
 
-  // No "Done" item — Esc backs out / exits (Done caused select() quirks + is redundant).
+  // No "Done" item; Esc backs out / exits (Done caused select() quirks + is redundant).
   // onOpen: renderers call it once on open so quota is fetched in the background and
   // ready when the user opens Quota / an account (no bars clutter the main list).
   const onOpen = typeof controller.refreshQuota === "function"

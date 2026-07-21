@@ -44,7 +44,7 @@ export function candidatesForScope(store, key, accountId, now = Date.now()) {
 }
 
 // Is a proxy the account ALREADY holds still valid to re-use in this scope? Same
-// checks as candidatesForScope MINUS the per-proxy cap — the account occupies its
+// checks as candidatesForScope MINUS the per-proxy cap: the account occupies its
 // own slot, so the cap (which gates NEW assignments) must not evict it. Without
 // this, an account on a cap-full proxy fails its own sticky check and churns (or,
 // with a one-proxy pool, deadlocks to direct).

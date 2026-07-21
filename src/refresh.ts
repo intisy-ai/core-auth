@@ -50,7 +50,7 @@ export function mergeModels(opencodeProvider: string, models: Record<string, unk
   if (npm) {
     config.provider[opencodeProvider].npm = npm;
     // @ai-sdk providers (google/anthropic/…) validate a NON-EMPTY apiKey when the
-    // model is constructed — before our loader's fetch override takes over — so
+    // model is constructed, before our loader's fetch override takes over, so
     // seed a dummy key. Real auth is the per-account OAuth token applied in handle().
     const existingOptions = config.provider[opencodeProvider].options || {};
     config.provider[opencodeProvider].options = {
@@ -59,7 +59,7 @@ export function mergeModels(opencodeProvider: string, models: Record<string, unk
     };
   }
   // REPLACE (not merge) the provider's models every refresh so a renamed/removed
-  // model id can never linger as a stale entry — the provider owns this list.
+  // model id can never linger as a stale entry; the provider owns this list.
   config.provider[opencodeProvider].models = { ...models };
   try {
     if (!existsSync(dirname(path))) mkdirSync(dirname(path), { recursive: true });
@@ -73,7 +73,7 @@ export function mergeModels(opencodeProvider: string, models: Record<string, unk
 // after a login so a newly-authed account populates models without waiting for a restart.
 //
 // `forceOpencodeMerge` is set by the opencode integration (opencode.ts), which only ever
-// runs inside the opencode process — there HUB_CONFIG_DIR may be unset and isOpencodeHost()
+// runs inside the opencode process, where HUB_CONFIG_DIR may be unset and isOpencodeHost()
 // would be unreliable, so the merge must be unconditional. The host-agnostic menu/login
 // paths leave it false and rely on isOpencodeHost() (the loaders export HUB_CONFIG_DIR).
 export async function refreshModels(def, forceOpencodeMerge = false): Promise<Record<string, unknown>> {

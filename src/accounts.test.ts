@@ -1,9 +1,8 @@
-// Regression tests for the withLock fail-closed fix (see accounts.ts). The bug: when
-// the lock couldn't be acquired, withLock used to `break` out of its wait loop with
-// handle===null and then run `fn()` ANYWAY -- unlocked. Two writers racing that path
-// would both read-modify-write accounts.json and the second `renameSync` would
-// silently clobber the first (a lost update). The fix makes withLock fail-closed:
-// it throws (LockTimeoutError) instead of ever running fn() without the lock held.
+// Regression tests for withLock's fail-closed contract (see accounts.ts): when the lock
+// cannot be acquired, withLock must throw (LockTimeoutError) rather than run `fn()`
+// unlocked. Running `fn()` unlocked would let two writers racing the same store both
+// read-modify-write accounts.json, with the second `renameSync` silently clobbering the
+// first (a lost update).
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { execSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, existsSync, statSync, readFileSync, writeFileSync, utimesSync } from "node:fs";
@@ -96,9 +95,9 @@ describe("cross-thread concurrency", () => {
   }
 
   // Happy path only: both writers hit an unlocked/quickly-released lock, so neither
-  // waits anywhere near LOCK_WAIT_MS. This does NOT exercise the degrade-to-unlocked
-  // bug (it would pass on the old buggy code too) -- see the held-lock test below for
-  // the genuine regression guard on the timeout->fail-closed path.
+  // waits anywhere near LOCK_WAIT_MS. This alone does not exercise the fail-closed
+  // guarantee -- see the held-lock test below for the genuine regression guard on
+  // the timeout->fail-closed path.
   it("two fast concurrent updateAccounts on the same provider both land (no timeout involved)", async () => {
     await Promise.all([runWorker(dir, "worker-a"), runWorker(dir, "worker-b")]);
     const pool = loadAccounts("lock-test-provider", { dir });
@@ -107,10 +106,9 @@ describe("cross-thread concurrency", () => {
 
   // The genuine regression guard: one real OS thread holds the store's lock file past
   // LOCK_WAIT_MS while a second thread concurrently attempts updateAccounts on the SAME
-  // store. On the OLD buggy withLock, the second thread's wait loop would `break` at the
-  // deadline and run fn() anyway -- unlocked -- succeeding and silently writing
-  // "contender" alongside "seed". The fix must make it fail closed: throw
-  // LockTimeoutError and leave the on-disk store untouched.
+  // store. withLock must fail closed here: throw LockTimeoutError and leave the on-disk
+  // store untouched, never run fn() unlocked and silently write "contender" alongside
+  // "seed".
   it("lock held by another thread past LOCK_WAIT_MS: a concurrent updateAccounts throws LockTimeoutError instead of degrading to unlocked", async () => {
     saveAccounts("lock-test-provider", { accounts: [{ id: "seed" }], activeIndex: 0, activeIndexByLane: {} }, { dir });
 

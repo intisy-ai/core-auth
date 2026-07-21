@@ -1,5 +1,5 @@
 // @ts-nocheck
-// Generic, schema-driven settings editor — the mechanism lives in core so every
+// Generic, schema-driven settings editor; the mechanism lives in core so every
 // provider can expose its config in the same UI (oc loader tab + `oc auth login`),
 // while the field list stays provider-specific. A provider declares:
 //

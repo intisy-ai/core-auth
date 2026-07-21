@@ -1,5 +1,5 @@
 // @ts-nocheck
-// OpenCode native in-process FRONT-DOOR (SP-4): owns the app<->IR translation so providers stay
+// OpenCode native in-process FRONT-DOOR: owns the app<->IR translation so providers stay
 // IR-native only. OpenCode speaks the Anthropic wire (opencodeProvider defaults to "anthropic"), so
 // this decodes the inbound Anthropic body to canonical IR, calls the provider's IR-native handleIr,
 // and encodes the IR result back to the Anthropic wire. The encode step is byte-for-byte the SAME
@@ -54,8 +54,8 @@ export async function handleOpencodeViaIr(def, request, ctx) {
     ir = await translators.anthropic.decodeRequest(bodyText || "{}");
   } catch (error) {
     // A body that will not decode through the IR is a malformed request. A legacy provider that still
-    // carries a wire handle() gets it verbatim (the old malformed-body tolerance); an IR-native
-    // provider has no wire path, so surface a 400 rather than crash on an undefined call.
+    // carries a wire handle() gets it verbatim; an IR-native provider has no wire path, so surface a
+    // 400 rather than crash on an undefined call.
     log("IR decode failed: " + error);
     if (typeof def.handle === "function") return def.handle(request, ctx);
     return new Response(

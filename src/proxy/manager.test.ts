@@ -25,7 +25,7 @@ describe("ProxyManager sticky at cap", () => {
     expect(pm.selectForAccount("a1", "p")).toBe("http://only");
     expect(pm.selectForAccount("a2", "p")).toBe("http://only");
     expect(pm.selectForAccount("a3", "p")).toBe("http://only");
-    // a1 re-selecting must keep its slot — NOT fall through to direct (null)
+    // a1 re-selecting must keep its slot, NOT fall through to direct (null)
     expect(pm.selectForAccount("a1", "p")).toBe("http://only");
     // a NEW 4th account is correctly capped out -> direct
     expect(pm.selectForAccount("a4", "p")).toBe(null);

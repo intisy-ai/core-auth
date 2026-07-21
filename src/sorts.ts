@@ -4,8 +4,6 @@
 // def.sorts (none required):
 //   - "leaderboard" : built-in, core computes a quality order (leaderboard.ts)
 //   - { id, label, compute(ids) } : a custom sort the provider defines
-// (The old automatic "recommended" = the provider's natural order was removed — it was
-// often inaccurate; "leaderboard" is the quality source now.)
 // computeSorts returns the available non-manual sources + their precomputed orders,
 // which get cached so editors (loader tab, oc auth menu) stay generic.
 
@@ -18,9 +16,9 @@ const BUILTIN_LABEL = { leaderboard: "Leaderboard (quality)" };
 // is an opaque API rawId). Defaults to identity when names aren't available.
 export async function computeSorts(def, ranking, nameOf = (id) => id) {
   const ids = Array.isArray(ranking) ? ranking : [];
-  const sorts = [];                 // [{ id, label }] — offered sources beyond manual
-  const sortOrders = {};            // { id: [modelId] } — precomputed order per source
-  let scores = {};                  // { id: number } — live leaderboard quality scores
+  const sorts = [];                 // [{ id, label }], offered sources beyond manual
+  const sortOrders = {};            // { id: [modelId] }, precomputed order per source
+  let scores = {};                  // { id: number }, live leaderboard quality scores
   let scoreSource = "";             // provenance of those scores (e.g. "Artificial Analysis via OpenRouter")
 
   for (const entry of (def && def.sorts) || []) {

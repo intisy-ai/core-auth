@@ -54,8 +54,6 @@ describe("createLiveStore", () => {
     writeFileSync(join(configSub, "accounts.json.lock"), "");
     writeFileSync(join(configSub, "accounts.json.deadbeef1234.tmp"), "{}");
 
-    // Reproduces the bug: listKeys('') used to return
-    // ['accounts.json', 'accounts.json.lock', 'accounts.json.deadbeef1234.tmp'].
     expect(store.listKeys("")).toEqual(["accounts.json"]);
     // A prefix that only matches the artifacts must not surface them either.
     expect(store.listKeys("accounts.json.")).toEqual([]);

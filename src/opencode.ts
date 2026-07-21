@@ -40,7 +40,7 @@ export function toProxyUrl(originalUrl, port) {
 // where "Add account" runs the driver's own OAuth login (loopback listener +
 // terminal paste fallback). Otherwise it falls back to opencode's `code` oauth
 // method: opencode prompts for the pasted code / redirect URL and hands it to
-// callback(code) — terminal-conflict-free for non-TTY / container-only flows.
+// callback(code), terminal-conflict-free for non-TTY / container-only flows.
 function authMethods(def) {
   if (typeof def.loginFlow !== "function") {
     return [{ label: def.label + " (via core-auth)", type: "api" }];
@@ -100,9 +100,9 @@ export function createOpencodePlugin(def) {
               }
               // NATIVE in-process FRONT-DOOR owns app<->IR: decode the Anthropic wire to IR, call the
               // provider's IR-native handleIr, encode the IR result back (parity with core-proxy's
-              // server front-door). Every ecosystem provider is IR-native post-T4; a provider that
-              // supplies neither handleIr nor a legacy handle() is a packaging error, surfaced as a
-              // 503 rather than crashing on an undefined call.
+              // server front-door). Every ecosystem provider is IR-native; a provider that supplies
+              // neither handleIr nor a legacy handle() is a packaging error, surfaced as a 503
+              // rather than crashing on an undefined call.
               const ctx = { configDir: getConfigDir(), log };
               if (typeof def.handleIr === "function") {
                 return handleOpencodeViaIr(def, request, ctx);
@@ -120,7 +120,7 @@ export function createOpencodePlugin(def) {
       },
     };
     // A provider may contribute extra opencode hooks (e.g. an `event` handler for
-    // session recovery). Generic passthrough — core doesn't know what they do.
+    // session recovery). Generic passthrough; core doesn't know what they do.
     if (typeof def.opencodeHooks === "function") {
       try { Object.assign(hooks, (await def.opencodeHooks(input)) || {}); }
       catch (e) { log("opencodeHooks failed: " + e); }

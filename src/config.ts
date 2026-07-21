@@ -48,11 +48,11 @@ export function setActiveProvider(name: string): void {
 // (recommended, leaderboard, custom) is provider-defined and advertised in the
 // model cache as { id, label } with a precomputed order in sortOrders.
 
-// Sort source ids that USED to exist but were removed from the code. A cache written
-// by older code may still advertise them; filter them out by id so a retired source can
-// never keep surfacing from a stale models.json after an update — WITHOUT
-// wiping the whole derived cache (which would also hide still-valid sources like
-// "leaderboard" until the next refresh). When you retire a sort source, add its id here.
+// Sort source ids to filter out of a stale cache: a models.json written before a source
+// was retired may still advertise it by id, which would incorrectly resurface it after
+// an update. Filtering by id (rather than wiping the whole derived cache) still lets
+// valid sources like "leaderboard" survive untouched until the next refresh. Add an id
+// here when retiring a sort source.
 const RETIRED_SOURCES = new Set<string>(["recommended"]);
 
 // Available sources for a provider: always manual, plus whatever the cache advertises
