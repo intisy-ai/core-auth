@@ -2,7 +2,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npx tsc",
+    "build": "npm --prefix anthropic-translator install && npm --prefix anthropic-translator run build && npx tsc",
     "test": "vitest run"
   },
   "devDependencies": {

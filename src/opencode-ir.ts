@@ -6,12 +6,10 @@
 // translation core-proxy's server.ts front-door performs (encodeIrResult), so the native in-process
 // path and the out-of-process opencode-proxy path behave identically.
 //
-// core-ir is a SIBLING of core-auth in every host (libs/core-ir standalone; provider/core-ir when
-// bundled), and `src/` and `dist/` are both one level under the core-auth root, so this one literal
-// specifier resolves from source (vitest), the compiled dist, and the provider esbuild bundle alike
-// -- the same convention the providers' own driver code already uses to reach core-ir.
+// anthropic-translator is core-auth's own nested submodule (it re-exports the IR surface it needs),
+// so this import resolves the same in the monorepo and inside any host provider.
 
-import { translators } from "../../core-ir/dist/index.js";
+import { anthropicTranslator } from "../anthropic-translator/dist/index.js";
 
 // Duck-typed HandleIrError recognizer. The provider throws its OWN esbuild-inlined copy of
 // core-proxy's HandleIrError, so `instanceof` is unreliable across the provider/core-auth bundle
@@ -33,11 +31,11 @@ function isHandleIrError(e) {
 // bytes. The generic front-door synthesizes only the content-type header (same as the proxy path).
 async function encodeIrResult(irResult) {
   if (irResult instanceof ReadableStream) {
-    const encodeStream = await translators.anthropic.encodeStream();
+    const encodeStream = await anthropicTranslator.encodeStream();
     const byteStream = irResult.pipeThrough(encodeStream).pipeThrough(new TextEncoderStream());
     return new Response(byteStream, { status: 200, headers: { "content-type": "text/event-stream" } });
   }
-  const wire = await translators.anthropic.encodeResponse(irResult);
+  const wire = await anthropicTranslator.encodeResponse(irResult);
   return new Response(wire, { status: 200, headers: { "content-type": "application/json" } });
 }
 
@@ -51,7 +49,7 @@ export async function handleOpencodeViaIr(def, request, ctx) {
 
   let ir;
   try {
-    ir = await translators.anthropic.decodeRequest(bodyText || "{}");
+    ir = await anthropicTranslator.decodeRequest(bodyText || "{}");
   } catch (error) {
     // A body that will not decode through the IR is a malformed request. A legacy provider that still
     // carries a wire handle() gets it verbatim; an IR-native provider has no wire path, so surface a

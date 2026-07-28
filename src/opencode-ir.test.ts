@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { translators } from "../../core-ir/dist/index.js";
+import { anthropicTranslator } from "../anthropic-translator/dist/index.js";
 import { handleOpencodeViaIr } from "./opencode-ir.js";
 
 const wireRequest = JSON.stringify({
@@ -15,7 +15,7 @@ function req() {
 describe("handleOpencodeViaIr (OpenCode native front-door)", () => {
   it("decodes the wire request, calls handleIr, and encodes the IrResponse back to Anthropic wire", async () => {
     // Build a valid IrResponse by decoding a known Anthropic response through the same translator.
-    const irResponse = await translators.anthropic.decodeResponse(
+    const irResponse = await anthropicTranslator.decodeResponse(
       JSON.stringify({
         id: "msg_1", type: "message", role: "assistant", model: "claude-x",
         content: [{ type: "text", text: "hello" }],
