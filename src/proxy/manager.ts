@@ -49,7 +49,7 @@ export class ProxyManager {
     const chain = resolveChain(store, accountId, providerId);
     if (!chain.length) return null;
     const current = store.assignments[accountId];
-    // keep a sticky assignment if it's still usable in some chain scope — the
+    // keep a sticky assignment if it's still usable in some chain scope: the
     // account already holds this slot, so the per-proxy cap must NOT evict it
     // (that would churn, or deadlock to direct with a one-proxy pool).
     if (current) {

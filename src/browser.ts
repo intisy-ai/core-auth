@@ -12,11 +12,11 @@ export function openBrowser(url) {
     let command, args;
     const spawnOpts = { detached: true, stdio: "ignore" };
     if (platform === "win32") {
-      // `cmd /c start "" "<url>"` — the SAME opener that always worked; the only bug was
-      // that an unquoted url let cmd treat & as a command separator (and %xx as env
-      // expansion), truncating the OAuth url. Passing the whole command verbatim with the
-      // url DOUBLE-QUOTED stops that: inside quotes cmd leaves & and %xx untouched, so the
-      // exact url reaches the default browser. (title arg is the empty "" before the url.)
+      // `cmd /c start "" "<url>"`: an unquoted url lets cmd treat & as a command separator
+      // (and %xx as env expansion), truncating the OAuth url. Passing the whole command
+      // verbatim with the url DOUBLE-QUOTED avoids that: inside quotes cmd leaves & and
+      // %xx untouched, so the exact url reaches the default browser. (title arg is the
+      // empty "" before the url.)
       command = "cmd";
       args = ["/c", 'start "" "' + String(url).replace(/"/g, "") + '"'];
       spawnOpts.windowsVerbatimArguments = true;

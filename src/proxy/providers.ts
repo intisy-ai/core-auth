@@ -39,7 +39,7 @@ async function iplocate() {
   return linesToProxies(text, "iplocate");
 }
 
-// keyed/premium providers — wire real endpoints once a key is configured
+// keyed/premium providers: wire real endpoints once a key is configured
 async function keyed(provider, config) {
   if (!config || !config.key) return [];
   return [];

@@ -25,7 +25,7 @@ export async function buildLoginInput(def) {
     input: {
       title: "Sign in to " + def.label,
       message: (flow.instructions || "Approve in your browser, then paste the authorization code here.") + (flow.url ? "\n\n" + flow.url : ""),
-      // shown while complete() runs — the token exchange + project discovery can
+      // shown while complete() runs: the token exchange + project discovery can
       // take ~10-15s (proxied), so the field reports progress instead of vanishing
       pendingLabel: "Adding account… (exchanging the code, this can take a few seconds)",
       // paste fallback: trade the pasted code/redirect URL for an account, then pull

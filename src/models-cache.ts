@@ -22,7 +22,7 @@ function readAll() {
 }
 
 // returns { models, ranking, defaultModelId, fetchedAt, sorts, sortOrders, scores } | null
-// NOTE: derived fields (sorts/sortOrders) are returned AS CACHED — we do NOT wipe them
+// NOTE: derived fields (sorts/sortOrders) are returned AS CACHED; we do NOT wipe them
 // on read. Wiping would hide still-valid sources (e.g. leaderboard) until the next
 // refresh. Stale RETIRED sources are filtered surgically in config.getAutoSources by id.
 export function readModelCache(providerId) {
@@ -51,7 +51,7 @@ export async function resolveProviderModels(def, ctx, nowMs) {
   let catalog = null;   // { models, ranking, defaultModelId }
   let source = null;    // "live" (fetched now) | "static" (shipped fallback list)
 
-  // 1. live fetch — providers that implement fetchModels and have an account
+  // 1. live fetch: providers that implement fetchModels and have an account
   if (typeof def.fetchModels === "function" && ctx && ctx.hasAccounts) {
     try {
       const result = await def.fetchModels(ctx);
@@ -63,7 +63,7 @@ export async function resolveProviderModels(def, ctx, nowMs) {
       log("fetchModels failed for " + providerId + ": " + e);
     }
   }
-  // 2. static catalog — providers that ship def.models (no fetch). ranking defaults
+  // 2. static catalog: providers that ship def.models (no fetch). ranking defaults
   //    to declaration order (the manual/catalog order; also the leaderboard input).
   if (!catalog && def.models && Object.keys(def.models).length > 0) {
     catalog = { models: def.models, ranking: Object.keys(def.models) };
@@ -75,7 +75,7 @@ export async function resolveProviderModels(def, ctx, nowMs) {
     return cached ? cached.models : {};
   }
 
-  // Generic "Auto" model: any multi-model provider automatically gets one — it resolves
+  // Generic "Auto" model: any multi-model provider automatically gets one; it resolves
   // at request time to the top of its Auto ranking (the provider's request handler does
   // the rewrite via getAutoCandidates). Skip if the provider already defines its own Auto
   // (antigravity keeps its thinking-level variants), or if there's nothing to choose from

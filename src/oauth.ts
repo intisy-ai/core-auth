@@ -71,7 +71,7 @@ export async function refreshAccessToken(refreshToken, opts) {
   try {
     response = await fetch(opts.tokenUrl, init);
   } catch (err) {
-    // A dead/unreachable proxy must not strand the account on an expired token —
+    // A dead/unreachable proxy must not strand the account on an expired token:
     // a token refresh that never reached the server can be safely retried direct.
     const message = String((err && err.message) || err);
     if (init.proxy && /unable to connect|failed to connect|could not connect|fetch failed|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EHOSTUNREACH|EAI_AGAIN|socket|proxy|tunnel|network/i.test(message)) {

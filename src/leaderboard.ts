@@ -1,13 +1,13 @@
 // @ts-nocheck
 // Live quality ranking for the Auto "leaderboard" source. Pulls per-model quality
-// scores from a public, KEYLESS source — OpenRouter's model list
+// scores from a public, keyless source: OpenRouter's model list
 // (https://openrouter.ai/api/v1/models), whose `benchmarks.artificial_analysis
 // .intelligence_index` aggregates Artificial Analysis' intelligence index for the
 // major providers (Anthropic/Google/OpenAI/…). No hardcoded quality table: the data
 // updates as OpenRouter refreshes. Results are cached to disk (24h TTL) so we don't
 // refetch on every model refresh. An optional ARTIFICIAL_ANALYSIS_API_KEY (or
 // cfg.leaderboard.apiKey) is used first when present (direct AA, finest coverage).
-// On a cold failure with no cache we return the catalog order unchanged — we never
+// On a cold failure with no cache we return the catalog order unchanged; we never
 // fabricate a ranking.
 
 import { readConfig } from "./config.js";
@@ -31,19 +31,14 @@ function apiKey(): string {
   return String(cfg.apiKey || "").trim();
 }
 
-export function hasLeaderboardKey(): boolean {
-  return !!apiKey();
-}
-
 // normalize a model id/name for fuzzy matching: lowercase, drop tier/variant
 // suffixes and any non-alphanumerics so "claude-opus-4-6-thinking" ~ "Claude 4.6 Opus".
 function normalize(name: string): string {
   return String(name || "")
     .toLowerCase()
     // strip effort/variant tokens regardless of separator so "Gemini Flash (High)",
-    // "gemini-flash-high" and "gemini flash low" all collapse to the SAME base key —
-    // variants of one model then share a score and group together (the old regex only
-    // stripped hyphenated "-high", so parenthesized "(High)" variants scattered).
+    // "gemini-flash-high" and "gemini flash low" all collapse to the SAME base key,
+    // so variants of one model share a score and group together.
     .replace(/\b(minimal|extra[\s_-]?low|low|medium|high|thinking|agent|preview|customtools|reasoning)\b/g, "")
     .replace(/[^a-z0-9]/g, "");
 }
@@ -52,13 +47,13 @@ type Score = { norm: string; score: number };
 type ScoreSet = { scores: Score[]; source: string };
 
 // Human-readable provenance of the score data (both routes carry Artificial
-// Analysis' intelligence index — the source says HOW we obtained it).
+// Analysis' intelligence index; the source says HOW we obtained it).
 const SOURCE_AA = "Artificial Analysis";
 const SOURCE_OPENROUTER = "Artificial Analysis via OpenRouter";
 
 // ---- score sources ----------------------------------------------------------
 
-// OpenRouter's public /models — keyless. Each model may carry
+// OpenRouter's public /models endpoint, keyless. Each model may carry
 // benchmarks.artificial_analysis.intelligence_index; index by both name and id.
 async function fetchOpenRouter(): Promise<Score[]> {
   const response = await fetch(OPENROUTER_URL, { headers: { Accept: "application/json" } });
@@ -76,7 +71,7 @@ async function fetchOpenRouter(): Promise<Score[]> {
   return out;
 }
 
-// Direct Artificial Analysis — requires the user's own key; broader/fresher coverage.
+// Direct Artificial Analysis: requires the user's own key; broader/fresher coverage.
 async function fetchAA(key: string): Promise<Score[]> {
   const response = await fetch(AA_URL, { headers: { "x-api-key": key, Accept: "application/json" } });
   if (!response.ok) { log("leaderboard: AA " + response.status); return []; }
@@ -143,7 +138,7 @@ export function leaderboardSourceShort(source: string): string {
 // ---- public order -----------------------------------------------------------
 
 // effort/variant weight (higher ranks higher), read from a model's DISPLAY NAME which
-// reliably carries "(Thinking)"/"(High)"/… — the catalog id is an opaque API rawId.
+// reliably carries "(Thinking)"/"(High)"/etc; the catalog id is an opaque API rawId.
 function effortRank(text: string): number {
   const s = String(text).toLowerCase();
   if (/(^|[^a-z])thinking([^a-z]|$)/.test(s)) return 6;
@@ -155,8 +150,8 @@ function effortRank(text: string): number {
   return 3;   // normal / no effort marker
 }
 
-// base matching key from a display name: drop ALL parenthetical tags — the effort
-// "(High)" and the provider label "(Antigravity)" — then normalize. Variants of one
+// base matching key from a display name: drop ALL parenthetical tags (the effort
+// "(High)" and the provider label "(Antigravity)"), then normalize. Variants of one
 // model collapse to the same key (so they group + share a score).
 function baseKeyFromName(text: string): string {
   return normalize(String(text).replace(/\([^)]*\)/g, " "));
@@ -169,7 +164,7 @@ function baseKeyFromName(text: string): string {
  * API rawId that doesn't carry the model name or effort). Variants of one model group
  * together at the base score, ordered by effort among themselves; effort never decides
  * order between different models. With no live data (offline, no cache) the catalog
- * order is preserved (variants still effort-ordered within a base) — never fabricated.
+ * order is preserved (variants still effort-ordered within a base); never fabricated.
  */
 // version-tolerant score lookup for a normalized base key: exact/substring base-key
 // match wins; else a digit-stripped FAMILY match so "Claude Opus 4.6" still ranks by
@@ -220,7 +215,7 @@ export async function computeLeaderboardOrder(
     const base = baseKeyFromName(name);
     return { id, i, base, effort: effortRank(name), score: scoreFor(base) };
   });
-  // Effort ONLY decides order between variants of the SAME base model — never between
+  // Effort ONLY decides order between variants of the SAME base model, never between
   // different models (those keep score order, then catalog order).
   const tie = (a, b) => (a.base === b.base ? (b.effort - a.effort) : 0) || (a.i - b.i);
   return scored

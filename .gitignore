@@ -9,3 +9,6 @@ java/.gradle/
 java/**/.gradle/
 java/.idea/
 *.iml
+docs/
+.superpowers/
+graphify-out/

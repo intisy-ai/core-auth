@@ -1,5 +1,5 @@
 // @ts-nocheck
-// Cross-app user notifications for auth providers — a small message the USER sees
+// Cross-app user notifications for auth providers: a small message the USER sees
 // that never enters the model's context.
 //
 //  - opencode: a real toast via the plugin client (client.tui.showToast). The
@@ -32,18 +32,18 @@ function configDir() {
 // config files only). Sibling of config/ and logs/ under the app dir.
 export function notifyQueuePath(dir) { return join(dir || configDir(), "cache", "auth-notifications.jsonl"); }
 
-// notify(message, level?) — level: "info" | "success" | "warning" | "error".
+// notify(message, level?): level is "info" | "success" | "warning" | "error".
 // Never throws: a failed notification must not break the request path.
 export function notify(message, level) {
   const lvl = level || "info";
   // Persistent record in the normal log (both apps). The toast/queue below is
-  // transient delivery only — the queue is read-and-cleared by the drain hook, so
+  // transient delivery only; the queue is read-and-cleared by the drain hook, so
   // without this a notification would leave no trace after being shown once.
   log("notify[" + lvl + "] " + message);
   try {
     if (!isClaude() && ocClient && ocClient.tui && typeof ocClient.tui.showToast === "function") {
       const variant = lvl === "success" || lvl === "warning" || lvl === "error" ? lvl : "info";
-      // opencode's SDK expects the payload nested under `body` — a flat {message,variant} silently no-ops.
+      // opencode's SDK expects the payload nested under `body`; a flat {message,variant} silently no-ops.
       Promise.resolve(ocClient.tui.showToast({ body: { message, variant } })).catch(() => {});
       return;
     }

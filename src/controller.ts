@@ -24,7 +24,7 @@ function soonestAvailable(account, now) {
 
 // opts: { status?(account,now), detail?(account,now), quota?(account), availableAt?(account,now), login(), refreshQuota?(), refreshQuotaOne?(id) }
 // availableAt lets a provider report usability from its own signal (e.g. quota
-// pools) instead of the generic per-lane backoff — a single transient lane limit
+// pools) instead of the generic per-lane backoff, since a single transient lane limit
 // shouldn't read as "the whole account is down" when other lanes still serve.
 export function accountControllerFromManager(manager, opts) {
   const options = opts || {};

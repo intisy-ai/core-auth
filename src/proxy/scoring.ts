@@ -6,7 +6,7 @@ export function countAssignments(store, url) {
   return Object.values(store.assignments || {}).filter((u) => u === url).length;
 }
 
-// lower is better — IP-rate-limit hits dominate (they reflect a burned exit IP)
+// lower is better; IP-rate-limit hits dominate (they reflect a burned exit IP)
 export function scoreOf(store, proxy) {
   const s = proxy.stats || {};
   const checks = s.checks || 0;
