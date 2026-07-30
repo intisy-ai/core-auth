@@ -15,10 +15,16 @@ import { homedir } from "os";
 import { log } from "./log.js";
 
 let ocClient = null;   // set by a provider's opencodeHooks
+let notifier = null;   // injected by a host that owns the core event bus
 
 // Providers call this from opencodeHooks with the plugin `client` so opencode
 // notifications become real toasts. No-op / harmless when never called.
 export function setOpencodeClient(client) { ocClient = client || null; }
+
+// A host that bundles core wires its event-bus publish here, so notifications flow
+// onto the one shared bus instead of the local toast/queue. Unset (the default)
+// keeps the standalone toast/queue delivery below.
+export function setNotifier(fn) { notifier = typeof fn === "function" ? fn : null; }
 
 function isClaude() { return process.argv.join(" ").includes("claude"); }
 
@@ -40,6 +46,10 @@ export function notify(message, level) {
   // transient delivery only; the queue is read-and-cleared by the drain hook, so
   // without this a notification would leave no trace after being shown once.
   log("notify[" + lvl + "] " + message);
+  if (notifier) {
+    try { notifier(message, lvl); } catch {}
+    return;
+  }
   try {
     if (!isClaude() && ocClient && ocClient.tui && typeof ocClient.tui.showToast === "function") {
       const variant = lvl === "success" || lvl === "warning" || lvl === "error" ? lvl : "info";
