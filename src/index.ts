@@ -2,6 +2,7 @@
 // Public surface of the core-auth library, bundled into each provider plugin.
 
 export { defineProvider } from "./provider.js";
+export { COMMON_PROVIDER_DEFAULTS, COMMON_PROVIDER_CAPABILITIES, commonManagerOptions } from "./provider-common.js";
 export { createOpencodePlugin } from "./opencode.js";
 export { isOAuthAuth, accessTokenExpired, calculateTokenExpiry, refreshAccessToken, TokenRefreshError } from "./oauth.js";
 export { startOAuthListener } from "./server.js";
