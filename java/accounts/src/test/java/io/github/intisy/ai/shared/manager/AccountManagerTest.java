@@ -333,6 +333,48 @@ class AccountManagerTest {
     }
 
     @Test
+    void reportError_yieldsToActiveProviderReset_doesNotSetCoolingDownUntil() {
+        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+
+        Account account = new Account();
+        account.id = "acc1";
+        account.enabled = true;
+        store.add("provider", account);
+
+        FixedClock clock = new FixedClock(1_000_000L);
+        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new TestJsonCodec());
+
+        manager.reportRateLimit("acc1", "chat", clock.now() + 60_000L); // provider reset still active
+        manager.reportError("acc1", 0, "boom");
+
+        Account persisted = store.list("provider").get(0);
+        assertNull(persisted.coolingDownUntil); // core's generic backoff yielded to the provider reset
+        assertNull(persisted.cooldownReason);
+        assertEquals(clock.now() + 60_000L, persisted.rateLimitResetTimes.get("chat"));
+    }
+
+    @Test
+    void reportError_appliesBackoffWhenNoActiveProviderReset() {
+        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+
+        Account account = new Account();
+        account.id = "acc1";
+        account.enabled = true;
+        account.rateLimitResetTimes = new java.util.LinkedHashMap<>();
+        account.rateLimitResetTimes.put("chat", 500_000L); // expired -- in the past
+        store.add("provider", account);
+
+        FixedClock clock = new FixedClock(1_000_000L);
+        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new TestJsonCodec());
+
+        manager.reportError("acc1", 0, "boom");
+
+        Account persisted = store.list("provider").get(0);
+        assertEquals(clock.now() + 750L, persisted.coolingDownUntil); // same math as reportError_setsCoolingDownUntilViaDeterministicBackoff
+        assertEquals("boom", persisted.cooldownReason);
+    }
+
+    @Test
     void reportSuccess_clearsCooldownAndBumpsLastUsed() {
         AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
 

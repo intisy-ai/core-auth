@@ -137,6 +137,36 @@ describe("reportError -> reportSuccess: cooldown lifecycle", () => {
   });
 });
 
+describe("reportError yields to an active provider reset (F4: one owner of usable-again)", () => {
+  it("does not set coolingDownUntil while a provider-supplied rate-limit reset is active, and the account recovers once that reset passes (not gated by a separate core backoff)", async () => {
+    const lane = "chat";
+    seed(pool([account("a"), account("b")], 0));
+    const mgr = manager({ selection: "sticky", backoff: { baseMs: 50, maxMs: 50 } });
+
+    const resetAt = Date.now() + 150;
+    mgr.reportRateLimit("a", lane, resetAt);
+    mgr.reportError("a", 0, "boom");
+
+    const a = mgr.list().find((x) => x.id === "a");
+    expect(a.coolingDownUntil).toBeFalsy(); // core's generic backoff yielded to the provider reset
+    expect(a.rateLimitResetTimes.chat).toBe(resetAt);
+
+    // gated by exactly the provider reset while it's active
+    const duringReset = await mgr.acquire(lane);
+    expect(duringReset.account.id).toBe("b");
+
+    await sleep(200);
+    const p = storedPool();
+    p.activeIndexByLane[lane] = 0;
+    store.put("accounts.json", JSON.stringify({ version: 1, providers: { [PROVIDER]: p } }));
+
+    // available again once the reset passes, not still cooling from a second, independently
+    // computed core backoff
+    const afterReset = await mgr.acquire(lane);
+    expect(afterReset.account.id).toBe("a");
+  });
+});
+
 describe("nextAvailableAt", () => {
   it("returns the soonest epoch-ms across the pool, not just one account's", async () => {
     const now = Date.now();

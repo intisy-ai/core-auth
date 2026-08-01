@@ -130,12 +130,24 @@ public class AccountManager {
     }
 
     public void reportError(String id, int attempt, String reason) {
-        long ms = RateLimitMath.calculateBackoffMs(attempt, opts.backoffBaseMs, opts.backoffMaxMs, true, random);
-        long resumeAt = clock.now() + ms;
+        long now = clock.now();
         mutate(id, account -> {
-            account.coolingDownUntil = resumeAt;
+            // The provider owns its upstream's real retry-after; when a rate-limit reset it
+            // supplied is still active for this account, core's own generic backoff yields to
+            // it instead of layering a second, independently-computed timer on top.
+            if (hasActiveRateLimitReset(account, now)) return;
+            long ms = RateLimitMath.calculateBackoffMs(attempt, opts.backoffBaseMs, opts.backoffMaxMs, true, random);
+            account.coolingDownUntil = now + ms;
             account.cooldownReason = reason != null ? reason : "transient error";
         });
+    }
+
+    private static boolean hasActiveRateLimitReset(Account account, long now) {
+        if (account.rateLimitResetTimes == null) return false;
+        for (Long resetMs : account.rateLimitResetTimes.values()) {
+            if (resetMs != null && resetMs > now) return true;
+        }
+        return false;
     }
 
     public void reportSuccess(String id) {
