@@ -1,16 +1,17 @@
 // @ts-nocheck
 // Generic OAuth helpers + token refresh; the driver supplies its own tokenUrl/clientId/clientSecret.
-
-const ACCESS_TOKEN_EXPIRY_BUFFER_MS = 60 * 1000;
+import { getCoreAuth } from "./core-auth-loader.js";
 
 export function isOAuthAuth(auth) {
   return !!auth && auth.type === "oauth";
 }
 
-// expired or missing, with a buffer for clock skew
+// Delegates to CoreAuthJs.accessTokenExpired (TokenRefresh.accessTokenExpired, java/accounts),
+// the single-sourced expired-or-missing predicate with the 60s clock-skew buffer. Requires
+// initCoreAuth() to have been awaited at startup; the only caller (AccountManager.ensureAccess)
+// runs on the async acquire() path, which self-inits.
 export function accessTokenExpired(auth) {
-  if (!auth || !auth.access || typeof auth.expires !== "number") return true;
-  return auth.expires <= Date.now() + ACCESS_TOKEN_EXPIRY_BUFFER_MS;
+  return getCoreAuth().accessTokenExpired(JSON.stringify(auth || {}), Date.now());
 }
 
 export function calculateTokenExpiry(requestTimeMs, expiresInSeconds) {
