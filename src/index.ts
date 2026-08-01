@@ -57,6 +57,7 @@ export { qualityLabel, isIpLimited, IP_LIMIT_COOLDOWN_MS, MAX_ACCOUNTS_PER_PROXY
 export { scopeKey, parseScopeKey, effectiveMode, resolveChain, proxiesInScope, candidatesForScope } from "./proxy/scopes.js";
 export { runProxyMenu, selectAccountProxies } from "./ui/proxy-menu.js";
 export { runProviderMenu } from "./menu.js";
+export { providerHandlerExports } from "./handler-exports.js";
 export { buildAccountMenu, buildAutoMenu } from "./ui/menu-model.js";
 export { buildLoginInput } from "./ui/url-auth.js";
 export { buildSettingsMenu } from "./ui/settings-menu.js";
