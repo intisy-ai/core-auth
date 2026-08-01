@@ -87,6 +87,14 @@ export function accessTokenExpired(accountJson: string, now: number): boolean;
 export function calculateBackoffMsJson(argsJson: string): string;
 
 /**
+ * `QuotaHealth.hasCapacity` -- the neutral quota-capacity predicate over a provider's mapped
+ * `{remainingFraction: number}[]`. `poolsJson` is that list as JSON (a missing/non-numeric
+ * `remainingFraction` counts as 0). The same decision answers both "does the account still have
+ * quota" and "is a 429 an IP/proxy limit" (ipSuspected).
+ */
+export function quotaHasCapacity(poolsJson: string): boolean;
+
+/**
  * `TokenRefresh.refresh` -- the network OAuth refresh call. `oauthConfigJson` supplies
  * `{tokenUrl, clientId, clientSecret?, extraParams?}`. Resolves to `{access, expires, refresh}` on
  * success, or `{revoked:true}` when the token endpoint reported `error=invalid_grant`. Any other

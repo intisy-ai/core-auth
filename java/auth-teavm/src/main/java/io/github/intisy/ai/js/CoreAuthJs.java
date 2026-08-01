@@ -8,6 +8,7 @@ import io.github.intisy.ai.shared.oauth.OAuthConfig;
 import io.github.intisy.ai.shared.oauth.Refreshed;
 import io.github.intisy.ai.shared.oauth.TokenRefresh;
 import io.github.intisy.ai.shared.oauth.TokenRefreshError;
+import io.github.intisy.ai.shared.select.QuotaHealth;
 import io.github.intisy.ai.shared.select.RateLimitMath;
 import io.github.intisy.ai.shared.select.Strategy;
 import io.github.intisy.ai.shared.spi.Clock;
@@ -22,7 +23,9 @@ import org.teavm.jso.core.JSObjects;
 import org.teavm.jso.core.JSPromise;
 import org.teavm.jso.core.JSString;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BiPredicate;
 
@@ -209,6 +212,35 @@ public final class CoreAuthJs {
         boolean jitter = Boolean.TRUE.equals(args.get("jitter"));
         long result = RateLimitMath.calculateBackoffMs(attempt, baseMs, maxMs, jitter);
         return json.stringify(result);
+    }
+
+    /**
+     * {@code QuotaHealth.hasCapacity} -- the neutral quota-capacity predicate a provider's quota
+     * parser delegates to after mapping its own cachedQuota shape into the neutral list. {@code
+     * poolsJson} is a JSON array of {@code {"remainingFraction":number}} objects (missing/non-
+     * numeric {@code remainingFraction} treated as 0, so a malformed pool never counts as
+     * capacity); returns the bare JSON boolean. The same value answers both "does the account
+     * still have quota" and "is a 429 an IP/proxy limit" (ipSuspected), see {@link
+     * QuotaHealth#ipSuspected} javadoc.
+     */
+    @JSExport
+    public static boolean quotaHasCapacity(String poolsJson) {
+        JsonCodec json = new SimpleJsonCodec();
+        return QuotaHealth.hasCapacity(quotaPoolsFromJson(json, poolsJson));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<QuotaHealth.Pool> quotaPoolsFromJson(JsonCodec json, String poolsJson) {
+        List<QuotaHealth.Pool> pools = new ArrayList<>();
+        Object parsed = poolsJson != null ? json.parse(poolsJson) : null;
+        if (!(parsed instanceof List)) return pools;
+        for (Object entry : (List<Object>) parsed) {
+            if (!(entry instanceof Map)) continue;
+            Object rf = ((Map<?, ?>) entry).get("remainingFraction");
+            double remainingFraction = rf instanceof Number ? ((Number) rf).doubleValue() : 0.0;
+            pools.add(new QuotaHealth.Pool(remainingFraction));
+        }
+        return pools;
     }
 
     /**
