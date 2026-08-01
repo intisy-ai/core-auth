@@ -46,6 +46,8 @@ export { readModelCache, resolveProviderModels } from "./models-cache.js";
 export { log } from "./log.js";
 export { notify, setOpencodeClient, setNotifier, notifyQueuePath } from "./notify.js";
 export { chatError, HandleIrError, handleIrErrorFromResponse } from "./errors.js";
+export { lazyModule, safeJsonParse } from "./lazy.js";
+export type { LazyModule } from "./lazy.js";
 export { select } from "./ui/select.js";
 export { confirm } from "./ui/confirm.js";
 export { prompt } from "./ui/prompt.js";
