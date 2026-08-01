@@ -4,7 +4,32 @@
 export { defineProvider } from "./provider.js";
 export { defineProviderPlugin } from "./provider-plugin.js";
 export type { ProviderPluginOpts, ProviderPluginCore, OpencodePlugin } from "./provider-plugin.js";
-export { COMMON_PROVIDER_DEFAULTS, COMMON_PROVIDER_CAPABILITIES, commonManagerOptions } from "./provider-common.js";
+export {
+  COMMON_PROVIDER_DEFAULTS,
+  COMMON_PROVIDER_CAPABILITIES,
+  commonManagerOptions,
+  retryBackoffCapabilities,
+  retryBackoffSettingsGroups,
+  retryBackoffConfigDefaults,
+  coercePositiveInt,
+  coerceRetryBackoff,
+  retryBackoffMs,
+} from "./provider-common.js";
+export type { RetryBackoffKeys, RetryBackoffDefaults } from "./provider-common.js";
+export {
+  toSettingsGroups,
+  toCapabilitiesFields,
+} from "./settings-schema.js";
+export type {
+  ProviderSettingsSchema,
+  SettingsGroupSchema,
+  SettingsField,
+  SettingsFieldType,
+  SettingsFieldOption,
+  SettingsMenuGroup,
+  SettingsMenuField,
+  CapabilitiesField,
+} from "./settings-schema.js";
 export { createOpencodePlugin } from "./opencode.js";
 export { isOAuthAuth, accessTokenExpired, calculateTokenExpiry, encodeState, decodeState, refreshAccessToken, TokenRefreshError } from "./oauth.js";
 export { startOAuthListener } from "./server.js";

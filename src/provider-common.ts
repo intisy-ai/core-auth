@@ -7,6 +7,8 @@
 // commonManagerOptions() to AccountManager, so the key name, default, and choice
 // list live in one place.
 
+import { toCapabilitiesFields, toSettingsGroups } from "./settings-schema.js";
+
 export const COMMON_PROVIDER_DEFAULTS = {
   account_selection_strategy: "hybrid",
 };
@@ -32,4 +34,78 @@ export const COMMON_PROVIDER_CAPABILITIES = [
 export function commonManagerOptions(config) {
   const cfg = config || {};
   return { selection: cfg.account_selection_strategy || "hybrid" };
+}
+
+// Retry/backoff: same "base cooldown, doubles per attempt, capped at a max"
+// semantics across providers (antigravity's default_retry_after_seconds/
+// max_backoff_seconds, claude-code's default_cooldown_seconds/max_cooldown_seconds),
+// but the KEY NAMES differ per provider and renaming them would silently drop a
+// live user's existing config value. So provider-common owns the field shape,
+// the coercion, and the AccountManager-ready backoff object; each provider
+// supplies its OWN key names (RetryBackoffKeys) and its OWN default values
+// (RetryBackoffDefaults) - antigravity's 60/60 and claude-code's 60/900 are
+// legitimate per-provider config values, not duplication.
+
+export interface RetryBackoffKeys {
+  baseKey: string;
+  maxKey: string;
+}
+
+export interface RetryBackoffDefaults {
+  baseSeconds: number;
+  maxSeconds: number;
+}
+
+function retryBackoffSchema(keys) {
+  return [
+    {
+      title: "Retry",
+      fields: [
+        { key: keys.baseKey, label: "Base retry delay (s)", type: "number", min: 1, hint: "Base cooldown after a rate limit or transient error; doubles per attempt." },
+        { key: keys.maxKey, label: "Max backoff (s)", type: "number", min: 1, hint: "Caps how long the exponential backoff can grow." },
+      ],
+    },
+  ];
+}
+
+// Ready-to-spread capabilities fields (Cairn dashboard) for a provider's retry/backoff
+// pair, generated from the one schema above via the settings-schema adapter.
+export function retryBackoffCapabilities(keys: RetryBackoffKeys) {
+  return toCapabilitiesFields(retryBackoffSchema(keys));
+}
+
+// Ready-to-use settings.groups (loader TUI) for a provider's retry/backoff pair,
+// generated from the same schema.
+export function retryBackoffSettingsGroups(keys: RetryBackoffKeys) {
+  return toSettingsGroups(retryBackoffSchema(keys));
+}
+
+// Default config values keyed by the provider's own key names.
+export function retryBackoffConfigDefaults(keys: RetryBackoffKeys, defaults: RetryBackoffDefaults) {
+  return { [keys.baseKey]: defaults.baseSeconds, [keys.maxKey]: defaults.maxSeconds };
+}
+
+// Validates a raw config value into a positive integer, falling back to the
+// default on anything non-finite or below the minimum (matches the existing
+// per-provider "isFinite && >= 1 ? floor : default" coercion, not a clamp).
+export function coercePositiveInt(value: unknown, defaultValue: number, min = 1): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= min ? Math.floor(n) : defaultValue;
+}
+
+// Coerces a provider's raw retry/backoff config into validated seconds, reading
+// the provider's own key names and falling back to the provider's own defaults.
+export function coerceRetryBackoff(config: Record<string, unknown> | undefined, keys: RetryBackoffKeys, defaults: RetryBackoffDefaults): RetryBackoffDefaults {
+  const cfg = config || {};
+  return {
+    baseSeconds: coercePositiveInt(cfg[keys.baseKey], defaults.baseSeconds),
+    maxSeconds: coercePositiveInt(cfg[keys.maxKey], defaults.maxSeconds),
+  };
+}
+
+// AccountManager-ready backoff object ({baseMs, maxMs}), matching the shape
+// antigravity's driver constructs by hand today.
+export function retryBackoffMs(config: Record<string, unknown> | undefined, keys: RetryBackoffKeys, defaults: RetryBackoffDefaults) {
+  const coerced = coerceRetryBackoff(config, keys, defaults);
+  return { baseMs: coerced.baseSeconds * 1000, maxMs: coerced.maxSeconds * 1000 };
 }
