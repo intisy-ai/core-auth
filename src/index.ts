@@ -10,7 +10,7 @@ export { loadAccounts, saveAccounts, updateAccounts, listAccounts, addAccount, r
 export { createLiveStore } from "./live-store.js";
 export type { LiveStoreLike } from "./live-store.js";
 export { AccountManager } from "./manager.js";
-export { accountControllerFromManager } from "./controller.js";
+export { accountControllerFromManager, refreshAccountToken, verifyAllAccounts } from "./controller.js";
 export { isAvailable, availableAt, isLaneRateLimited, isCoolingDown, isEnabled, calculateBackoffMs } from "./ratelimit.js";
 export { selectIndex } from "./selection.js";
 export { getConfigDir, configFolder, reposDir } from "./env.js";

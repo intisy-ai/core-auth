@@ -3,6 +3,8 @@
 
 import { isCoolingDown } from "./ratelimit.js";
 
+function out(message) { process.stdout.write(message + "\n"); }
+
 function defaultStatus(account, now) {
   if (account.enabled === false) return "disabled";
   if (isCoolingDown(account, now)) return "cooling-down";
@@ -50,4 +52,27 @@ export function accountControllerFromManager(manager, opts) {
     actions: options.actions,
     accountActions: options.accountActions,
   };
+}
+
+// Refresh one account's OAuth token via the manager and report success/failure.
+// Fully generic (manager.refresh() already encapsulates the OAuth refresh call),
+// so unlike verifyAllAccounts this needs no provider-specific hook.
+export async function refreshAccountToken(manager, view) {
+  const name = view.email || view.id;
+  try {
+    out((await manager.refresh(view.id)) ? "✓ refreshed " + name : "✗ no OAuth config / refresh token for " + name);
+  } catch (error) {
+    out("✗ refresh failed for " + name + ": " + ((error && error.message) || error));
+  }
+}
+
+// Verify every enabled account, skipping disabled ones, then print a summary. The
+// actual ping is provider-specific (each provider hits its own upstream endpoint),
+// so it is injected as `verify`; this owns the shared loop/skip/summary shape.
+export async function verifyAllAccounts(manager, verify) {
+  for (const account of manager.list()) {
+    if (account.enabled === false) { out("- " + (account.email || account.id) + ": skipped (disabled)"); continue; }
+    await verify(manager, { id: account.id, email: account.email });
+  }
+  out("Done.");
 }
