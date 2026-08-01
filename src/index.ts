@@ -68,4 +68,5 @@ export { parsePastedCallback, awaitPaste, toCoreAccount, oauthConfigFor } from "
 export { runMenu } from "./ui/menu-render.js";
 export { runAccountCli, printAccounts } from "./account-cli.js";
 export type { AccountCliDriver, AccountCliLoginOpts, RunAccountCliOpts } from "./account-cli.js";
+export { initCoreAuth, getCoreAuth } from "./core-auth-loader.js";
 export * from "./types.js";
