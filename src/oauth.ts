@@ -7,9 +7,9 @@ export function isOAuthAuth(auth) {
 }
 
 // Delegates to CoreAuthJs.accessTokenExpired (TokenRefresh.accessTokenExpired, java/accounts),
-// the single-sourced expired-or-missing predicate with the 60s clock-skew buffer. Requires
-// initCoreAuth() to have been awaited at startup; the only caller (AccountManager.ensureAccess)
-// runs on the async acquire() path, which self-inits.
+// the single-sourced expired-or-missing predicate with the 60s clock-skew buffer. Callers must
+// have awaited initCoreAuth() first; AccountManager.acquire and AccountManager.ensureAccess both
+// self-init, so calling either is safe on its own.
 export function accessTokenExpired(auth) {
   return getCoreAuth().accessTokenExpired(JSON.stringify(auth || {}), Date.now());
 }

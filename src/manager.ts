@@ -57,6 +57,7 @@ export class AccountManager {
 
   // a revoked refresh token disables the account so selection skips it.
   async ensureAccess(id) {
+    await initCoreAuth();
     const account = this.load().accounts.find((candidate) => candidate.id === id);
     if (!account) return undefined;
     if (!accessTokenExpired(account)) return account.access;
