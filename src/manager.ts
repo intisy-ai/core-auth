@@ -80,31 +80,30 @@ export class AccountManager {
   // reportRateLimit/reportError/reportSuccess/nextAvailableAt delegate to CoreAuthJs (Java),
   // which persists the same rateLimitResetTimes/coolingDownUntil/cooldownReason fields onto this
   // same accounts.json via the jsStore bridge, so a subsequent acquire() (also delegated) sees
-  // the exact state this call just wrote.
-  async reportRateLimit(id, lane, resetMs) {
-    await initCoreAuth();
+  // the exact state this call just wrote. These stay SYNC (getCoreAuth(), not initCoreAuth()):
+  // callers invoke them unawaited over the Java orchestrator's sync jsAccountOps callbacks, so
+  // core-auth must already be initialized (acquire() self-inits it on the normal rotation path;
+  // a standalone caller needs its own await initCoreAuth() at setup, before getCoreAuth() runs).
+  reportRateLimit(id, lane, resetMs) {
     getCoreAuth().reportRateLimit(this.providerId, id, lane || "", resetMs, this.jsStore());
   }
 
   // baseMs/maxMs are computed here (not left to CoreAuthJs's own ManagerOptions default) so a
   // provider's configured backoff (e.g. antigravity's retryBackoffMs) survives the delegation
   // instead of silently reverting to the built-in 1s/5min default.
-  async reportError(id, attempt, reason) {
-    await initCoreAuth();
+  reportError(id, attempt, reason) {
     const baseMs = (this.backoff && this.backoff.baseMs) || 1000;
     const maxMs = (this.backoff && this.backoff.maxMs) || 5 * 60 * 1000;
     getCoreAuth().reportError(this.providerId, id, attempt || 0, reason || "transient error", baseMs, maxMs, this.jsStore());
   }
 
-  async reportSuccess(id) {
-    await initCoreAuth();
+  reportSuccess(id) {
     getCoreAuth().reportSuccess(this.providerId, id, this.jsStore());
   }
 
   // Java returns the bare JSON number, or the literal JSON "null" when no account will ever
   // become available; JSON.parse turns that into a real `null`, never a truthy string.
-  async nextAvailableAt(lane) {
-    await initCoreAuth();
+  nextAvailableAt(lane) {
     const raw = getCoreAuth().nextAvailableAt(this.providerId, lane || "", this.jsStore());
     return JSON.parse(raw);
   }

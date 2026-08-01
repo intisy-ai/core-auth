@@ -68,7 +68,7 @@ describe("reportRateLimit: acquire -> rate-limit -> rotate -> recover", () => {
     expect(first.account.id).toBe("a");
 
     const resetAt = Date.now() + 150;
-    await mgr.reportRateLimit("a", lane, resetAt);
+    mgr.reportRateLimit("a", lane, resetAt);
 
     // persisted onto the store, not just in memory: rateLimitResetTimes.chat is set
     expect(storedPool().accounts.find((x: any) => x.id === "a").rateLimitResetTimes.chat).toBe(resetAt);
@@ -96,7 +96,7 @@ describe("reportError -> reportSuccess: cooldown lifecycle", () => {
     const mgr = manager({ selection: "sticky", backoff: { baseMs: 50, maxMs: 50 } });
 
     const before = Date.now();
-    await mgr.reportError("a", 0, "boom");
+    mgr.reportError("a", 0, "boom");
     const a = mgr.list().find((x) => x.id === "a");
     expect(a.coolingDownUntil).toBeGreaterThan(before);
     expect(a.coolingDownUntil).toBeLessThanOrEqual(before + 60);
@@ -111,7 +111,7 @@ describe("reportError -> reportSuccess: cooldown lifecycle", () => {
     seed(pool([account("a", { coolingDownUntil: Date.now() + 60000, cooldownReason: "boom" }), account("b")], 0));
     const mgr = manager({ selection: "sticky" });
 
-    await mgr.reportSuccess("a");
+    mgr.reportSuccess("a");
     const a = mgr.list().find((x) => x.id === "a");
     expect(a.coolingDownUntil).toBe(0);
     // AccountStore's wire format omits null fields entirely (rather than persisting an explicit
@@ -128,7 +128,7 @@ describe("reportError -> reportSuccess: cooldown lifecycle", () => {
     seed(pool([account("a")], 0));
     const mgr = manager();
     const before = Date.now();
-    await mgr.reportError("a", 0, undefined);
+    mgr.reportError("a", 0, undefined);
     const a = mgr.list().find((x) => x.id === "a");
     expect(a.cooldownReason).toBe("transient error");
     // attempt 0, base 1000ms, jittered to somewhere in [500, 1000)ms
@@ -142,7 +142,7 @@ describe("nextAvailableAt", () => {
     const now = Date.now();
     seed(pool([account("a", { coolingDownUntil: now + 5000 }), account("b", { coolingDownUntil: now + 2000 })]));
     const mgr = manager();
-    const next = await mgr.nextAvailableAt("chat");
+    const next = mgr.nextAvailableAt("chat");
     expect(next).toBeGreaterThanOrEqual(now + 2000 - 100);
     expect(next).toBeLessThanOrEqual(now + 2000 + 200);
   });
@@ -150,7 +150,7 @@ describe("nextAvailableAt", () => {
   it("returns null (a real JS null, not the truthy string \"null\") when every account is disabled", async () => {
     seed(pool([account("a", { enabled: false }), account("b", { enabled: false })]));
     const mgr = manager();
-    const next = await mgr.nextAvailableAt("chat");
+    const next = mgr.nextAvailableAt("chat");
     expect(next).toBeNull();
   });
 });
