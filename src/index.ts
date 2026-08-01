@@ -39,7 +39,6 @@ export type { LiveStoreLike } from "./live-store.js";
 export { AccountManager } from "./manager.js";
 export { accountControllerFromManager, refreshAccountToken, verifyAllAccounts } from "./controller.js";
 export { isAvailable, availableAt, isLaneRateLimited, isCoolingDown, isEnabled, calculateBackoffMs } from "./ratelimit.js";
-export { selectIndex } from "./selection.js";
 export { getConfigDir, configFolder, reposDir } from "./env.js";
 export { readConfig, writeConfig, activeProvider, setActiveProvider, getAutoConfig, setAutoConfig, getAutoCandidates } from "./config.js";
 export { readModelCache, resolveProviderModels } from "./models-cache.js";

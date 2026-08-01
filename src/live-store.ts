@@ -30,8 +30,10 @@ export interface LiveStoreLike {
 // `getConfigDir()` convention: every key lives at `<configDir>/config/<key>`
 // (accounts.json, models.json, a routing profile's configFile, ...) -- the same
 // location core-auth's own default store (accounts.ts) already uses.
-export function createLiveStore(configDir: string): LiveStoreLike {
-  const dir = join(configDir, "config");
+// `dirOverride`, when given, replaces `<configDir>/config` outright -- matching
+// accounts.ts's `opts.dir` store-location override (AccountManager's `options.store.dir`).
+export function createLiveStore(configDir: string, dirOverride?: string): LiveStoreLike {
+  const dir = dirOverride || join(configDir, "config");
   const filePath = (key: string): string => join(dir, key);
   // `withLock`'s lock file is derived from {dir, file}, so each key gets its own
   // independent lock -- concurrent ops on different keys never contend.

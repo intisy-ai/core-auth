@@ -17,10 +17,29 @@ export interface CoreAuthJsStore {
 export type CoreAuthJsHttpSend = (requestJson: string) => Promise<string>;
 
 /**
- * `AccountManager.selectAndClaim` for `providerId`/`lane`. Returns the JSON `{accountId, access?}`
- * for the claimed account, or `{none:true}` when nobody in the pool is available.
+ * JS-provided synchronous availability predicate: the JS side of a provider's `isAvailable`
+ * option (e.g. antigravity's `(account) => !(account.meta && account.meta.verificationRequired)`).
+ * `accountJson` is the full account shape (same field set the account store persists, absent
+ * fields omitted); `lane` is `""` when no lane was given. AND-ed onto the built-in
+ * enabled/cooldown/rate-limit check on the Java side, never replacing it.
  */
-export function acquireAccount(providerId: string, lane: string, jsStore: CoreAuthJsStore): string;
+export type CoreAuthJsAvailable = (accountJson: string, lane: string) => boolean;
+
+/**
+ * `AccountManager.selectAndClaim` for `providerId`/`lane`. `strategy` is `"sticky"` /
+ * `"round-robin"` / `"hybrid"` (unrecognized or `undefined` falls back to `"hybrid"`).
+ * `available` is the provider's `isAvailable` predicate; pass `undefined`/`null` when the
+ * provider supplied none (built-in availability check only). Returns the JSON
+ * `{accountId, access?}` for the claimed account, or `{none:true}` when nobody in the pool is
+ * available.
+ */
+export function acquireAccount(
+  providerId: string,
+  lane: string,
+  strategy: string | undefined,
+  available: CoreAuthJsAvailable | undefined | null,
+  jsStore: CoreAuthJsStore,
+): string;
 
 /** `AccountManager.reportRateLimit` -- persists `account.rateLimitResetTimes[lane] = resetMs`. */
 export function reportRateLimit(

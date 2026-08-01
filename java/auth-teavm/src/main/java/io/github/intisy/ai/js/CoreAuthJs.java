@@ -18,11 +18,13 @@ import io.github.intisy.ai.shared.spi.Store;
 import io.github.intisy.ai.shared.store.AccountStore;
 
 import org.teavm.jso.JSExport;
+import org.teavm.jso.core.JSObjects;
 import org.teavm.jso.core.JSPromise;
 import org.teavm.jso.core.JSString;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.BiPredicate;
 
 /**
  * TeaVM JS export surface over core-auth's account/oauth engine — relocated from ai-java's
@@ -39,18 +41,15 @@ public final class CoreAuthJs {
     }
 
     /**
-     * Builds an {@link AccountManager} over the LIVE store for {@code providerId}, wired with a
-     * {@link HttpClient} that always throws: every export below except {@link #refreshToken}
-     * never triggers {@code AccountManager}'s internal network refresh path ({@code
-     * ensureAccess}/{@code refresh}) -- {@link AccountManager#selectAndClaim} and the reportRateLimit/
-     * reportError/reportSuccess/nextAvailableAt methods never call it, so the throwing stub is
-     * provably unreachable rather than silently wrong.
-     *
-     * <p>Strategy is pinned to {@link Strategy#ROUND_ROBIN} (not {@link ManagerOptions}'s own
-     * {@code HYBRID} default): these fine-grained exports have no per-call strategy parameter, so
-     * a single, predictable, load-spreading default is used.
+     * Builds an {@link AccountManager} over the LIVE store for {@code providerId} and the given
+     * (already-resolved) {@code opts}, wired with a {@link HttpClient} that always throws: every
+     * export below except {@link #refreshToken} never triggers {@code AccountManager}'s internal
+     * network refresh path ({@code ensureAccess}/{@code refresh}) -- {@link
+     * AccountManager#selectAndClaim} and the reportRateLimit/reportError/reportSuccess/
+     * nextAvailableAt methods never call it, so the throwing stub is provably unreachable rather
+     * than silently wrong.
      */
-    private static AccountManager accountManagerFor(String providerId, Store store, JsonCodec json) {
+    private static AccountManager accountManagerFor(String providerId, Store store, JsonCodec json, ManagerOptions opts) {
         AccountStore accountStore = new AccountStore(store, json);
         HttpClient unreachable = req -> {
             throw new UnsupportedOperationException(
@@ -59,9 +58,27 @@ public final class CoreAuthJs {
         };
         Clock clock = System::currentTimeMillis;
         Random random = Math::random;
-        ManagerOptions opts = new ManagerOptions();
-        opts.strategy = Strategy.ROUND_ROBIN;
         return new AccountManager(providerId, accountStore, unreachable, clock, random, json, opts);
+    }
+
+    /**
+     * {@code strategy} is one of {@code "sticky"} / {@code "round-robin"} / {@code "hybrid"}
+     * (matching the string values {@code commonManagerOptions}/{@code manager.ts} already use);
+     * {@code null}, empty, or anything unrecognized falls back to {@link ManagerOptions}'s own
+     * {@link Strategy#HYBRID} default.
+     */
+    private static Strategy parseStrategy(String strategy) {
+        if (strategy == null) return Strategy.HYBRID;
+        switch (strategy) {
+            case "sticky":
+                return Strategy.STICKY;
+            case "round-robin":
+                return Strategy.ROUND_ROBIN;
+            case "hybrid":
+                return Strategy.HYBRID;
+            default:
+                return Strategy.HYBRID;
+        }
     }
 
     /**
@@ -70,12 +87,28 @@ public final class CoreAuthJs {
      * Returns {@code {accountId, access?}} (the claimed account's CURRENT stored access token,
      * possibly stale/expired -- check via {@link #accessTokenExpired}), or {@code {none:true}}
      * when nobody in the pool is available.
+     *
+     * <p>{@code available} is the JS side of a provider's {@code isAvailable} option (see JS
+     * {@code manager.ts}'s {@code extraAvailable}, e.g. antigravity's "skip accounts pending
+     * Google verification" gate) -- pass {@code null}/{@code undefined} when the provider
+     * supplied none, matching {@link ManagerOptions#extraAvailable}'s own null-means-"built-in
+     * check only" contract.
      */
     @JSExport
-    public static String acquireAccount(String providerId, String lane, JsStoreBridge.JsStore jsStore) {
+    public static String acquireAccount(String providerId, String lane, String strategy,
+                                         JsAvailabilityBridge.JsAvailable available, JsStoreBridge.JsStore jsStore) {
         JsonCodec json = new SimpleJsonCodec();
         Store store = new JsStoreBridge(jsStore);
-        AccountManager manager = accountManagerFor(providerId, store, json);
+
+        ManagerOptions opts = new ManagerOptions();
+        opts.strategy = parseStrategy(strategy);
+        if (available != null && !JSObjects.isUndefined(available)) {
+            String laneArg = lane != null ? lane : "";
+            opts.extraAvailable = (account, l) ->
+                    available.test(JSString.valueOf(json.stringify(accountToJson(account))), JSString.valueOf(laneArg));
+        }
+
+        AccountManager manager = accountManagerFor(providerId, store, json, opts);
         Acquired acquired = manager.selectAndClaim(lane);
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -102,7 +135,7 @@ public final class CoreAuthJs {
     public static void reportRateLimit(String providerId, String id, String lane, double resetMs, JsStoreBridge.JsStore jsStore) {
         JsonCodec json = new SimpleJsonCodec();
         Store store = new JsStoreBridge(jsStore);
-        accountManagerFor(providerId, store, json).reportRateLimit(id, lane, (long) resetMs);
+        accountManagerFor(providerId, store, json, new ManagerOptions()).reportRateLimit(id, lane, (long) resetMs);
     }
 
     /** {@code AccountManager.reportError} -- persists a deterministic-backoff {@code coolingDownUntil}/{@code cooldownReason}. */
@@ -110,7 +143,7 @@ public final class CoreAuthJs {
     public static void reportError(String providerId, String id, int attempt, String reason, JsStoreBridge.JsStore jsStore) {
         JsonCodec json = new SimpleJsonCodec();
         Store store = new JsStoreBridge(jsStore);
-        accountManagerFor(providerId, store, json).reportError(id, attempt, reason);
+        accountManagerFor(providerId, store, json, new ManagerOptions()).reportError(id, attempt, reason);
     }
 
     /** {@code AccountManager.reportSuccess} -- clears cooldown, bumps {@code lastUsed}. */
@@ -118,7 +151,7 @@ public final class CoreAuthJs {
     public static void reportSuccess(String providerId, String id, JsStoreBridge.JsStore jsStore) {
         JsonCodec json = new SimpleJsonCodec();
         Store store = new JsStoreBridge(jsStore);
-        accountManagerFor(providerId, store, json).reportSuccess(id);
+        accountManagerFor(providerId, store, json, new ManagerOptions()).reportSuccess(id);
     }
 
     /**
@@ -130,7 +163,7 @@ public final class CoreAuthJs {
     public static String nextAvailableAt(String providerId, String lane, JsStoreBridge.JsStore jsStore) {
         JsonCodec json = new SimpleJsonCodec();
         Store store = new JsStoreBridge(jsStore);
-        Long next = accountManagerFor(providerId, store, json).nextAvailableAt(lane);
+        Long next = accountManagerFor(providerId, store, json, new ManagerOptions()).nextAvailableAt(lane);
         return json.stringify(next);
     }
 
@@ -222,6 +255,32 @@ public final class CoreAuthJs {
             a.expires = expires instanceof Number ? ((Number) expires).longValue() : null;
         }
         return a;
+    }
+
+    /**
+     * The full account shape (same field set {@code AccountStore.accountToMap} serializes to
+     * disk, absent-field-omitted the same way) for {@link #acquireAccount}'s {@code available}
+     * callback: a provider's {@code isAvailable} predicate (e.g. antigravity's {@code
+     * account.meta.verificationRequired} check) must see the SAME account shape it would over
+     * the pure-TS path, not a trimmed-down projection. Kept here rather than made public on
+     * {@code AccountStore} so {@code :accounts} stays untouched by this JS-boundary concern.
+     */
+    private static Map<String, Object> accountToJson(Account a) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        if (a.id != null) m.put("id", a.id);
+        if (a.email != null) m.put("email", a.email);
+        if (a.refresh != null) m.put("refresh", a.refresh);
+        if (a.access != null) m.put("access", a.access);
+        if (a.expires != null) m.put("expires", a.expires);
+        if (a.addedAt != null) m.put("addedAt", a.addedAt);
+        if (a.lastUsed != null) m.put("lastUsed", a.lastUsed);
+        if (a.enabled != null) m.put("enabled", a.enabled);
+        if (a.rateLimitResetTimes != null) m.put("rateLimitResetTimes", a.rateLimitResetTimes);
+        if (a.coolingDownUntil != null) m.put("coolingDownUntil", a.coolingDownUntil);
+        if (a.cooldownReason != null) m.put("cooldownReason", a.cooldownReason);
+        if (a.disabledReason != null) m.put("disabledReason", a.disabledReason);
+        if (a.meta != null) m.put("meta", a.meta);
+        return m;
     }
 
     private static OAuthConfig oauthConfigFromJson(JsonCodec json, String oauthConfigJson) {
