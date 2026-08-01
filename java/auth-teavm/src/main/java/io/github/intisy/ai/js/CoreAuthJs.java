@@ -143,23 +143,27 @@ public final class CoreAuthJs {
 
     /**
      * {@code AccountManager.reportError} -- persists a jittered-backoff {@code coolingDownUntil}/
-     * {@code cooldownReason}. {@code baseMs}/{@code maxMs} are the CALLER's own backoff config
-     * (e.g. a provider's user-configurable retry settings, see {@code provider-common.ts}'s
-     * {@code retryBackoffMs}) -- passed through as {@code double}s (see {@link #reportRateLimit}'s
-     * javadoc for why a raw exported {@code long} is unsafe) rather than hardcoded on
-     * {@link ManagerOptions}'s own defaults, so a provider that configures a non-default backoff
-     * (e.g. antigravity's 60s/60s) keeps that value across this delegation instead of silently
-     * reverting to {@code ManagerOptions}'s 1s/5min built-in default.
+     * {@code cooldownReason}, UNLESS {@code lane} already has an active provider-supplied
+     * {@code rateLimitResetTimes} entry (that reset owns usable-again for this lane instead).
+     * {@code lane} is {@code ""} when the caller doesn't know the failing request's lane (treated
+     * as "no same-lane reset known", so this cools down normally -- the safe default). {@code
+     * baseMs}/{@code maxMs} are the CALLER's own backoff config (e.g. a provider's user-
+     * configurable retry settings, see {@code provider-common.ts}'s {@code retryBackoffMs}) --
+     * passed through as {@code double}s (see {@link #reportRateLimit}'s javadoc for why a raw
+     * exported {@code long} is unsafe) rather than hardcoded on {@link ManagerOptions}'s own
+     * defaults, so a provider that configures a non-default backoff (e.g. antigravity's 60s/60s)
+     * keeps that value across this delegation instead of silently reverting to {@link
+     * ManagerOptions}'s 1s/5min built-in default.
      */
     @JSExport
-    public static void reportError(String providerId, String id, int attempt, String reason,
+    public static void reportError(String providerId, String id, String lane, int attempt, String reason,
                                     double baseMs, double maxMs, JsStoreBridge.JsStore jsStore) {
         JsonCodec json = new SimpleJsonCodec();
         Store store = new JsStoreBridge(jsStore);
         ManagerOptions opts = new ManagerOptions();
         opts.backoffBaseMs = (long) baseMs;
         opts.backoffMaxMs = (long) maxMs;
-        accountManagerFor(providerId, store, json, opts).reportError(id, attempt, reason);
+        accountManagerFor(providerId, store, json, opts).reportError(id, lane, attempt, reason);
     }
 
     /** {@code AccountManager.reportSuccess} -- clears cooldown, bumps {@code lastUsed}. */

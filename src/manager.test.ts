@@ -96,7 +96,7 @@ describe("reportError -> reportSuccess: cooldown lifecycle", () => {
     const mgr = manager({ selection: "sticky", backoff: { baseMs: 50, maxMs: 50 } });
 
     const before = Date.now();
-    mgr.reportError("a", 0, "boom");
+    mgr.reportError("a", lane, 0, "boom");
     const a = mgr.list().find((x) => x.id === "a");
     expect(a.coolingDownUntil).toBeGreaterThan(before);
     expect(a.coolingDownUntil).toBeLessThanOrEqual(before + 60);
@@ -128,7 +128,7 @@ describe("reportError -> reportSuccess: cooldown lifecycle", () => {
     seed(pool([account("a")], 0));
     const mgr = manager();
     const before = Date.now();
-    mgr.reportError("a", 0, undefined);
+    mgr.reportError("a", undefined, 0, undefined); // no known lane: the safe "cools down normally" default
     const a = mgr.list().find((x) => x.id === "a");
     expect(a.cooldownReason).toBe("transient error");
     // attempt 0, base 1000ms, jittered to somewhere in [500, 1000)ms
@@ -138,14 +138,14 @@ describe("reportError -> reportSuccess: cooldown lifecycle", () => {
 });
 
 describe("reportError yields to an active provider reset (F4: one owner of usable-again)", () => {
-  it("does not set coolingDownUntil while a provider-supplied rate-limit reset is active, and the account recovers once that reset passes (not gated by a separate core backoff)", async () => {
+  it("same lane: does not set coolingDownUntil while THIS lane's provider-supplied reset is active, and the account recovers once that reset passes (not gated by a separate core backoff)", async () => {
     const lane = "chat";
     seed(pool([account("a"), account("b")], 0));
     const mgr = manager({ selection: "sticky", backoff: { baseMs: 50, maxMs: 50 } });
 
     const resetAt = Date.now() + 150;
     mgr.reportRateLimit("a", lane, resetAt);
-    mgr.reportError("a", 0, "boom");
+    mgr.reportError("a", lane, 0, "boom"); // same lane as the active reset
 
     const a = mgr.list().find((x) => x.id === "a");
     expect(a.coolingDownUntil).toBeFalsy(); // core's generic backoff yielded to the provider reset
@@ -164,6 +164,24 @@ describe("reportError yields to an active provider reset (F4: one owner of usabl
     // computed core backoff
     const afterReset = await mgr.acquire(lane);
     expect(afterReset.account.id).toBe("a");
+  });
+
+  it("cross lane: an unrelated lane's active reset does NOT suppress this lane's cooldown (would otherwise hot-loop with zero backoff)", async () => {
+    seed(pool([account("a")], 0));
+    const mgr = manager({ selection: "sticky", backoff: { baseMs: 50, maxMs: 50 } });
+
+    mgr.reportRateLimit("a", "gemini-pro", Date.now() + 60_000); // a DIFFERENT lane's active reset
+
+    const before = Date.now();
+    mgr.reportError("a", "gemini-flash", 0, "boom"); // this lane has no reset of its own
+
+    const a = mgr.list().find((x) => x.id === "a");
+    // must still cool down via core's own backoff: an unrelated lane's reset must never make a
+    // genuinely erroring lane immediately re-selectable with zero backoff
+    expect(a.coolingDownUntil).toBeGreaterThan(before);
+    expect(a.coolingDownUntil).toBeLessThanOrEqual(before + 60);
+    expect(a.cooldownReason).toBe("boom");
+    expect(a.rateLimitResetTimes["gemini-pro"]).toBeGreaterThan(before); // untouched by reportError
   });
 });
 

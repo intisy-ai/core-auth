@@ -129,25 +129,23 @@ public class AccountManager {
         });
     }
 
-    public void reportError(String id, int attempt, String reason) {
+    /**
+     * {@code lane} is the failing request's lane, or {@code null}/{@code ""} when the caller
+     * doesn't know it (the safe default: no same-lane reset can be found, so this cools down via
+     * core's own backoff exactly as if no reset existed).
+     */
+    public void reportError(String id, String lane, int attempt, String reason) {
         long now = clock.now();
         mutate(id, account -> {
-            // The provider owns its upstream's real retry-after; when a rate-limit reset it
-            // supplied is still active for this account, core's own generic backoff yields to
-            // it instead of layering a second, independently-computed timer on top.
-            if (hasActiveRateLimitReset(account, now)) return;
+            // The provider owns its upstream's real retry-after for THIS lane; when it has
+            // already supplied an active reset for this exact lane, core's own generic backoff
+            // yields to it instead of layering a second, independently-computed timer on top. A
+            // reset on some OTHER lane never suppresses this lane's backoff.
+            if (RateLimitMath.isLaneRateLimited(account, lane, now)) return;
             long ms = RateLimitMath.calculateBackoffMs(attempt, opts.backoffBaseMs, opts.backoffMaxMs, true, random);
             account.coolingDownUntil = now + ms;
             account.cooldownReason = reason != null ? reason : "transient error";
         });
-    }
-
-    private static boolean hasActiveRateLimitReset(Account account, long now) {
-        if (account.rateLimitResetTimes == null) return false;
-        for (Long resetMs : account.rateLimitResetTimes.values()) {
-            if (resetMs != null && resetMs > now) return true;
-        }
-        return false;
     }
 
     public void reportSuccess(String id) {

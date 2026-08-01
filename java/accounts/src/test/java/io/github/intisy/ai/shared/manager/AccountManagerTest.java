@@ -324,7 +324,7 @@ class AccountManagerTest {
         Random rng = () -> 0.5;
         AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, rng, new TestJsonCodec());
 
-        manager.reportError("acc1", 0, "boom");
+        manager.reportError("acc1", "chat", 0, "boom");
 
         // attempt=0, base=1000, max=300000: raw=min(300000,1000)=1000; jittered=floor(500+0.5*500)=750
         Account persisted = store.list("provider").get(0);
@@ -333,7 +333,7 @@ class AccountManagerTest {
     }
 
     @Test
-    void reportError_yieldsToActiveProviderReset_doesNotSetCoolingDownUntil() {
+    void reportError_sameLane_yieldsToActiveProviderReset_doesNotSetCoolingDownUntil() {
         AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
 
         Account account = new Account();
@@ -345,12 +345,55 @@ class AccountManagerTest {
         AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new TestJsonCodec());
 
         manager.reportRateLimit("acc1", "chat", clock.now() + 60_000L); // provider reset still active
-        manager.reportError("acc1", 0, "boom");
+        manager.reportError("acc1", "chat", 0, "boom"); // same lane as the active reset
 
         Account persisted = store.list("provider").get(0);
         assertNull(persisted.coolingDownUntil); // core's generic backoff yielded to the provider reset
         assertNull(persisted.cooldownReason);
         assertEquals(clock.now() + 60_000L, persisted.rateLimitResetTimes.get("chat"));
+    }
+
+    @Test
+    void reportError_crossLane_doesNotYieldToAnUnrelatedLanesActiveReset() {
+        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+
+        Account account = new Account();
+        account.id = "acc1";
+        account.enabled = true;
+        store.add("provider", account);
+
+        FixedClock clock = new FixedClock(1_000_000L);
+        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new TestJsonCodec());
+
+        manager.reportRateLimit("acc1", "gemini-pro", clock.now() + 60_000L); // unrelated lane's reset, still active
+        manager.reportError("acc1", "gemini-flash", 0, "boom"); // a DIFFERENT lane's generic error
+
+        // the unrelated lane's reset must not suppress this lane's cooldown -- otherwise the
+        // account would be immediately re-selectable for gemini-flash with zero backoff
+        Account persisted = store.list("provider").get(0);
+        assertEquals(clock.now() + 750L, persisted.coolingDownUntil);
+        assertEquals("boom", persisted.cooldownReason);
+        assertEquals(clock.now() + 60_000L, persisted.rateLimitResetTimes.get("gemini-pro")); // untouched
+    }
+
+    @Test
+    void reportError_missingLane_treatsItAsNoSameLaneResetKnownAndCoolsDownNormally() {
+        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+
+        Account account = new Account();
+        account.id = "acc1";
+        account.enabled = true;
+        store.add("provider", account);
+
+        FixedClock clock = new FixedClock(1_000_000L);
+        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new TestJsonCodec());
+
+        manager.reportRateLimit("acc1", "chat", clock.now() + 60_000L); // active reset on SOME lane
+        manager.reportError("acc1", null, 0, "boom"); // caller doesn't know the failing request's lane
+
+        Account persisted = store.list("provider").get(0);
+        assertEquals(clock.now() + 750L, persisted.coolingDownUntil); // the safe default: cools normally
+        assertEquals("boom", persisted.cooldownReason);
     }
 
     @Test
@@ -367,7 +410,7 @@ class AccountManagerTest {
         FixedClock clock = new FixedClock(1_000_000L);
         AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new TestJsonCodec());
 
-        manager.reportError("acc1", 0, "boom");
+        manager.reportError("acc1", "chat", 0, "boom");
 
         Account persisted = store.list("provider").get(0);
         assertEquals(clock.now() + 750L, persisted.coolingDownUntil); // same math as reportError_setsCoolingDownUntilViaDeterministicBackoff

@@ -91,10 +91,17 @@ export class AccountManager {
   // baseMs/maxMs are computed here (not left to CoreAuthJs's own ManagerOptions default) so a
   // provider's configured backoff (e.g. antigravity's retryBackoffMs) survives the delegation
   // instead of silently reverting to the built-in 1s/5min default.
-  reportError(id, attempt, reason) {
+  //
+  // lane (2nd positional arg, matching reportRateLimit's shape) is the failing request's lane, so
+  // an active provider-supplied reset on THAT lane can take sole ownership of usable-again instead
+  // of core also layering its own backoff on top. A caller that doesn't know the lane passes
+  // none; the exported lane || "" default cools down normally (CoreAuthJs.reportError's
+  // documented "no same-lane reset known" contract -- an undefined/null lane must never reach the
+  // exported string parameter as-is).
+  reportError(id, lane, attempt, reason) {
     const baseMs = (this.backoff && this.backoff.baseMs) || 1000;
     const maxMs = (this.backoff && this.backoff.maxMs) || 5 * 60 * 1000;
-    getCoreAuth().reportError(this.providerId, id, attempt || 0, reason || "transient error", baseMs, maxMs, this.jsStore());
+    getCoreAuth().reportError(this.providerId, id, lane || "", attempt || 0, reason || "transient error", baseMs, maxMs, this.jsStore());
   }
 
   reportSuccess(id) {

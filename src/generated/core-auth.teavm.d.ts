@@ -51,13 +51,18 @@ export function reportRateLimit(
 ): void;
 
 /**
- * `AccountManager.reportError` -- persists a jittered-backoff `coolingDownUntil`/`cooldownReason`.
- * `baseMs`/`maxMs` are the caller's own backoff config (falls back to `AccountManager`'s built-in
- * 1s/5min default when the caller has none), so a provider with a custom backoff keeps it.
+ * `AccountManager.reportError` -- persists a jittered-backoff `coolingDownUntil`/`cooldownReason`,
+ * UNLESS `lane` already has an active provider-supplied `rateLimitResetTimes` entry (that reset
+ * owns usable-again for this lane instead). `lane` is `""` when the caller doesn't know the
+ * failing request's lane (treated as "no same-lane reset known", so this cools down normally --
+ * the safe default). `baseMs`/`maxMs` are the caller's own backoff config (falls back to
+ * `AccountManager`'s built-in 1s/5min default when the caller has none), so a provider with a
+ * custom backoff keeps it.
  */
 export function reportError(
   providerId: string,
   id: string,
+  lane: string,
   attempt: number,
   reason: string,
   baseMs: number,
