@@ -34,5 +34,6 @@ export { buildAccountMenu, buildAutoMenu } from "./ui/menu-model.js";
 export { buildLoginInput } from "./ui/url-auth.js";
 export { buildSettingsMenu } from "./ui/settings-menu.js";
 export { openBrowser } from "./browser.js";
+export { parsePastedCallback, awaitPaste, toCoreAccount, oauthConfigFor } from "./login.js";
 export { runMenu } from "./ui/menu-render.js";
 export * from "./types.js";
