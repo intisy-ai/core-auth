@@ -19,6 +19,22 @@ export function calculateTokenExpiry(requestTimeMs, expiresInSeconds) {
   return requestTimeMs + seconds * 1000;
 }
 
+// Packs an OAuth `state` param as URL-safe base64 so it survives a redirect roundtrip.
+export function encodeState(payload) {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+}
+
+// Unpacks a `state` param produced by encodeState and asserts the PKCE verifier is present.
+export function decodeState(state) {
+  const normalized = String(state).replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+  const parsed = JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
+  if (typeof parsed.verifier !== "string") {
+    throw new Error("Missing PKCE verifier in state");
+  }
+  return parsed;
+}
+
 export class TokenRefreshError extends Error {
   constructor(options) {
     super(options.message);
