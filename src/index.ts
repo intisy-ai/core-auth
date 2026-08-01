@@ -36,4 +36,6 @@ export { buildSettingsMenu } from "./ui/settings-menu.js";
 export { openBrowser } from "./browser.js";
 export { parsePastedCallback, awaitPaste, toCoreAccount, oauthConfigFor } from "./login.js";
 export { runMenu } from "./ui/menu-render.js";
+export { runAccountCli, printAccounts } from "./account-cli.js";
+export type { AccountCliDriver, AccountCliLoginOpts, RunAccountCliOpts } from "./account-cli.js";
 export * from "./types.js";
