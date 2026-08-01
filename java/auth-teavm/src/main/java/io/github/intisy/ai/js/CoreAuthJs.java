@@ -27,11 +27,11 @@ import java.util.Map;
 import java.util.function.BiPredicate;
 
 /**
- * TeaVM JS export surface over core-auth's account/oauth engine — relocated from ai-java's
+ * TeaVM JS export surface over core-auth's account/oauth engine, relocated from ai-java's
  * {@code AiJavaJs} (Phase 4 Task 2), ACCOUNT-ONLY: this is exactly the set of exports Phase 4
  * Task 1 EXCLUDED when trimming {@code AiJavaJs} down to {@code core-proxy}'s {@code CoreProxyJs}
  * (routing-only). {@code SimpleJsonCodec}/{@code JsStoreBridge}/{@code JsHttpClientBridge} are
- * NOT duplicated here — this class lives in the same package ({@code io.github.intisy.ai.js}) as
+ * NOT duplicated here, this class lives in the same package ({@code io.github.intisy.ai.js}) as
  * core-proxy's {@code :teavm} module (a Gradle project dependency, see
  * {@code core-auth/java/teavm/build.gradle}), so it references those classes unqualified exactly
  * like the original single-module {@code AiJavaJs} did.
@@ -138,12 +138,25 @@ public final class CoreAuthJs {
         accountManagerFor(providerId, store, json, new ManagerOptions()).reportRateLimit(id, lane, (long) resetMs);
     }
 
-    /** {@code AccountManager.reportError} -- persists a deterministic-backoff {@code coolingDownUntil}/{@code cooldownReason}. */
+    /**
+     * {@code AccountManager.reportError} -- persists a jittered-backoff {@code coolingDownUntil}/
+     * {@code cooldownReason}. {@code baseMs}/{@code maxMs} are the CALLER's own backoff config
+     * (e.g. a provider's user-configurable retry settings, see {@code provider-common.ts}'s
+     * {@code retryBackoffMs}) -- passed through as {@code double}s (see {@link #reportRateLimit}'s
+     * javadoc for why a raw exported {@code long} is unsafe) rather than hardcoded on
+     * {@link ManagerOptions}'s own defaults, so a provider that configures a non-default backoff
+     * (e.g. antigravity's 60s/60s) keeps that value across this delegation instead of silently
+     * reverting to {@code ManagerOptions}'s 1s/5min built-in default.
+     */
     @JSExport
-    public static void reportError(String providerId, String id, int attempt, String reason, JsStoreBridge.JsStore jsStore) {
+    public static void reportError(String providerId, String id, int attempt, String reason,
+                                    double baseMs, double maxMs, JsStoreBridge.JsStore jsStore) {
         JsonCodec json = new SimpleJsonCodec();
         Store store = new JsStoreBridge(jsStore);
-        accountManagerFor(providerId, store, json, new ManagerOptions()).reportError(id, attempt, reason);
+        ManagerOptions opts = new ManagerOptions();
+        opts.backoffBaseMs = (long) baseMs;
+        opts.backoffMaxMs = (long) maxMs;
+        accountManagerFor(providerId, store, json, opts).reportError(id, attempt, reason);
     }
 
     /** {@code AccountManager.reportSuccess} -- clears cooldown, bumps {@code lastUsed}. */

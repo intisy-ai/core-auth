@@ -50,8 +50,20 @@ export function reportRateLimit(
   jsStore: CoreAuthJsStore,
 ): void;
 
-/** `AccountManager.reportError` -- persists a deterministic-backoff `coolingDownUntil`/`cooldownReason`. */
-export function reportError(providerId: string, id: string, attempt: number, reason: string, jsStore: CoreAuthJsStore): void;
+/**
+ * `AccountManager.reportError` -- persists a jittered-backoff `coolingDownUntil`/`cooldownReason`.
+ * `baseMs`/`maxMs` are the caller's own backoff config (falls back to `AccountManager`'s built-in
+ * 1s/5min default when the caller has none), so a provider with a custom backoff keeps it.
+ */
+export function reportError(
+  providerId: string,
+  id: string,
+  attempt: number,
+  reason: string,
+  baseMs: number,
+  maxMs: number,
+  jsStore: CoreAuthJsStore,
+): void;
 
 /** `AccountManager.reportSuccess` -- clears cooldown, bumps `lastUsed`. */
 export function reportSuccess(providerId: string, id: string, jsStore: CoreAuthJsStore): void;
