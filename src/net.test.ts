@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { proxiedFetch } from "./net.js";
+import { proxiedFetch, timeoutFetch } from "./net.js";
 
 function fakeProxyManager(url) {
   return {
@@ -88,5 +88,43 @@ describe("proxiedFetch", () => {
     expect(result.proxyUsed).toBe(false);
     expect(result.transportFailed).toBe(false);
     expect(result.response).toBe(response);
+  });
+});
+
+describe("timeoutFetch", () => {
+  it("aborts a fetch that never resolves once timeoutMs elapses", async () => {
+    const fetchImpl = vi.fn((_url: string, init: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init.signal!.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+    }));
+
+    const started = Date.now();
+    await expect(timeoutFetch("https://api.example.com", {}, 30, fetchImpl)).rejects.toThrow(/aborted/i);
+    expect(Date.now() - started).toBeLessThan(300);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the response and clears the timer when fetch resolves before timeoutMs", async () => {
+    const response = new Response("ok");
+    const fetchImpl = vi.fn(async () => response);
+    const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
+
+    const result = await timeoutFetch("https://api.example.com", { method: "GET" }, 20000, fetchImpl);
+
+    expect(result).toBe(response);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    clearTimeoutSpy.mockRestore();
+  });
+
+  it("passes an abort signal through to fetchImpl alongside the caller's init", async () => {
+    const response = new Response("ok");
+    const fetchImpl = vi.fn(async () => response);
+
+    await timeoutFetch("https://api.example.com", { method: "POST" }, 20000, fetchImpl);
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [, init] = fetchImpl.mock.calls[0];
+    expect(init.method).toBe("POST");
+    expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 });

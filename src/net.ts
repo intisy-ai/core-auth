@@ -70,3 +70,22 @@ export async function proxiedFetch(
 
   return { response, proxyUsed: !!proxyUrl, transportFailed: false };
 }
+
+// AbortController-based fetch with a hard deadline, lifted out of the ~5 hand-rolled
+// AbortController+setTimeout copies across antigravity-auth and claude-code-auth (ping
+// checks and quota/model-list calls). fetchImpl is a test seam only; production callers
+// never pass it (defaults to the global fetch).
+export async function timeoutFetch(
+  url: string | Request,
+  init: RequestInit = {},
+  timeoutMs = 20000,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Response> {
+  const aborter = new AbortController();
+  const timer = setTimeout(() => aborter.abort(), timeoutMs);
+  try {
+    return await fetchImpl(url, { ...init, signal: aborter.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
