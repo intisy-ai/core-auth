@@ -32,3 +32,31 @@ export function chatError(message, opts) {
   }
   return new Response(JSON.stringify(payload), { status, headers });
 }
+
+// Canonical IR<->upstream transport error. The front-door recognizes it by its
+// stable `name` marker (duck-typed), never `instanceof`: providers are esbuild-bundled
+// independently, so a shared class is never instanceof-compatible across the boundary.
+export class HandleIrError extends Error {
+  status: number;
+  headers?: Record<string, string>;
+  body?: string;
+  retryAfterMs?: number;
+  constructor(init: { status: number; headers?: Record<string, string>; body?: string; retryAfterMs?: number }) {
+    super("handleIr transport error: " + init.status);
+    this.name = "HandleIrError";
+    this.status = init.status;
+    this.headers = init.headers;
+    this.body = init.body;
+    this.retryAfterMs = init.retryAfterMs;
+  }
+}
+
+export function handleIrErrorFromResponse(res: Response, bodyText: string): HandleIrError {
+  const retryAfter = res.headers.get("retry-after");
+  return new HandleIrError({
+    status: res.status,
+    headers: Object.fromEntries(res.headers.entries()),
+    body: bodyText,
+    retryAfterMs: retryAfter ? Number(retryAfter) * 1000 : undefined,
+  });
+}
