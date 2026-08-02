@@ -9,12 +9,17 @@ describe("proxyFetchTarget", () => {
     expect(proxyFetchTarget({})).toEqual({ mode: "handle" });
     expect(proxyFetchTarget(undefined)).toEqual({ mode: "handle" });
   });
+  it("stays in-process when the flag is any value other than exactly '1'", () => {
+    expect(proxyFetchTarget({ HUB_OC_PROXY: "0" })).toEqual({ mode: "handle" });
+    expect(proxyFetchTarget({ HUB_OC_PROXY: "true" })).toEqual({ mode: "handle" });
+  });
   it("routes to the proxy on HUB_OC_PROXY=1, defaulting the port to 34568", () => {
     expect(proxyFetchTarget({ HUB_OC_PROXY: "1" })).toEqual({ mode: "proxy", port: 34568 });
   });
   it("honours HUB_PROXY_PORT and degrades a bad value to the default", () => {
     expect(proxyFetchTarget({ HUB_OC_PROXY: "1", HUB_PROXY_PORT: "40000" })).toEqual({ mode: "proxy", port: 40000 });
     expect(proxyFetchTarget({ HUB_OC_PROXY: "1", HUB_PROXY_PORT: "nonsense" })).toEqual({ mode: "proxy", port: 34568 });
+    expect(proxyFetchTarget({ HUB_OC_PROXY: "1", HUB_PROXY_PORT: "0" })).toEqual({ mode: "proxy", port: 34568 });
   });
 });
 
