@@ -91,7 +91,7 @@ export async function refreshModels(def, forceOpencodeMerge = false): Promise<Re
       const { sorts, sortOrders, scores, scoreSource } = await computeSorts(def, cache.ranking || [], nameOf);
       writeModelCache(def.id, { ...cache, sorts, sortOrders, scores, scoreSource });
     }
-    if (forceOpencodeMerge || isOpencodeHost()) mergeModels(def.opencodeProvider || "anthropic", models, def.opencodeNpm);
+    if (forceOpencodeMerge || isOpencodeHost()) mergeModels(def.opencodeProvider || def.id, models, def.opencodeNpm);
   } catch (e) { log("model refresh/merge failed: " + e); }
   return models;
 }
