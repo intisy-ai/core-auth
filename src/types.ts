@@ -24,6 +24,10 @@ export interface ProviderDef {
   loginFlow?: (ctx: ProviderCtx) => Promise<{ url: string; instructions?: string; complete: (input?: string) => Promise<CoreAccount | null> }>;
   accounts?: AccountController;
   proxies?: boolean;   // opt into the shared proxy subsystem (Manage-proxies menu + per-account selection)
+  // Injected in-process app front-door (from the provider's bundled app-proxy). When set and no
+  // proxy is configured, the OpenCode loader.fetch calls this to translate app wire <-> IR around
+  // handleIr. core-auth supplies no translator of its own.
+  serveDirect?: (request: Request, handleIr: unknown, ctx: unknown) => Promise<Response>;
 }
 
 export interface CoreAccount {
