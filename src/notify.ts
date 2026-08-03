@@ -11,8 +11,8 @@
 
 import { appendFileSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
-import { homedir } from "os";
 import { log } from "./log.js";
+import { activeApp, getConfigDir } from "./env.js";
 
 let appClient = null;   // set by the provider's app-front-door hooks
 let notifier = null;    // injected by a host that owns the core event bus
@@ -26,17 +26,12 @@ export function setAppClient(client) { appClient = client || null; }
 // keeps the standalone toast/queue delivery below.
 export function setNotifier(fn) { notifier = typeof fn === "function" ? fn : null; }
 
-function isClaude() { return process.argv.join(" ").includes("claude"); }
-
-function configDir() {
-  if (process.env.HUB_CONFIG_DIR) return process.env.HUB_CONFIG_DIR;
-  return isClaude() ? join(homedir(), ".claude") : join(homedir(), ".config", "opencode");
-}
+function isClaude() { return activeApp() === "claude"; }
 
 // Shared queue the Claude drain hook reads. It's TRANSIENT runtime state (appended
 // then read-and-cleared), so it lives under cache/, not config/ (config is for
 // config files only). Sibling of config/ and logs/ under the app dir.
-export function notifyQueuePath(dir) { return join(dir || configDir(), "cache", "auth-notifications.jsonl"); }
+export function notifyQueuePath(dir) { return join(dir || getConfigDir(), "cache", "auth-notifications.jsonl"); }
 
 // notify(message, level?): level is "info" | "success" | "warning" | "error".
 // Never throws: a failed notification must not break the request path.
