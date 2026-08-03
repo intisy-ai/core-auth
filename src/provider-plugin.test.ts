@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { createOpencodePluginMock } = vi.hoisted(() => ({ createOpencodePluginMock: vi.fn() }));
-vi.mock("./opencode.js", () => ({ createOpencodePlugin: createOpencodePluginMock }));
+const { createProviderPluginMock } = vi.hoisted(() => ({ createProviderPluginMock: vi.fn() }));
+vi.mock("./provider-plugin-runtime.js", () => ({ createProviderPlugin: createProviderPluginMock }));
 
 import { defineProviderPlugin, type ProviderPluginCore } from "./provider-plugin.js";
 
@@ -19,15 +19,15 @@ const driver = { id: "stub", label: "Stub", models: {} } as never;
 
 describe("defineProviderPlugin", () => {
   beforeEach(() => {
-    createOpencodePluginMock.mockReset();
+    createProviderPluginMock.mockReset();
   });
 
-  it("registers config, capabilities, readme and deploys commands in order before returning the opencode plugin", async () => {
+  it("registers config, capabilities, readme and deploys commands in order before returning the provider plugin", async () => {
     const order: string[] = [];
     const core = makeCore(order);
     const configCliGuard = vi.fn(() => { order.push("configCliGuard"); return false; });
     const sentinel = { hooks: true };
-    createOpencodePluginMock.mockReturnValue(sentinel);
+    createProviderPluginMock.mockReturnValue(sentinel);
 
     const result = await defineProviderPlugin({
       name: "stub-auth",
@@ -50,7 +50,7 @@ describe("defineProviderPlugin", () => {
     ]);
     expect(core.defineConfig).toHaveBeenCalledWith("stub-auth", { logging: true });
     expect(core.deployCommands).toHaveBeenCalledWith("stub-auth", [{ name: "stub-auth-config", description: "config" }]);
-    expect(createOpencodePluginMock).toHaveBeenCalledWith(driver);
+    expect(createProviderPluginMock).toHaveBeenCalledWith(driver);
     expect(result).toBe(sentinel);
   });
 
@@ -72,7 +72,7 @@ describe("defineProviderPlugin", () => {
     expect(order).toEqual(["defineConfig", "configCliGuard"]);
     expect(exit).toHaveBeenCalledWith(0);
     expect(core.deployCommands).not.toHaveBeenCalled();
-    expect(createOpencodePluginMock).not.toHaveBeenCalled();
+    expect(createProviderPluginMock).not.toHaveBeenCalled();
     expect(result).toBeUndefined();
   });
 
@@ -95,7 +95,7 @@ describe("defineProviderPlugin", () => {
     expect(order).toEqual(["defineConfig", "defineReadme", "maybeRunReadmeCli"]);
     expect(exit).toHaveBeenCalledWith(0);
     expect(configCliGuard).not.toHaveBeenCalled();
-    expect(createOpencodePluginMock).not.toHaveBeenCalled();
+    expect(createProviderPluginMock).not.toHaveBeenCalled();
     expect(result).toBeUndefined();
   });
 
@@ -108,7 +108,7 @@ describe("defineProviderPlugin", () => {
     await defineProviderPlugin({ name: "claude-code", driver, core, configCliGuard, exit });
 
     expect(exit).toHaveBeenCalledWith(0);
-    expect(createOpencodePluginMock).not.toHaveBeenCalled();
+    expect(createProviderPluginMock).not.toHaveBeenCalled();
   });
 
   it("skips capabilities, readme and deployCommands when not provided, and never crashes on a deployCommands failure", async () => {
@@ -116,7 +116,7 @@ describe("defineProviderPlugin", () => {
     const core = makeCore(order);
     core.deployCommands = vi.fn(() => { throw new Error("no configDirs"); });
     const configCliGuard = vi.fn(() => false);
-    createOpencodePluginMock.mockReturnValue({});
+    createProviderPluginMock.mockReturnValue({});
 
     await defineProviderPlugin({
       name: "custom-auth",
@@ -129,13 +129,13 @@ describe("defineProviderPlugin", () => {
     expect(core.defineCapabilities).not.toHaveBeenCalled();
     expect(core.defineReadme).not.toHaveBeenCalled();
     expect(core.maybeRunReadmeCli).not.toHaveBeenCalled();
-    expect(createOpencodePluginMock).toHaveBeenCalled();
+    expect(createProviderPluginMock).toHaveBeenCalled();
   });
 
   it("falls back deployCommands' bundle name to `name` when packageName is omitted", async () => {
     const order: string[] = [];
     const core = makeCore(order);
-    createOpencodePluginMock.mockReturnValue({});
+    createProviderPluginMock.mockReturnValue({});
 
     await defineProviderPlugin({
       name: "stub-auth",

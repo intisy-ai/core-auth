@@ -3,7 +3,7 @@
 // that never enters the model's context.
 //
 //  - opencode: a real toast via the plugin client (client.tui.showToast). The
-//    provider's opencodeHooks hand us the client through setOpencodeClient().
+//    provider's app-front-door hooks hand us the client through setAppClient().
 //  - Claude Code: the provider runs headless under the CC proxy and Claude has no
 //    toast API, so we append to a queue file. A PostToolUse hook (registered by the
 //    loader) drains it and re-emits each line as a hook `systemMessage`, which Claude
@@ -14,12 +14,12 @@ import { join, dirname } from "path";
 import { homedir } from "os";
 import { log } from "./log.js";
 
-let ocClient = null;   // set by a provider's opencodeHooks
-let notifier = null;   // injected by a host that owns the core event bus
+let appClient = null;   // set by the provider's app-front-door hooks
+let notifier = null;    // injected by a host that owns the core event bus
 
-// Providers call this from opencodeHooks with the plugin `client` so opencode
-// notifications become real toasts. No-op / harmless when never called.
-export function setOpencodeClient(client) { ocClient = client || null; }
+// Providers call this from their app-front-door hooks with the plugin `client` so
+// opencode notifications become real toasts. No-op / harmless when never called.
+export function setAppClient(client) { appClient = client || null; }
 
 // A host that bundles core wires its event-bus publish here, so notifications flow
 // onto the one shared bus instead of the local toast/queue. Unset (the default)
@@ -51,10 +51,10 @@ export function notify(message, level) {
     return;
   }
   try {
-    if (!isClaude() && ocClient && ocClient.tui && typeof ocClient.tui.showToast === "function") {
+    if (!isClaude() && appClient && appClient.tui && typeof appClient.tui.showToast === "function") {
       const variant = lvl === "success" || lvl === "warning" || lvl === "error" ? lvl : "info";
       // opencode's SDK expects the payload nested under `body`; a flat {message,variant} silently no-ops.
-      Promise.resolve(ocClient.tui.showToast({ body: { message, variant } })).catch(() => {});
+      Promise.resolve(appClient.tui.showToast({ body: { message, variant } })).catch(() => {});
       return;
     }
     const p = notifyQueuePath();

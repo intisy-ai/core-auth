@@ -14,8 +14,8 @@ export interface ProviderModel {
 export interface ProviderDef {
   id: string;                         // loader/proxy provider name (handler discovery + Providers tab)
   label: string;
-  opencodeProvider?: string;          // opencode provider id to attach models to (defaults to the provider id)
-  opencodeNpm?: string;               // SDK package for a custom (non-built-in) opencode provider
+  appProviderId?: string;             // app-side provider id to attach models to (defaults to the provider id)
+  appNpm?: string;                    // SDK package for a custom (non-built-in) app-side provider
   models: Record<string, ProviderModel>;
   handle: (request: Request, ctx: ProviderCtx) => Promise<Response>;
   // when present, core exposes an opencode oauth "code" method; complete(input?)
@@ -24,10 +24,10 @@ export interface ProviderDef {
   loginFlow?: (ctx: ProviderCtx) => Promise<{ url: string; instructions?: string; complete: (input?: string) => Promise<CoreAccount | null> }>;
   accounts?: AccountController;
   proxies?: boolean;   // opt into the shared proxy subsystem (Manage-proxies menu + per-account selection)
-  // Injected in-process app front-door (from the provider's bundled app-proxy). When set and no
-  // proxy is configured, the OpenCode loader.fetch calls this to translate app wire <-> IR around
-  // handleIr. core-auth supplies no translator of its own.
-  serveDirect?: (request: Request, handleIr: unknown, ctx: unknown) => Promise<Response>;
+  handleIr?: (request: unknown, ctx: unknown) => Promise<unknown>;
+  // A provider may contribute extra app-shaped plugin hooks (e.g. an `event` handler);
+  // the injected app front-door merges these in. Generic passthrough; core-auth doesn't know what they do.
+  appHooks?: (input: unknown) => unknown | Promise<unknown>;
 }
 
 export interface CoreAccount {
