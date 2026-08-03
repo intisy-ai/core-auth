@@ -25,9 +25,8 @@ function candidatePaths(configDir: string): string[] {
   const fromEnv = process.env.HUB_APP_FRONTDOOR;
   const paths: string[] = [];
   if (fromEnv) paths.push(fromEnv);
-  // deployed home-path fallback (app-data-keyed by the home), extensionless-agnostic
-  paths.push(configDir + "/repos/opencode-loader/dist/frontdoor.mjs");
-  paths.push(configDir + "/repos/opencode-loader/dist/frontdoor.js");
+  // generic deployed home-path fallback, no app/vendor name
+  paths.push(configDir + "/frontdoor/app-frontdoor.mjs");
   return paths;
 }
 

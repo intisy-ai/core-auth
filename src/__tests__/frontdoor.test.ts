@@ -27,13 +27,14 @@ describe("resolveAppFrontDoor", () => {
     expect((await fd!.serve(new Request("http://x/"), null, null)).status).toBe(200);
   });
 
-  it("falls back to the deployed home-path when env is unset", async () => {
+  it("falls back to the deployed generic home-path when env is unset", async () => {
     const home = mkdtempSync(join(tmpdir(), "fd-"));
-    const dep = join(home, "repos", "opencode-loader", "dist");
+    const dep = join(home, "frontdoor");
     mkdirSync(dep, { recursive: true });
-    writeFileSync(join(dep, "frontdoor.mjs"), `export const appFrontDoor = { buildPluginHooks: () => ({}), serve: async () => new Response("home") };`);
+    writeFileSync(join(dep, "app-frontdoor.mjs"), `export const appFrontDoor = { buildPluginHooks: () => ({}), serve: async () => new Response("home") };`);
     const fd = await resolveAppFrontDoor({ configDir: home });
     expect(fd).not.toBeNull();
+    expect((await fd!.serve(new Request("http://x/"), null, null)).status).toBe(200);
   });
 
   it("importModuleFromPath resolves an absolute path adapter", async () => {
