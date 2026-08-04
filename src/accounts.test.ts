@@ -189,4 +189,48 @@ describe("activity emit", () => {
 
     expect(seen.map((s) => s.action)).toEqual(["account_removed"]);
   });
+
+  it("re-upserting an object-valued field with the same content in a different key order emits nothing", () => {
+    const opts = { dir };
+    const seen: any[] = [];
+    addAccount("p", { id: "a1", email: "a@b.c", meta: { a: 1, b: 2 } }, opts);
+    setActivityEmitter((spec: any) => seen.push(spec));
+
+    addAccount("p", { id: "a1", email: "a@b.c", meta: { b: 2, a: 1 } }, opts);
+
+    expect(seen).toEqual([]);
+  });
+
+  it("re-upserting an object-valued field with genuinely different content emits one account_updated", () => {
+    const opts = { dir };
+    const seen: any[] = [];
+    addAccount("p", { id: "a1", email: "a@b.c", meta: { a: 1, b: 2 } }, opts);
+    setActivityEmitter((spec: any) => seen.push(spec));
+
+    addAccount("p", { id: "a1", email: "a@b.c", meta: { a: 1, b: 3 } }, opts);
+
+    expect(seen.map((s) => s.action)).toEqual(["account_updated"]);
+  });
+
+  it("same content with reordered keys two levels deep emits nothing", () => {
+    const opts = { dir };
+    const seen: any[] = [];
+    addAccount("p", { id: "a1", email: "a@b.c", meta: { outer: { a: 1, b: 2 } } }, opts);
+    setActivityEmitter((spec: any) => seen.push(spec));
+
+    addAccount("p", { id: "a1", email: "a@b.c", meta: { outer: { b: 2, a: 1 } } }, opts);
+
+    expect(seen).toEqual([]);
+  });
+
+  it("reordering an array-valued field's elements emits one account_updated (array order is real content)", () => {
+    const opts = { dir };
+    const seen: any[] = [];
+    addAccount("p", { id: "a1", email: "a@b.c", tags: ["x", "y"] }, opts);
+    setActivityEmitter((spec: any) => seen.push(spec));
+
+    addAccount("p", { id: "a1", email: "a@b.c", tags: ["y", "x"] }, opts);
+
+    expect(seen.map((s) => s.action)).toEqual(["account_updated"]);
+  });
 });

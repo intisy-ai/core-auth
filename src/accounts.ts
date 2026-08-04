@@ -135,16 +135,40 @@ export function updateAccounts(provider, mutator, opts) {
 
 export function listAccounts(provider, opts) { return loadAccounts(provider, opts).accounts; }
 
+function sortKeysDeep(value) {
+  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (value && typeof value === "object") {
+    const sorted = {};
+    for (const key of Object.keys(value).sort()) sorted[key] = sortKeysDeep(value[key]);
+    return sorted;
+  }
+  return value;
+}
+
+// Sorts object keys at every depth before serializing so two accounts with the same
+// content but differently-ordered nested object fields compare equal; array order is
+// real content and is left alone. Returns null on any serialization failure (cycle,
+// non-serializable value) so the caller treats that as a real change rather than
+// silently treating it as identical.
+function stableSerialize(value) {
+  try {
+    return JSON.stringify(sortKeysDeep(value));
+  } catch {
+    return null;
+  }
+}
+
 export function addAccount(provider, account, opts) {
   let action = "account_added";
   updateAccounts(provider, (pool) => {
     const i = pool.accounts.findIndex((a) => (account.id && a.id === account.id) || (account.refresh && a.refresh === account.refresh));
     if (i < 0) { pool.accounts.push(account); return; }
-    const before = JSON.stringify(pool.accounts[i]);
+    const before = stableSerialize(pool.accounts[i]);
     pool.accounts[i] = { ...pool.accounts[i], ...account };
+    const after = stableSerialize(pool.accounts[i]);
     // A login refresh re-upserts the same account on every call; reporting an identical
     // upsert as a change would bury the real ones in the activity feed.
-    action = JSON.stringify(pool.accounts[i]) === before ? "" : "account_updated";
+    action = before !== null && after !== null && after === before ? "" : "account_updated";
   }, opts);
   if (!action) return;
   const subjectId = account.email || account.id;
