@@ -17,10 +17,21 @@ import { openBrowser } from "../browser.js";
 import { getConfigDir } from "../env.js";
 import { log } from "../log.js";
 import { refreshModels } from "../refresh.js";
+import { emitActivity } from "../activity.js";
+
+function loginFailedSpec(provider, message) {
+  return { topic: "account", action: "login_failed", impact: "error", subject: { kind: "account", id: "?" }, details: { provider, message } };
+}
+
+function loginSucceededSpec(provider, account) {
+  const subjectId = account.email || account.id;
+  return { topic: "account", action: "login_succeeded", impact: "notice", subject: { kind: "account", id: subjectId, label: subjectId }, details: { provider } };
+}
 
 export async function buildLoginInput(def) {
   const flow = await def.loginFlow({ configDir: getConfigDir(), log });
   openBrowser(flow.url);
+  const provider = def.id;
   return {
     input: {
       title: "Sign in to " + def.label,
@@ -30,9 +41,32 @@ export async function buildLoginInput(def) {
       pendingLabel: "Adding account… (exchanging the code, this can take a few seconds)",
       // paste fallback: trade the pasted code/redirect URL for an account, then pull
       // the now-authed account's models so they appear without an app restart
-      complete: async (text) => { const account = await flow.complete(text); if (account && account.refresh) await refreshModels(def).catch(() => {}); return { refresh: true }; },
+      complete: async (text) => {
+        let account;
+        try {
+          account = await flow.complete(text);
+        } catch (error) {
+          emitActivity(loginFailedSpec(provider, (error && error.message) || String(error)), provider);
+          throw error;
+        }
+        if (account && account.refresh) {
+          await refreshModels(def).catch(() => {});
+          emitActivity(loginSucceededSpec(provider, account), provider);
+        } else {
+          emitActivity(loginFailedSpec(provider, "login did not return an account"), provider);
+        }
+        return { refresh: true };
+      },
       // primary path: the loopback listener auto-completes the input when it fires
-      background: flow.loopback ? flow.loopback.then(async (account) => { if (!account) return null; await refreshModels(def).catch(() => {}); return { refresh: true }; }).catch(() => null) : null,
+      background: flow.loopback ? flow.loopback.then(async (account) => {
+        if (!account) { emitActivity(loginFailedSpec(provider, "loopback login returned no account"), provider); return null; }
+        await refreshModels(def).catch(() => {});
+        emitActivity(loginSucceededSpec(provider, account), provider);
+        return { refresh: true };
+      }).catch((error) => {
+        emitActivity(loginFailedSpec(provider, (error && error.message) || String(error)), provider);
+        return null;
+      }) : null,
       // release the listener when the input is dismissed / superseded
       onClose: typeof flow.cancel === "function" ? flow.cancel : undefined,
     },

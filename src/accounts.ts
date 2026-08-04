@@ -5,6 +5,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, openSyn
 import { join } from "path";
 import { randomBytes } from "crypto";
 import { configFolder } from "./env.js";
+import { emitActivity } from "./activity.js";
 
 const DEFAULT_FILE = "accounts.json";
 const LOCK_STALE_MS = 15 * 1000;
@@ -140,10 +141,13 @@ export function addAccount(provider, account, opts) {
     if (i >= 0) pool.accounts[i] = { ...pool.accounts[i], ...account };
     else pool.accounts.push(account);
   }, opts);
+  const subjectId = account.email || account.id;
+  emitActivity({ topic: "account", action: "account_added", impact: "notice", subject: { kind: "account", id: subjectId, label: subjectId }, details: { provider } }, provider);
 }
 
 export function removeAccount(provider, id, opts) {
   updateAccounts(provider, (pool) => { pool.accounts = pool.accounts.filter((a) => a.id !== id); }, opts);
+  emitActivity({ topic: "account", action: "account_removed", impact: "notice", subject: { kind: "account", id, label: id } }, provider);
 }
 
 export function clearAccounts(provider, opts) { saveAccounts(provider, emptyPool(), opts); }

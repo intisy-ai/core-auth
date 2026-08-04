@@ -49,6 +49,7 @@ export { readConfig, writeConfig, activeProvider, setActiveProvider, getAutoConf
 export { readModelCache, resolveProviderModels } from "./models-cache.js";
 export { log } from "./log.js";
 export { notify, setAppClient, setNotifier, notifyQueuePath } from "./notify.js";
+export { setActivityEmitter } from "./activity.js";
 export { chatError, HandleIrError, handleIrErrorFromResponse } from "./errors.js";
 export { lazyModule, safeJsonParse } from "./lazy.js";
 export type { LazyModule } from "./lazy.js";

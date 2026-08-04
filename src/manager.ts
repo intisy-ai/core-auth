@@ -7,6 +7,7 @@ import { proxyManager } from "./proxy/manager.js";
 import { initCoreAuth, getCoreAuth } from "./core-auth-loader.js";
 import { createLiveStore } from "./live-store.js";
 import { getConfigDir } from "./env.js";
+import { emitActivity } from "./activity.js";
 
 // token refresh rides the account's sticky proxy so Google sees the same IP for
 // refresh as for requests; null when proxying is off -> direct refresh as before
@@ -87,6 +88,7 @@ export class AccountManager {
   // a standalone caller needs its own await initCoreAuth() at setup, before getCoreAuth() runs).
   reportRateLimit(id, lane, resetMs) {
     getCoreAuth().reportRateLimit(this.providerId, id, lane || "", resetMs, this.jsStore());
+    emitActivity({ topic: "account.rate_limited", action: "rate_limited", impact: "warning", subject: { kind: "account", id, label: id }, details: { provider: this.providerId, resetAt: resetMs } }, this.providerId);
   }
 
   // baseMs/maxMs are computed here (not left to CoreAuthJs's own ManagerOptions default) so a

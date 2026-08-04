@@ -10,7 +10,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
-import { loadAccounts, saveAccounts, updateAccounts, LockTimeoutError } from "./accounts.js";
+import { loadAccounts, saveAccounts, updateAccounts, addAccount, LockTimeoutError } from "./accounts.js";
+import { setActivityEmitter } from "./activity.js";
 
 const pkgRoot = fileURLToPath(new URL("..", import.meta.url));
 const distAccounts = join(pkgRoot, "dist", "accounts.js");
@@ -145,4 +146,22 @@ describe("cross-thread concurrency", () => {
     const pool = loadAccounts("lock-test-provider", { dir });
     expect(pool.accounts.map((a: any) => a.id)).toEqual(["seed"]);
   }, 20000);
+});
+
+describe("activity emit", () => {
+  afterEach(() => setActivityEmitter(null));
+
+  it("emits account_added when an account is stored", () => {
+    const seen: any[] = [];
+    setActivityEmitter((spec: any, source: any) => seen.push({ spec, source }));
+
+    addAccount("activity-provider", { id: "user@example.com", email: "user@example.com", refresh: "r" }, { dir });
+
+    expect(loadAccounts("activity-provider", { dir }).accounts.map((a: any) => a.id)).toEqual(["user@example.com"]);
+    const added = seen.find((s) => s.spec.action === "account_added");
+    expect(added).toBeDefined();
+    expect(added.source).toBe("activity-provider");
+    expect(added.spec.subject).toEqual({ kind: "account", id: "user@example.com", label: "user@example.com" });
+    expect(added.spec.details).toEqual({ provider: "activity-provider" });
+  });
 });
