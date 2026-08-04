@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
-import { loadAccounts, saveAccounts, updateAccounts, addAccount, LockTimeoutError } from "./accounts.js";
+import { loadAccounts, saveAccounts, updateAccounts, addAccount, removeAccount, LockTimeoutError } from "./accounts.js";
 import { setActivityEmitter } from "./activity.js";
 
 const pkgRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -163,5 +163,30 @@ describe("activity emit", () => {
     expect(added.source).toBe("activity-provider");
     expect(added.spec.subject).toEqual({ kind: "account", id: "user@example.com", label: "user@example.com" });
     expect(added.spec.details).toEqual({ provider: "activity-provider" });
+  });
+
+  it("records an add once, an update only on a real change, and nothing for a no-op", () => {
+    const opts = { dir };
+    const seen: any[] = [];
+    setActivityEmitter((spec: any) => seen.push(spec));
+
+    addAccount("p", { id: "a1", email: "a@b.c", refresh: "r1" }, opts);
+    addAccount("p", { id: "a1", email: "a@b.c", refresh: "r1" }, opts); // identical upsert
+    addAccount("p", { id: "a1", email: "a@b.c", refresh: "r2" }, opts); // real change
+
+    expect(seen.map((s) => s.action)).toEqual(["account_added", "account_updated"]);
+    expect(seen[0].outcome).toBe("ok");
+  });
+
+  it("records a removal only when the account was there", () => {
+    const opts = { dir };
+    const seen: any[] = [];
+    addAccount("p", { id: "a1", email: "a@b.c" }, opts);
+    setActivityEmitter((spec: any) => seen.push(spec));
+
+    removeAccount("p", "nope", opts);
+    removeAccount("p", "a1", opts);
+
+    expect(seen.map((s) => s.action)).toEqual(["account_removed"]);
   });
 });

@@ -136,18 +136,30 @@ export function updateAccounts(provider, mutator, opts) {
 export function listAccounts(provider, opts) { return loadAccounts(provider, opts).accounts; }
 
 export function addAccount(provider, account, opts) {
+  let action = "account_added";
   updateAccounts(provider, (pool) => {
     const i = pool.accounts.findIndex((a) => (account.id && a.id === account.id) || (account.refresh && a.refresh === account.refresh));
-    if (i >= 0) pool.accounts[i] = { ...pool.accounts[i], ...account };
-    else pool.accounts.push(account);
+    if (i < 0) { pool.accounts.push(account); return; }
+    const before = JSON.stringify(pool.accounts[i]);
+    pool.accounts[i] = { ...pool.accounts[i], ...account };
+    // A login refresh re-upserts the same account on every call; reporting an identical
+    // upsert as a change would bury the real ones in the activity feed.
+    action = JSON.stringify(pool.accounts[i]) === before ? "" : "account_updated";
   }, opts);
+  if (!action) return;
   const subjectId = account.email || account.id;
-  emitActivity({ topic: "account", action: "account_added", impact: "notice", subject: { kind: "account", id: subjectId, label: subjectId }, details: { provider } }, provider);
+  emitActivity({ topic: "account", action, impact: "notice", outcome: "ok", subject: { kind: "account", id: subjectId, label: subjectId }, details: { provider } }, provider);
 }
 
 export function removeAccount(provider, id, opts) {
-  updateAccounts(provider, (pool) => { pool.accounts = pool.accounts.filter((a) => a.id !== id); }, opts);
-  emitActivity({ topic: "account", action: "account_removed", impact: "notice", subject: { kind: "account", id, label: id } }, provider);
+  let removed = false;
+  updateAccounts(provider, (pool) => {
+    const before = pool.accounts.length;
+    pool.accounts = pool.accounts.filter((a) => a.id !== id);
+    removed = pool.accounts.length !== before;
+  }, opts);
+  if (!removed) return;
+  emitActivity({ topic: "account", action: "account_removed", impact: "notice", outcome: "ok", subject: { kind: "account", id, label: id }, details: { provider } }, provider);
 }
 
 export function clearAccounts(provider, opts) { saveAccounts(provider, emptyPool(), opts); }
