@@ -9,7 +9,12 @@ import { existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
-function activeApp(): "claude" | "opencode" {
+// The single core-auth app-home resolver. core-auth has no `core` submodule of its
+// own (only provider repos nest core-auth and core side by side), so it cannot import
+// core's app-detection primitive; every other core-auth module that needs to know
+// which app it's running under (e.g. notify.ts) MUST import this instead of
+// re-deriving its own process.argv/env check.
+export function activeApp(): "claude" | "opencode" {
   const override = process.env.CORE_APP;
   if (override === "claude" || override === "opencode") return override;
   const forced = process.env.HUB_CONFIG_DIR;

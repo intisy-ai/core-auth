@@ -3,7 +3,7 @@
 
 export { defineProvider } from "./provider.js";
 export { defineProviderPlugin } from "./provider-plugin.js";
-export type { ProviderPluginOpts, ProviderPluginCore, OpencodePlugin } from "./provider-plugin.js";
+export type { ProviderPluginOpts, ProviderPluginCore } from "./provider-plugin.js";
 export {
   COMMON_PROVIDER_DEFAULTS,
   COMMON_PROVIDER_CAPABILITIES,
@@ -30,7 +30,10 @@ export type {
   SettingsMenuField,
   CapabilitiesField,
 } from "./settings-schema.js";
-export { createOpencodePlugin } from "./opencode.js";
+export { createProviderPlugin, dispatchFetch } from "./provider-plugin-runtime.js";
+export type { ProviderPlugin } from "./provider-plugin-runtime.js";
+export { resolveAppFrontDoor } from "./frontdoor.js";
+export type { AppFrontDoor, FrontDoorToolkit } from "./frontdoor.js";
 export { isOAuthAuth, accessTokenExpired, calculateTokenExpiry, encodeState, decodeState, refreshAccessToken, TokenRefreshError } from "./oauth.js";
 export { startOAuthListener } from "./server.js";
 export { loadAccounts, saveAccounts, updateAccounts, listAccounts, addAccount, removeAccount, clearAccounts, LockTimeoutError } from "./accounts.js";
@@ -45,7 +48,7 @@ export { getConfigDir, configFolder, reposDir } from "./env.js";
 export { readConfig, writeConfig, activeProvider, setActiveProvider, getAutoConfig, setAutoConfig, getAutoCandidates } from "./config.js";
 export { readModelCache, resolveProviderModels } from "./models-cache.js";
 export { log } from "./log.js";
-export { notify, setOpencodeClient, setNotifier, notifyQueuePath } from "./notify.js";
+export { notify, setAppClient, setNotifier, notifyQueuePath } from "./notify.js";
 export { chatError, HandleIrError, handleIrErrorFromResponse } from "./errors.js";
 export { lazyModule, safeJsonParse } from "./lazy.js";
 export type { LazyModule } from "./lazy.js";

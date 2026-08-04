@@ -10,7 +10,7 @@
 // imports in via `core`, and its own config-CLI guard (`maybeRunConfigCli(name)` or a provider's
 // richer `maybeRunCli(name)` that also handles other actions like `accounts`) via `configCliGuard`.
 
-import { createOpencodePlugin } from "./opencode.js";
+import { createProviderPlugin, type ProviderPlugin } from "./provider-plugin-runtime.js";
 import type { ProviderDef } from "./types.js";
 
 // core-auth carries no "core" submodule of its own (only a provider repo nests core/ and
@@ -86,11 +86,9 @@ export interface ProviderPluginOpts {
   exit?: (code: number) => void;                     // defaults to process.exit; overridable for tests
 }
 
-export type OpencodePlugin = ReturnType<typeof createOpencodePlugin>;
-
 // Slash-command / config invocations shell back in as `node <bundle> <action>`; both guards
 // below must exit before the provider registers, so a CLI invocation never boots the provider.
-export async function defineProviderPlugin(opts: ProviderPluginOpts): Promise<OpencodePlugin | undefined> {
+export async function defineProviderPlugin(opts: ProviderPluginOpts): Promise<ProviderPlugin | undefined> {
   const exit = opts.exit ?? ((code: number) => process.exit(code));
 
   opts.core.defineConfig(opts.name, opts.defaults ?? {});
@@ -112,5 +110,5 @@ export async function defineProviderPlugin(opts: ProviderPluginOpts): Promise<Op
     catch { /* best-effort, matches every provider's current guard */ }
   }
 
-  return createOpencodePlugin(opts.driver);
+  return createProviderPlugin(opts.driver);
 }
