@@ -20,18 +20,22 @@ import { refreshModels } from "../refresh.js";
 import { emitActivity } from "../activity.js";
 
 function loginFailedSpec(provider, message) {
-  return { topic: "account", action: "login_failed", impact: "error", subject: { kind: "account", id: "?" }, details: { provider, message } };
+  return { topic: "account", action: "login_failed", impact: "error", outcome: "failed", subject: { kind: "account", id: "?" }, details: { provider, message } };
 }
 
-function loginSucceededSpec(provider, account) {
+function loginSucceededSpec(provider, account, durationMs) {
   const subjectId = account.email || account.id;
-  return { topic: "account", action: "login_succeeded", impact: "notice", subject: { kind: "account", id: subjectId, label: subjectId }, details: { provider } };
+  return { topic: "account", action: "login_succeeded", impact: "notice", outcome: "ok", durationMs, subject: { kind: "account", id: subjectId, label: subjectId }, details: { provider } };
 }
 
 export async function buildLoginInput(def) {
   const flow = await def.loginFlow({ configDir: getConfigDir(), log });
   openBrowser(flow.url);
   const provider = def.id;
+  // a login is the one account operation a user WAITS on (browser round trip, token
+  // exchange, project discovery), so how long it took is worth recording
+  const startedAt = Date.now();
+  const elapsed = () => Date.now() - startedAt;
   return {
     input: {
       title: "Sign in to " + def.label,
@@ -51,7 +55,7 @@ export async function buildLoginInput(def) {
         }
         if (account && account.refresh) {
           await refreshModels(def).catch(() => {});
-          emitActivity(loginSucceededSpec(provider, account), provider);
+          emitActivity(loginSucceededSpec(provider, account, elapsed()), provider);
         } else {
           emitActivity(loginFailedSpec(provider, "login did not return an account"), provider);
         }
@@ -61,7 +65,7 @@ export async function buildLoginInput(def) {
       background: flow.loopback ? flow.loopback.then(async (account) => {
         if (!account) { emitActivity(loginFailedSpec(provider, "loopback login returned no account"), provider); return null; }
         await refreshModels(def).catch(() => {});
-        emitActivity(loginSucceededSpec(provider, account), provider);
+        emitActivity(loginSucceededSpec(provider, account, elapsed()), provider);
         return { refresh: true };
       }).catch((error) => {
         emitActivity(loginFailedSpec(provider, (error && error.message) || String(error)), provider);

@@ -88,7 +88,7 @@ export class AccountManager {
   // a standalone caller needs its own await initCoreAuth() at setup, before getCoreAuth() runs).
   reportRateLimit(id, lane, resetMs) {
     getCoreAuth().reportRateLimit(this.providerId, id, lane || "", resetMs, this.jsStore());
-    emitActivity({ topic: "account.rate_limited", action: "rate_limited", impact: "warning", subject: { kind: "account", id, label: id }, details: { provider: this.providerId, resetAt: resetMs } }, this.providerId);
+    emitActivity({ topic: "account.rate_limited", action: "rate_limited", impact: "warning", outcome: "failed", subject: { kind: "account", id, label: id }, details: { provider: this.providerId, resetAt: resetMs } }, this.providerId);
   }
 
   // baseMs/maxMs are computed here (not left to CoreAuthJs's own ManagerOptions default) so a
