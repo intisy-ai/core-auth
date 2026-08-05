@@ -5,6 +5,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, openSyn
 import { join } from "path";
 import { randomBytes } from "crypto";
 import { configFolder } from "./env.js";
+import { emitActivity } from "./activity.js";
 
 const DEFAULT_FILE = "accounts.json";
 const LOCK_STALE_MS = 15 * 1000;
@@ -134,16 +135,55 @@ export function updateAccounts(provider, mutator, opts) {
 
 export function listAccounts(provider, opts) { return loadAccounts(provider, opts).accounts; }
 
+function sortKeysDeep(value) {
+  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (value && typeof value === "object") {
+    const sorted = {};
+    for (const key of Object.keys(value).sort()) sorted[key] = sortKeysDeep(value[key]);
+    return sorted;
+  }
+  return value;
+}
+
+// Sorts object keys at every depth before serializing so two accounts with the same
+// content but differently-ordered nested object fields compare equal; array order is
+// real content and is left alone. Returns null on any serialization failure (cycle,
+// non-serializable value) so the caller treats that as a real change rather than
+// silently treating it as identical.
+function stableSerialize(value) {
+  try {
+    return JSON.stringify(sortKeysDeep(value));
+  } catch {
+    return null;
+  }
+}
+
 export function addAccount(provider, account, opts) {
+  let action = "account_added";
   updateAccounts(provider, (pool) => {
     const i = pool.accounts.findIndex((a) => (account.id && a.id === account.id) || (account.refresh && a.refresh === account.refresh));
-    if (i >= 0) pool.accounts[i] = { ...pool.accounts[i], ...account };
-    else pool.accounts.push(account);
+    if (i < 0) { pool.accounts.push(account); return; }
+    const before = stableSerialize(pool.accounts[i]);
+    pool.accounts[i] = { ...pool.accounts[i], ...account };
+    const after = stableSerialize(pool.accounts[i]);
+    // A login refresh re-upserts the same account on every call; reporting an identical
+    // upsert as a change would bury the real ones in the activity feed.
+    action = before !== null && after !== null && after === before ? "" : "account_updated";
   }, opts);
+  if (!action) return;
+  const subjectId = account.email || account.id;
+  emitActivity({ topic: "account", action, impact: "notice", outcome: "ok", subject: { kind: "account", id: subjectId, label: subjectId }, details: { provider } }, provider);
 }
 
 export function removeAccount(provider, id, opts) {
-  updateAccounts(provider, (pool) => { pool.accounts = pool.accounts.filter((a) => a.id !== id); }, opts);
+  let removed = false;
+  updateAccounts(provider, (pool) => {
+    const before = pool.accounts.length;
+    pool.accounts = pool.accounts.filter((a) => a.id !== id);
+    removed = pool.accounts.length !== before;
+  }, opts);
+  if (!removed) return;
+  emitActivity({ topic: "account", action: "account_removed", impact: "notice", outcome: "ok", subject: { kind: "account", id, label: id }, details: { provider } }, provider);
 }
 
 export function clearAccounts(provider, opts) { saveAccounts(provider, emptyPool(), opts); }

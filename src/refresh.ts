@@ -14,6 +14,7 @@ import { log } from "./log.js";
 import { listAccounts } from "./accounts.js";
 import { resolveProviderModels, readModelCache, writeModelCache } from "./models-cache.js";
 import { computeSorts } from "./sorts.js";
+import { emitActivity } from "./activity.js";
 
 // The host is opencode unless the active config dir is the Claude home. The loader sets
 // HUB_CONFIG_DIR to the app's config dir, so the path is the reliable signal.
@@ -78,6 +79,7 @@ export function mergeModels(providerId: string, models: Record<string, unknown>,
 // leave it false and rely on isOpencodeHost() (the loaders export HUB_CONFIG_DIR).
 export async function refreshModels(def, forceOpencodeMerge = false): Promise<Record<string, unknown>> {
   let models: Record<string, unknown> = {};
+  const startedAt = Date.now();
   try {
     const hasAccounts = listAccounts(def.id).length > 0;
     models = await resolveProviderModels(def, { configDir: getConfigDir(), log, hasAccounts }, Date.now());
@@ -92,6 +94,7 @@ export async function refreshModels(def, forceOpencodeMerge = false): Promise<Re
       writeModelCache(def.id, { ...cache, sorts, sortOrders, scores, scoreSource });
     }
     if (forceOpencodeMerge || isOpencodeHost()) mergeModels(def.appProviderId || def.id, models, def.appNpm);
+    emitActivity({ topic: "account", action: "models_refreshed", impact: "info", outcome: "ok", durationMs: Date.now() - startedAt, subject: { kind: "provider", id: def.id, label: def.id }, details: { provider: def.id, count: Object.keys(models).length } }, def.id);
   } catch (e) { log("model refresh/merge failed: " + e); }
   return models;
 }

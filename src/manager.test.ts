@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { initCoreAuth } from "./core-auth-loader.js";
 import { createLiveStore, type LiveStoreLike } from "./live-store.js";
 import { AccountManager } from "./manager.js";
+import { setActivityEmitter } from "./activity.js";
 
 const PROVIDER = "test-provider-report";
 
@@ -57,6 +58,29 @@ function storedPool() {
 function manager(opts: Record<string, unknown> = {}) {
   return new AccountManager(PROVIDER, { store: { dir: homeDir }, ...opts });
 }
+
+describe("reportRateLimit activity", () => {
+  it("records the rate limit as a failed attempt against that account", async () => {
+    const seen: any[] = [];
+    setActivityEmitter((spec: any) => seen.push(spec));
+    try {
+      seed(pool([account("a")], 0));
+      const mgr = manager({ selection: "sticky" });
+      await mgr.acquire("chat");
+
+      const resetAt = Date.now() + 60_000;
+      mgr.reportRateLimit("a", "chat", resetAt);
+
+      const rec = seen.find((spec) => spec.action === "rate_limited");
+      expect(rec.outcome).toBe("failed");
+      expect(rec.impact).toBe("warning");
+      expect(rec.subject.id).toBe("a");
+      expect(rec.details.resetAt).toBe(resetAt);
+    } finally {
+      setActivityEmitter(null);
+    }
+  });
+});
 
 describe("reportRateLimit: acquire -> rate-limit -> rotate -> recover", () => {
   it("makes the reported account unavailable for that lane until its reset passes, and a later acquire sees it again", async () => {
