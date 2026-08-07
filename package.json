@@ -1,16 +1,33 @@
 {
   "name": "core-auth",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Provider account, OAuth, and quota library for the intisy-ai AI-proxy ecosystem.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
   "author": "intisy",
-  "repository": { "type": "git", "url": "git+https://github.com/intisy-ai/core-auth.git" },
-  "keywords": ["intisy-ai", "ai-proxy", "core", "auth", "oauth", "accounts", "provider"],
-  "files": ["dist/", "README.md", "LICENSE"],
-  "engines": { "node": ">=20.0.0" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intisy-ai/core-auth.git"
+  },
+  "keywords": [
+    "intisy-ai",
+    "ai-proxy",
+    "core",
+    "auth",
+    "oauth",
+    "accounts",
+    "provider"
+  ],
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "build": "npm run build:teavm && npx tsc && node copy-generated.mjs",
     "build:teavm": "node teavm-build.mjs --java-dir java --module :auth-teavm --out src/generated/core-auth.teavm.js",
