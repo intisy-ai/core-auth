@@ -44,9 +44,13 @@ describe("resolveAppFrontDoor", () => {
     expect(typeof mod.appFrontDoor.serve).toBe("function");
   });
 
-  // Vite's dev loader tolerates bare absolute-path specifiers in import(), which hides a real bug:
-  // raw Node ESM rejects them (drive letter read as a URL scheme on Windows, leading "/" rejected on POSIX).
-  // This spawns an actual `node` child process, outside Vite/vitest's loader, to prove the fix holds there.
+  // Vite's dev loader tolerates bare absolute-path specifiers in import(), which can hide a real
+  // bug: raw Node ESM reads a Windows drive letter as a URL scheme. This spawns an actual `node`
+  // child process, outside Vite/vitest's loader, to prove the file: URL the code uses works there.
+  //
+  // Whether the BARE path also fails is deliberately not asserted: that is Node's behavior, not
+  // ours, and it differs by platform and version (it loads fine on Linux under Node 24, which is
+  // what CI runs).
   it("raw Node ESM (spawned child process) can import the adapter the same way resolveAppFrontDoor does", () => {
     const dir = mkdtempSync(join(tmpdir(), "fd-rawnode-"));
     const adapterPath = fakeAdapterModule(dir);
@@ -59,19 +63,10 @@ import { pathToFileURL } from "url";
 
 const target = ${JSON.stringify(adapterPath)};
 
-let bareFailed = false;
-let bareErrorCode = null;
-try {
-  await import(target);
-} catch (e) {
-  bareFailed = true;
-  bareErrorCode = e.code;
-}
-
 const mod = await import(pathToFileURL(target).href);
 if (typeof mod.appFrontDoor?.serve !== "function") throw new Error("adapter did not load via file: URL");
 
-console.log(JSON.stringify({ bareFailed, bareErrorCode, loaded: true }));
+console.log(JSON.stringify({ loaded: true }));
 `
     );
 
@@ -79,6 +74,5 @@ console.log(JSON.stringify({ bareFailed, bareErrorCode, loaded: true }));
     const result = JSON.parse(output);
 
     expect(result.loaded).toBe(true);
-    expect(result.bareFailed).toBe(true);
   });
 });
