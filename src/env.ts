@@ -9,6 +9,16 @@ import { existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
+// The config subdirectory's name, mirrored from core the same way the home
+// resolution above is: an app declares it in the registry, core's appPaths
+// resolves it, and whoever bundles core passes the result down here. Only a
+// single path segment is accepted, so a name cannot move storage out of the home.
+export const CONFIG_SUBDIR = (function () {
+  const declared = (process.env.HUB_CONFIG_SUBDIR || "").trim();
+  if (!declared || declared === "." || declared === ".." || /[\\/]/.test(declared)) return "config";
+  return declared;
+})();
+
 // The single core-auth app-home resolver. core-auth has no `core` submodule of its
 // own (only provider repos nest core-auth and core side by side), so it cannot import
 // core's app-detection primitive; every other core-auth module that needs to know

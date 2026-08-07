@@ -4,13 +4,13 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
-import { configFolder, getConfigDir } from "./env.js";
+import { configFolder, getConfigDir, CONFIG_SUBDIR } from "./env.js";
 import { readModelCache } from "./models-cache.js";
 
 function paths() {
   const dir = getConfigDir();
   return {
-    preferred: join(dir, "config", "auth.json"),
+    preferred: join(dir, CONFIG_SUBDIR, "auth.json"),
     fallback: join(dir, "auth.json"),
   };
 }
