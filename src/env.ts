@@ -56,3 +56,11 @@ export function configFolder(): string {
 export function reposDir(): string {
   return join(getConfigDir(), "repos");
 }
+
+// The cache subdirectory's name is mirrored from core the same way CONFIG_SUBDIR above is, because
+// core-loader derives the same path for the file this one names and the two libs share no code.
+export function cacheDir(): string {
+  const declared = (process.env.HUB_CACHE_SUBDIR || "").trim();
+  const subdir = !declared || declared === "." || declared === ".." || /[\\/]/.test(declared) ? "cache" : declared;
+  return join(getConfigDir(), subdir);
+}
