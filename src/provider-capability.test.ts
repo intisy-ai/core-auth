@@ -60,4 +60,16 @@ describe("providerCapability", () => {
       /handleIr/,
     );
   });
+
+  it("builds a capability assignable to the api interface it mirrors", () => {
+    interface ApiIrResponse {}
+    type ApiIrEventStream = ReadableStream<unknown>;
+    interface ApiProviderCapability {
+      readonly id: string;
+      handleIr(request: never, context: never): Promise<ApiIrResponse | ApiIrEventStream>;
+      providers?(): unknown[] | Promise<unknown[]>;
+    }
+    const built: ApiProviderCapability = providerCapability(driver as never);
+    expect(built.id).toBe("stub");
+  });
 });

@@ -21,7 +21,15 @@ export interface ProviderDescriptor {
 /** Talks to one upstream vendor in canonical IR, structurally identical to api's capability. */
 export interface ProviderCapability {
   readonly id: string;
-  handleIr(request: unknown, context: unknown): Promise<unknown>;
+  /**
+   * Handles one request in canonical IR.
+   *
+   * @remarks
+   * `any` rather than a mirrored IR union, because a return type is covariant: `unknown` would make
+   * this whole interface un-assignable to api's, which is the one thing the mirror exists to
+   * guarantee. The driver's own signature is the real contract.
+   */
+  handleIr(request: unknown, context: unknown): Promise<any>;
   providers(): Promise<ProviderDescriptor[]>;
 }
 
@@ -61,12 +69,13 @@ export function descriptorFor(driver: ProviderDef): ProviderDescriptor {
  * @param extra - lanes beyond the driver's own, for a plugin backing several upstream quotas
  */
 export function providerCapability(driver: ProviderDef, extra?: ExtraLanes): ProviderCapability {
-  if (typeof driver.handleIr !== "function") {
+  const handleIr = driver.handleIr;
+  if (typeof handleIr !== "function") {
     throw new Error(`provider ${driver.id} has no handleIr: a provider must implement handleIr(request, context)`);
   }
   return {
     id: driver.id,
-    handleIr: (request: unknown, context: unknown) => driver.handleIr!(request, context),
+    handleIr: (request: unknown, context: unknown) => handleIr(request, context),
     providers: async () => [descriptorFor(driver), ...(await resolveExtra(extra))],
   };
 }
