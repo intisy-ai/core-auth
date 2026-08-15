@@ -1,6 +1,6 @@
 // @ts-nocheck
 // Shared model-catalog cache. core-auth fetches a provider's live models (via
-// def.fetchModels) and writes them here; both the OpenCode merge and the Claude
+// def.fetchModels) and writes them here; both the app-config merge and the
 // loader's Providers tab read this file instead of a hardcoded list.
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
