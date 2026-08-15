@@ -12,7 +12,7 @@
 import { appendFileSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { log } from "./log.js";
-import { activeApp, getConfigDir } from "./env.js";
+import { activeAppId, getConfigDir } from "./env.js";
 
 let appClient = null;   // set by the provider's app-front-door hooks
 let notifier = null;    // injected by a host that owns the core event bus
@@ -26,7 +26,7 @@ export function setAppClient(client) { appClient = client || null; }
 // keeps the standalone toast/queue delivery below.
 export function setNotifier(fn) { notifier = typeof fn === "function" ? fn : null; }
 
-function isClaude() { return activeApp() === "claude"; }
+function isClaude() { return activeAppId() === "claude"; }
 
 // Shared queue the Claude drain hook reads. It's TRANSIENT runtime state (appended
 // then read-and-cleared), so it lives under cache/, not config/ (config is for
