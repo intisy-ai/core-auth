@@ -17,7 +17,11 @@ export interface ProviderDef {
   appProviderId?: string;             // app-side provider id to attach models to (defaults to the provider id)
   appNpm?: string;                    // SDK package for a custom (non-built-in) app-side provider
   models: Record<string, ProviderModel>;
-  handle: (request: Request, ctx: ProviderCtx) => Promise<Response>;
+  /**
+   * The app-wire entry point, for a host that supplies no translator. A provider that speaks
+   * canonical IR implements {@link handleIr} alone and leaves this unset.
+   */
+  handle?: (request: Request, ctx: ProviderCtx) => Promise<Response>;
   // when present, core exposes an opencode oauth "code" method; complete(input?)
   // persists the CoreAccount. input is opencode's pasted code / redirect URL;
   // when omitted (CLI path) the driver falls back to its own listener / readline.

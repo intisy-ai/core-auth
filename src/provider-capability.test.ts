@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { descriptorFor, providerCapability } from "./provider-capability.js";
+import type { ProviderDef } from "./types.js";
 
 const driver = {
   id: "stub",
@@ -71,5 +72,15 @@ describe("providerCapability", () => {
     }
     const built: ApiProviderCapability = providerCapability(driver as never);
     expect(built.id).toBe("stub");
+  });
+
+  it("satisfies ProviderDef with only handleIr, no app-wire handle", () => {
+    const irOnlyDriver: ProviderDef = {
+      id: "ir-only",
+      label: "IR Only",
+      models: {},
+      handleIr: async () => ({ ok: true }),
+    };
+    expect(providerCapability(irOnlyDriver).id).toBe("ir-only");
   });
 });
