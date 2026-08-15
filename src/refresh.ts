@@ -3,8 +3,10 @@
 // and the loader's in-tab account menu. Resolving the catalog (live fetch -> static ->
 // cache) is host-neutral and auth-aware (a live fetch only runs when the provider has
 // accounts); writing it into the app's own config file happens ONLY for an app that
-// declares a `modelCatalog`. Kept in its own module so the menu can trigger a refresh
-// without importing opencode.ts (which would form an import cycle).
+// declares a `modelCatalog`. Kept in its own module so the menu chain (menu.ts ->
+// menu-model.ts -> url-auth.ts) can trigger a refresh without importing
+// provider-plugin-runtime.ts, which imports that same chain to wire runProviderMenu
+// (an import cycle).
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { dirname, resolve } from "path";

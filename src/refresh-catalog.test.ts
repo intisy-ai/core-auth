@@ -76,11 +76,14 @@ describe("an app that declares one", () => {
 
   it("prefers the first declared file that exists", async () => {
     writeRegistry({ files: ["zeta.jsonc", "zeta.json"], providerKey: "provider" });
-    writeFileSync(join(appHome, "zeta.json"), "{}");
+    writeFileSync(join(appHome, "zeta.jsonc"), JSON.stringify({ marker: "jsonc" }));
+    writeFileSync(join(appHome, "zeta.json"), JSON.stringify({ marker: "json" }));
     const { mergeModels } = await import("./refresh.js");
     mergeModels("zeta-provider", { fresh: {} });
-    expect(existsSync(join(appHome, "zeta.jsonc"))).toBe(false);
-    expect(JSON.parse(readFileSync(join(appHome, "zeta.json"), "utf8")).provider).toBeTruthy();
+    const written = JSON.parse(readFileSync(join(appHome, "zeta.jsonc"), "utf8"));
+    expect(written.provider["zeta-provider"].models).toEqual({ fresh: {} });
+    const untouched = JSON.parse(readFileSync(join(appHome, "zeta.json"), "utf8"));
+    expect(untouched).toEqual({ marker: "json" });
   });
 
   it("lets the declared env override name the file outright", async () => {
