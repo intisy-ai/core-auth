@@ -11,7 +11,7 @@ function fakeAccountController() {
 }
 
 describe("providerHandlerExports", () => {
-  it("builds handleIr + a def carrying id/label/hasOAuth/accountPool from the driver", () => {
+  it("builds handleIr from the driver", () => {
     const driver = {
       id: "stub",
       label: "Stub",
@@ -21,14 +21,6 @@ describe("providerHandlerExports", () => {
     };
     const result = providerHandlerExports(driver);
     expect(result.handleIr).toBe(driver.handleIr);
-    expect(result.def).toEqual({
-      id: "stub",
-      label: "Stub",
-      models: driver.models,
-      hasOAuth: false,
-      settings: driver.settings,
-      accountPool: "stub",
-    });
   });
 
   it("includes accounts/loginFlow/menu/menuModel when the driver supports them", () => {
@@ -43,7 +35,6 @@ describe("providerHandlerExports", () => {
     const result = providerHandlerExports(driver);
     expect(result.accounts).toBe(driver.accounts);
     expect(result.loginFlow).toBe(driver.loginFlow);
-    expect(result.def.hasOAuth).toBe(true);
     expect(typeof result.menu).toBe("function");
     expect(typeof result.menuModel).toBe("function");
     // both are callable against the real menu-model builder without throwing
@@ -65,18 +56,5 @@ describe("providerHandlerExports", () => {
     expect("accounts" in result).toBe(false);
     expect("menu" in result).toBe(false);
     expect("menuModel" in result).toBe(false);
-    expect(result.def.hasOAuth).toBe(false);
-    expect(result.def.accountPool).toBe("custom");
-  });
-
-  it("never sets defs or resolveProviders; those stay handler-local (antigravity/custom-auth style)", () => {
-    const driver = { id: "antigravity", label: "Antigravity", models: {}, handleIr: async () => ({}) };
-    const result = providerHandlerExports(driver);
-    expect("defs" in result).toBe(false);
-    expect("resolveProviders" in result).toBe(false);
-    // a handler can still add these itself alongside the spread
-    const withDefs = { ...result, defs: [result.def, { ...result.def, id: "gemini-cli" }] };
-    expect(withDefs.defs).toHaveLength(2);
-    expect(withDefs.defs[1].id).toBe("gemini-cli");
   });
 });
