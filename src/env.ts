@@ -32,12 +32,18 @@ export function getConfigDir(): string {
   return desc ? resolveHome(desc) : "";
 }
 
+/** Empty when the app is unknown, never a relative path that would resolve against the process's cwd. */
+function pathUnderConfigDir(subdir: string): string {
+  const dir = getConfigDir();
+  return dir ? join(dir, subdir) : "";
+}
+
 export function configFolder(): string {
-  return join(getConfigDir(), "config");
+  return pathUnderConfigDir("config");
 }
 
 export function reposDir(): string {
-  return join(getConfigDir(), "repos");
+  return pathUnderConfigDir("repos");
 }
 
 // The cache subdirectory's name is mirrored from core the same way CONFIG_SUBDIR above is, because
@@ -45,5 +51,5 @@ export function reposDir(): string {
 export function cacheDir(): string {
   const declared = (process.env.HUB_CACHE_SUBDIR || "").trim();
   const subdir = !declared || declared === "." || declared === ".." || /[\\/]/.test(declared) ? "cache" : declared;
-  return join(getConfigDir(), subdir);
+  return pathUnderConfigDir(subdir);
 }

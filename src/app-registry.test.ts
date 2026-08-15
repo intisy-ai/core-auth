@@ -78,3 +78,22 @@ describe("the active descriptor", () => {
     expect(activeDescriptor()?.modelCatalog?.providerKey).toBe("provider");
   });
 });
+
+describe("paths derived from the config dir", () => {
+  it("are empty for an unknown app rather than resolving against the cwd", async () => {
+    process.env.HUB_APP_ID = "nobody";
+    const { configFolder, reposDir, cacheDir } = await import("./env.js");
+    expect(configFolder()).toBe("");
+    expect(reposDir()).toBe("");
+    expect(cacheDir()).toBe("");
+  });
+
+  it("still resolve under the app's home for a known app", async () => {
+    process.env.HUB_APP_ID = "zeta";
+    const { configFolder, reposDir, cacheDir } = await import("./env.js");
+    const home = join(dir, "homes", "zeta");
+    expect(configFolder()).toBe(join(home, "config"));
+    expect(reposDir()).toBe(join(home, "repos"));
+    expect(cacheDir()).toBe(join(home, "cache"));
+  });
+});
