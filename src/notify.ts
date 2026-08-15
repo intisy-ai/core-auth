@@ -1,18 +1,16 @@
 // @ts-nocheck
-// Cross-app user notifications for auth providers: a small message the USER sees
-// that never enters the model's context.
+// Cross-app user notifications for auth providers: a small message the USER sees that never
+// enters the model's context.
 //
-//  - opencode: a real toast via the plugin client (client.tui.showToast). The
-//    provider's app-front-door hooks hand us the client through setAppClient().
-//  - Claude Code: the provider runs headless under the CC proxy and Claude has no
-//    toast API, so we append to a queue file. A PostToolUse hook (registered by the
-//    loader) drains it and re-emits each line as a hook `systemMessage`, which Claude
-//    Code shows to the user WITHOUT adding it to the model's context.
+// Delivery follows the CLIENT, not the app: an app whose front door registered a client with a
+// toast API gets a real toast, and everything else appends to a queue file that the app's own
+// drain hook re-emits in whatever form that app shows a user. An app with no toast API registers
+// no client, so it takes the queue path without this module knowing which app it is.
 
 import { appendFileSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { log } from "./log.js";
-import { activeAppId, getConfigDir } from "./env.js";
+import { getConfigDir } from "./env.js";
 
 let appClient = null;   // set by the provider's app-front-door hooks
 let notifier = null;    // injected by a host that owns the core event bus
@@ -25,8 +23,6 @@ export function setAppClient(client) { appClient = client || null; }
 // onto the one shared bus instead of the local toast/queue. Unset (the default)
 // keeps the standalone toast/queue delivery below.
 export function setNotifier(fn) { notifier = typeof fn === "function" ? fn : null; }
-
-function isClaude() { return activeAppId() === "claude"; }
 
 // Shared queue the Claude drain hook reads. It's TRANSIENT runtime state (appended
 // then read-and-cleared), so it lives under cache/, not config/ (config is for
@@ -46,7 +42,7 @@ export function notify(message, level) {
     return;
   }
   try {
-    if (!isClaude() && appClient && appClient.tui && typeof appClient.tui.showToast === "function") {
+    if (appClient && appClient.tui && typeof appClient.tui.showToast === "function") {
       const variant = lvl === "success" || lvl === "warning" || lvl === "error" ? lvl : "info";
       // opencode's SDK expects the payload nested under `body`; a flat {message,variant} silently no-ops.
       Promise.resolve(appClient.tui.showToast({ body: { message, variant } })).catch(() => {});
