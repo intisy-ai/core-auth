@@ -55,4 +55,21 @@ describe("notification delivery follows the client, not the app", () => {
     const { readFileSync } = await import("node:fs");
     expect(readFileSync(notifyQueuePath(), "utf8")).toContain("queued");
   });
+
+  it("delivers via registered client regardless of app id", async () => {
+    const prevAppId = process.env.HUB_APP_ID;
+    process.env.HUB_APP_ID = "claude";
+    try {
+      vi.resetModules();
+      const { notify, setAppClient } = await import("./notify.js");
+      const showToast = vi.fn(() => Promise.resolve());
+      setAppClient({ tui: { showToast } });
+      notify("cross-app", "warning");
+      expect(showToast).toHaveBeenCalledWith({ body: { message: "cross-app", variant: "warning" } });
+      setAppClient(null);
+    } finally {
+      if (prevAppId === undefined) delete process.env.HUB_APP_ID;
+      else process.env.HUB_APP_ID = prevAppId;
+    }
+  });
 });
