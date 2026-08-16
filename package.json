@@ -31,7 +31,7 @@
   "scripts": {
     "build": "npm run build:teavm && npx tsc && node copy-generated.mjs",
     "build:teavm": "node teavm-build.mjs --java-dir java --module :auth-teavm --out src/generated/core-auth.teavm.js",
-    "test": "vitest run",
+    "test": "npm run build && vitest run",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
