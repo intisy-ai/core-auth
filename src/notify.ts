@@ -15,8 +15,9 @@ import { getConfigDir } from "./env.js";
 let appClient = null;   // set by the provider's app-front-door hooks
 let notifier = null;    // injected by a host that owns the core event bus
 
-// Providers call this from their app-front-door hooks with the plugin `client` so
-// opencode notifications become real toasts. No-op / harmless when never called.
+// Providers call this from their app-front-door hooks with the plugin `client`: a registered
+// client with a toast API is what turns a notification into a real toast rather than a queue
+// entry. No-op / harmless when never called.
 export function setAppClient(client) { appClient = client || null; }
 
 // A host that bundles core wires its event-bus publish here, so notifications flow
@@ -24,7 +25,8 @@ export function setAppClient(client) { appClient = client || null; }
 // keeps the standalone toast/queue delivery below.
 export function setNotifier(fn) { notifier = typeof fn === "function" ? fn : null; }
 
-// Shared queue the Claude drain hook reads. It's TRANSIENT runtime state (appended
+// Shared queue for an app whose front door registered no toast-capable client: that app's own
+// drain hook reads it. It's TRANSIENT runtime state (appended
 // then read-and-cleared), so it lives under cache/, not config/ (config is for
 // config files only). Sibling of config/ and logs/ under the app dir.
 export function notifyQueuePath(dir) { return join(dir || getConfigDir(), "cache", "auth-notifications.jsonl"); }
