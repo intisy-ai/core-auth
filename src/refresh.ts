@@ -24,7 +24,9 @@ export function mergesModelCatalog(): boolean {
 }
 
 // The declared file: the app's own env override wins outright, then the first declared candidate
-// that exists, then the first candidate, so a first refresh creates the file the app reads.
+// that exists, then the LAST declared candidate. Earlier entries are preferred only when they
+// already exist, so a first refresh into a fresh home creates the last (plain) file rather than a
+// commented variant an earlier entry names.
 function catalogPath(): string {
   const desc = activeDescriptor();
   const declared = desc?.modelCatalog;
@@ -33,7 +35,7 @@ function catalogPath(): string {
   if (override) return resolve(override);
   const home = getConfigDir() || resolveHome(desc);
   const candidates = declared.files.map((file) => expandPath(file, home));
-  return candidates.find((candidate) => existsSync(candidate)) || candidates[0];
+  return candidates.find((candidate) => existsSync(candidate)) || candidates[candidates.length - 1];
 }
 
 function stripJsonc(text: string): string {
@@ -76,10 +78,11 @@ export function mergeModels(providerId: string, models: Record<string, unknown>,
 // models into the app's own config when the active app declares one. Run at plugin startup and
 // right after a login so a newly-authed account populates models without waiting for a restart.
 //
-// `forceMerge` is set by createProviderPlugin's startup call, which runs inside the app's own
-// process where HUB_CONFIG_DIR may be unset and detection would be unreliable, so there the merge
-// is unconditional. Every other caller leaves it false and lets the declaration decide.
-export async function refreshModels(def, forceMerge = false): Promise<Record<string, unknown>> {
+// The declaration alone decides whether a merge happens, for every caller: without a descriptor
+// there is no target file and no provider key to write under, so there is nothing a caller could
+// force. A startup call inside the app's own process, where HUB_CONFIG_DIR may be unset, still
+// resolves its home from the descriptor's own declared candidates.
+export async function refreshModels(def): Promise<Record<string, unknown>> {
   let models: Record<string, unknown> = {};
   const startedAt = Date.now();
   try {
@@ -95,7 +98,7 @@ export async function refreshModels(def, forceMerge = false): Promise<Record<str
       const { sorts, sortOrders, scores, scoreSource } = await computeSorts(def, cache.ranking || [], nameOf);
       writeModelCache(def.id, { ...cache, sorts, sortOrders, scores, scoreSource });
     }
-    if (forceMerge || mergesModelCatalog()) mergeModels(def.appProviderId || def.id, models, def.appNpm);
+    if (mergesModelCatalog()) mergeModels(def.appProviderId || def.id, models, def.appNpm);
     emitActivity({ topic: "account", action: "models_refreshed", impact: "info", outcome: "ok", durationMs: Date.now() - startedAt, subject: { kind: "provider", id: def.id, label: def.id }, details: { provider: def.id, count: Object.keys(models).length } }, def.id);
   } catch (e) { log("model refresh/merge failed: " + e); }
   return models;

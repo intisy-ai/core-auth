@@ -86,6 +86,14 @@ describe("an app that declares one", () => {
     expect(untouched).toEqual({ marker: "json" });
   });
 
+  it("creates the last declared file when none of them exists yet", async () => {
+    writeRegistry({ files: ["zeta.jsonc", "zeta.json"], providerKey: "provider" });
+    const { mergeModels } = await import("./refresh.js");
+    mergeModels("zeta-provider", { fresh: {} });
+    expect(existsSync(join(appHome, "zeta.json"))).toBe(true);
+    expect(existsSync(join(appHome, "zeta.jsonc"))).toBe(false);
+  });
+
   it("lets the declared env override name the file outright", async () => {
     const elsewhere = join(dir, "elsewhere.json");
     process.env.ZETA_CONFIG = elsewhere;
@@ -93,5 +101,29 @@ describe("an app that declares one", () => {
     const { mergeModels } = await import("./refresh.js");
     mergeModels("zeta-provider", { fresh: {} });
     expect(existsSync(elsewhere)).toBe(true);
+  });
+});
+
+// The provider plugin's startup refresh runs inside the app's own process, where no home is
+// injected. The declaration alone has to carry it: the target comes from the descriptor's own
+// candidates, and an app declaring no catalog gets nothing written.
+describe("the startup refresh, with no home injected", () => {
+  const def = { id: "demo-auth", label: "Demo", models: { "demo-model": { name: "Demo Model" } } } as any;
+
+  it("merges into the file the descriptor declares", async () => {
+    delete process.env.HUB_CONFIG_DIR;
+    writeRegistry({ files: ["zeta.json"], providerKey: "provider" });
+    const { refreshModels } = await import("./refresh.js");
+    await refreshModels(def);
+    const written = JSON.parse(readFileSync(join(appHome, "zeta.json"), "utf8"));
+    expect(written.provider["demo-auth"].models).toEqual({ "demo-model": { name: "Demo Model" } });
+  });
+
+  it("writes no catalog for an app that declares none", async () => {
+    delete process.env.HUB_CONFIG_DIR;
+    writeRegistry(null);
+    const { refreshModels } = await import("./refresh.js");
+    await refreshModels(def);
+    expect(existsSync(join(appHome, "zeta.json"))).toBe(false);
   });
 });
