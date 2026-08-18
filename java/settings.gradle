@@ -29,3 +29,8 @@ project(":routing").projectDir = file("core-proxy/java/routing")
 
 include ":teavm"
 project(":teavm").projectDir = file("core-proxy/java/teavm")
+
+// :ir - core-ir's canonical IR types, aliased like :routing/:teavm above. core-ir is nested inside
+// core-proxy (core-proxy/core-ir from here), so :routing's compileOnly project(":ir") resolves.
+include ":ir"
+project(":ir").projectDir = file("core-proxy/core-ir/java/ir")
