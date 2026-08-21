@@ -8,11 +8,10 @@ plugins {
 dependencies {
     // :accounts -- the account/oauth engine this JS export surface wraps.
     implementation project(":accounts")
-    // core-proxy's own :teavm js-base (SimpleJsonCodec/JsStoreBridge/JsHttpClientBridge) --
+    // :js-base's TeaVM service implementations (SimpleJsonCodec/JsStoreBridge/JsHttpClientBridge),
     // reused rather than duplicated; CoreAuthJs lives in the SAME package (io.github.intisy.ai.js)
-    // so it can reference those classes unqualified, exactly like ai-java's original AiJavaJs did
-    // (single :js module) before this split across two repos.
-    implementation project(":teavm")
+    // so it references them unqualified.
+    implementation project(":js-base")
     teavm teavm.libs.jsoApis
 }
 
