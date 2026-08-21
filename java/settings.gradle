@@ -16,19 +16,19 @@ include ":accounts"
 include ":auth-teavm"
 
 // :spi and :js-base - the plugin-to-host contract and the TeaVM implementations of its
-// host-injected services, from the core-contracts submodule (../../core-contracts from here).
+// host-injected services, from this repo's own core-contracts submodule.
 // core-auth needs the CONTRACT, never the routing engine: it hands a provider its accounts, and the
 // engine is a separate consumer of the same contract. The project paths are preserved and only
 // projectDir differs, the ecosystem convention, so a larger build folding this one in resolves the
 // same coordinates.
 include ":spi"
-project(":spi").projectDir = file("../../core-contracts/java/spi")
+project(":spi").projectDir = file("../core-contracts/java/spi")
 
 include ":js-base"
-project(":js-base").projectDir = file("../../core-contracts/java/js-base")
+project(":js-base").projectDir = file("../core-contracts/java/js-base")
 
 // :ir - core-ir's canonical IR types, from this repo's own core-ir submodule, which is also what
 // src/types.ts and src/provider-capability.ts import. One :ir per build, and no drift between
 // core-auth's Java and TypeScript views of core-ir.
 include ":ir"
-project(":ir").projectDir = file("../../core-ir/java/ir")
+project(":ir").projectDir = file("../core-ir/java/ir")
