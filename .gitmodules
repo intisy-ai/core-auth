@@ -1,3 +1,6 @@
 [submodule "java/core-proxy"]
 	path = java/core-proxy
 	url = https://github.com/intisy-ai/core-proxy.git
+[submodule "core-ir"]
+	path = core-ir
+	url = https://github.com/intisy-ai/core-ir.git
