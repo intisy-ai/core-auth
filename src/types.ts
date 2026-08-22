@@ -1,7 +1,7 @@
 // @ts-nocheck
 // The provider contract: a plugin supplies one of these and core-auth does all the app/loader integration.
 
-import type { IrEventStream, IrRequest, IrResponse, ProviderCallContext } from "../core-ir/dist/index.js";
+import type { HandlerCtx, IrEventStream, IrRequest, IrResponse } from "../core-ir/dist/index.js";
 
 export interface ProviderCtx {
   configDir: string;
@@ -38,7 +38,7 @@ export interface ProviderDef {
    * declared there, so a driver whose return type does not match it is a compile error here instead
    * of a runtime surprise at the front-door.
    */
-  handleIr?: (request: IrRequest, ctx: ProviderCallContext) => Promise<IrResponse | IrEventStream>;
+  handleIr?: (request: IrRequest, ctx: HandlerCtx) => Promise<IrResponse | IrEventStream>;
   // A provider may contribute extra app-shaped plugin hooks (e.g. an `event` handler);
   // the injected app front-door merges these in. Generic passthrough; core-auth doesn't know what they do.
   appHooks?: (input: unknown) => unknown | Promise<unknown>;

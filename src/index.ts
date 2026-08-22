@@ -33,7 +33,8 @@ export type {
 export { createProviderPlugin, dispatchFetch } from "./provider-plugin-runtime.js";
 export type { ProviderPlugin } from "./provider-plugin-runtime.js";
 export { descriptorFor, providerCapability } from "./provider-capability.js";
-export type { ExtraLanes, ProviderCapability, ProviderDescriptor } from "./provider-capability.js";
+export type { ExtraLanes, Provider, ProviderDescriptor } from "./provider-capability.js";
+export { PROVIDER } from "./generated/auth-contracts.keys.js";
 export { resolveAppFrontDoor } from "./frontdoor.js";
 export type { AppFrontDoor, FrontDoorToolkit } from "./frontdoor.js";
 export { isOAuthAuth, accessTokenExpired, calculateTokenExpiry, encodeState, decodeState, refreshAccessToken, TokenRefreshError } from "./oauth.js";

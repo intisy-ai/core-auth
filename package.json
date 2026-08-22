@@ -33,7 +33,8 @@
     "build:teavm": "node teavm-build.mjs --java-dir java --module :auth-teavm --out src/generated/core-auth.teavm.js",
     "test": "npm run build && vitest run",
     "prepublishOnly": "npm run build",
-    "build:deps": "npm --prefix core-ir install && npm --prefix core-ir run build"
+    "build:deps": "npm --prefix core-ir install && npm --prefix core-ir run build",
+    "emit": "node core-ir/api/scripts/emit-dts.mjs --java-dir java --module :auth-contracts --module-dir auth-contracts --out src/generated"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",
