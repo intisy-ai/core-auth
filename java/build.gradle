@@ -1,8 +1,12 @@
+plugins {
+    id "io.github.intisy.github-gradle" version "1.8.2.1" apply false
+}
+
 // core-auth's Java module -- self-contained Gradle build living alongside core-auth's TS (../src,
 // ../package.json). Mirrors core-proxy/java/build.gradle's subprojects{} shape exactly (plain
 // java-library + JUnit, Java 8 baseline) -- deliberately not ai-java's root build.gradle (its
-// io.github.intisy.online-gradle/github-gradle plugins are ai-java-repo-specific publishing
-// concerns, out of scope here).
+// io.github.intisy.online-gradle plugin is ai-java-repo-specific, out of
+// scope here).
 //
 // This block applies to EVERY project this settings.gradle knows about, including the two
 // vendored core-proxy projects aliased in via project(...).projectDir (:core-proxy-routing,
@@ -12,9 +16,16 @@
 // vendored one) runs afterward and overrides sourceCompatibility to 17 for itself.
 subprojects {
     apply plugin: "java-library"
+    apply plugin: "io.github.intisy.github-gradle"
 
     group = "io.github.intisy"
-    version = "0.1.0"
+    // publishGithub requires a concrete version. Derive it from -Partifact_version=<tag> passed by
+    // CI (stripping a leading "v"), falling back to a local dev version, the ecosystem derivation.
+    version = (project.findProperty("artifact_version") ?: "0.0.0-dev").toString().replaceFirst(/^v/, "")
+
+    github {
+        accessToken = System.getenv("GITHUB_TOKEN") ?: ""
+    }
 
     repositories {
         mavenLocal()
@@ -43,5 +54,40 @@ subprojects {
 
     test {
         useJUnitPlatform()
+    }
+}
+
+// The modules a downstream java repo resolves, mapped to the classifier its coordinate names.
+// Per module rather than one shaded jar, because they serve different gradle configurations and
+// shading would put every module on every consumer's classpath.
+ext.PUBLISHED_MODULES = [
+    ":accounts": "accounts",
+    ":auth-contracts": "auth-contracts",
+]
+
+configure(subprojects.findAll { PUBLISHED_MODULES.containsKey(it.path) }) {
+    jar {
+        archiveVersion = ""
+    }
+
+    publishGithub {
+        // These modules sit inside this repo with no .git of their own, so the default git-remote
+        // lookup fails; owner/repo also drive the uploaded asset name (core-auth-<classifier>.jar).
+        owner = "intisy-ai"
+        repo = "core-auth"
+        releaseName = "core-auth ${project.findProperty('artifact_version') ?: project.version}"
+        artifacts {
+            artifact {
+                classifier = PUBLISHED_MODULES[project.path]
+                jar = file("build/libs/${project.name}.jar")
+            }
+        }
+    }
+}
+
+// A publish fanned out to every subproject would fail on the ones with no artifacts declared.
+subprojects {
+    tasks.matching { it.name == "publishGithub" }.configureEach {
+        onlyIf { project.path in rootProject.PUBLISHED_MODULES.keySet() }
     }
 }
