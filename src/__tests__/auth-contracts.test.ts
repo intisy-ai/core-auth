@@ -16,7 +16,7 @@ it("keeps the committed provider vocabulary identical to what the java emits", (
   const scratch = mkdtempSync(join(tmpdir(), "auth-contracts-"));
   execFileSync(process.execPath, [
     join(repo, "core-ir", "api", "scripts", "emit-dts.mjs"),
-    "--java-dir", join(repo, "java"),
+    "--java-dir", repo,
     "--module", ":auth-contracts",
     "--module-dir", "auth-contracts",
     "--out", scratch,
