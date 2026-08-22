@@ -32,3 +32,17 @@ project(":js-base").projectDir = file("../core-contracts/java/js-base")
 // core-auth's Java and TypeScript views of core-ir.
 include ":ir"
 project(":ir").projectDir = file("../core-ir/java/ir")
+
+// :annotations, :processor and :contract come from api, reached through core-ir's own api submodule
+// because :ir exports api's seam types in HandlerCtx's public fields, so any build including :ir must
+// resolve api at the same coordinates.
+include ":annotations"
+project(":annotations").projectDir = file("../core-ir/api/java/annotations")
+include ":processor"
+project(":processor").projectDir = file("../core-ir/api/java/processor")
+include ":contract"
+project(":contract").projectDir = file("../core-ir/api/java/contract")
+
+// :auth-contracts - the provider vocabulary core-auth mints: Provider and the account, quota and
+// config contracts a provider plugin implements.
+include ":auth-contracts"

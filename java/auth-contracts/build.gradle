@@ -1,0 +1,18 @@
+// The annotations are SOURCE-retention, the api contract supplies only the typed-key interfaces, and
+// :ir supplies types this module names but never constructs. So all three are compileOnly: this
+// module's jar carries none of them, and no :teavm module embeds a second copy of any.
+dependencies {
+    compileOnly project(":annotations")
+    compileOnly project(":contract")
+    compileOnly project(":ir")
+    annotationProcessor project(":processor")
+}
+
+tasks.named("compileJava") {
+    options.compilerArgs += [
+        "-Atsemit.name=auth-contracts",
+        "-Atsemit.ext=.ts",
+        "-Atsemit.keys=@intisy-ai/api/contract",
+        "-Atsemit.imports=../types.js=IrRequest,IrResponse,IrEventStream",
+    ]
+}
