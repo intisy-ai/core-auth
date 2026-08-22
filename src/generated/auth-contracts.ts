@@ -40,11 +40,13 @@ export interface Provider {
   /** The provider id a routing chain names. */
   readonly id: string;
   /**
-   * Every lane this plugin serves, when it serves more than the one `id` names.
+   * Every lane this plugin serves, when it serves more than the one `id` names, or
+   * `null` when it serves only that one.
    *
    * @remarks
-   * Optional because most providers are one lane, so a host that does not call it sees
-   * exactly the behaviour it saw before this method existed.
+   * Defaulted rather than abstract so the optionality the emitted declaration carries
+   * also holds in Java: a one-lane provider does not write this method at all, and a host reads
+   * `null` as the lane list being absent rather than as serving no lanes.
    */
   providers?(): ProviderDescriptor[] | Promise<ProviderDescriptor[]>;
 }

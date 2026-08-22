@@ -33,12 +33,16 @@ public interface Provider extends IrHandler {
     IrResponse handleIr(IrRequest request, HandlerCtx ctx) throws Exception;
 
     /**
-     * Every lane this plugin serves, when it serves more than the one {@code id} names.
+     * Every lane this plugin serves, when it serves more than the one {@code id} names, or
+     * {@code null} when it serves only that one.
      *
-     * @implNote Optional because most providers are one lane, so a host that does not call it sees
-     * exactly the behaviour it saw before this method existed.
+     * @implNote Defaulted rather than abstract so the optionality the emitted declaration carries
+     * also holds in Java: a one-lane provider does not write this method at all, and a host reads
+     * {@code null} as the lane list being absent rather than as serving no lanes.
      */
     @TsOptional
     @TsMaybeAsync
-    List<ProviderDescriptor> providers();
+    default List<ProviderDescriptor> providers() {
+        return null;
+    }
 }
