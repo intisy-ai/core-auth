@@ -6,10 +6,10 @@ import io.github.intisy.ai.shared.model.Account;
 import io.github.intisy.ai.shared.oauth.Refreshed;
 import io.github.intisy.ai.shared.oauth.TokenRefresh;
 import io.github.intisy.ai.shared.oauth.TokenRefreshError;
-import io.github.intisy.ai.shared.spi.Clock;
-import io.github.intisy.ai.shared.spi.HttpClient;
-import io.github.intisy.ai.shared.spi.JsonCodec;
-import io.github.intisy.ai.shared.spi.Random;
+import io.github.intisy.ai.api.seam.Clock;
+import io.github.intisy.ai.api.seam.HttpClient;
+import io.github.intisy.ai.api.seam.JsonCodec;
+import io.github.intisy.ai.api.seam.Random;
 import io.github.intisy.ai.shared.store.AccountStore;
 
 import java.util.LinkedHashMap;

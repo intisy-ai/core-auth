@@ -8,9 +8,10 @@ plugins {
 dependencies {
     // :accounts -- the account/oauth engine this JS export surface wraps.
     implementation project(":accounts")
-    // :js-base's TeaVM service implementations (SimpleJsonCodec/JsStoreBridge/JsHttpClientBridge),
-    // reused rather than duplicated; CoreAuthJs lives in the SAME package (io.github.intisy.ai.js)
-    // so it references them unqualified.
+    // :seam and :js-base carry the seam implementations (SimpleJsonCodec, InMemoryStore, JsStoreBridge,
+    // JsHttpClientBridge), reused rather than duplicated; CoreAuthJs lives in :js-base's own package
+    // (io.github.intisy.ai.js) so it references those two unqualified.
+    implementation project(":seam")
     implementation project(":js-base")
     teavm teavm.libs.jsoApis
 }

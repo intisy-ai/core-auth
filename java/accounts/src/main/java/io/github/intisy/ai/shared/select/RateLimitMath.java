@@ -1,7 +1,7 @@
 package io.github.intisy.ai.shared.select;
 
 import io.github.intisy.ai.shared.model.Account;
-import io.github.intisy.ai.shared.spi.Random;
+import io.github.intisy.ai.api.seam.Random;
 
 /**
  * Generic availability + backoff math; "lanes" are arbitrary strings a driver uses to

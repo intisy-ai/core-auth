@@ -1,23 +1,25 @@
 package io.github.intisy.ai.shared.store;
 
-import io.github.intisy.ai.shared.spi.Store;
+import io.github.intisy.ai.api.seam.Store;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import io.github.intisy.ai.seam.SimpleJsonCodec;
+import io.github.intisy.ai.seam.InMemoryStore;
 
 class AuthConfigTest {
 
     @Test
     void activeProvider_defaultsToEmptyStringWhenUnset() {
-        AuthConfig cfg = new AuthConfig(new InMemoryStore(), new TestJsonCodec());
+        AuthConfig cfg = new AuthConfig(new InMemoryStore(), new SimpleJsonCodec());
         assertEquals("", cfg.activeProvider());
     }
 
     @Test
     void setActiveProvider_thenActiveProvider_roundTrips() {
         Store store = new InMemoryStore();
-        AuthConfig cfg = new AuthConfig(store, new TestJsonCodec());
+        AuthConfig cfg = new AuthConfig(store, new SimpleJsonCodec());
 
         cfg.setActiveProvider("x");
 
@@ -30,7 +32,7 @@ class AuthConfigTest {
     void setActiveProvider_preservesOtherFieldsAlreadyInTheDocument() {
         Store store = new InMemoryStore();
         store.put("auth.json", "{\"other\":\"kept\"}");
-        AuthConfig cfg = new AuthConfig(store, new TestJsonCodec());
+        AuthConfig cfg = new AuthConfig(store, new SimpleJsonCodec());
 
         cfg.setActiveProvider("y");
 
@@ -46,7 +48,7 @@ class AuthConfigTest {
     void activeProvider_defaultsToEmptyStringWhenStoreContainsMalformedJson() {
         Store store = new InMemoryStore();
         store.put("auth.json", "{ not json");
-        AuthConfig cfg = new AuthConfig(store, new TestJsonCodec());
+        AuthConfig cfg = new AuthConfig(store, new SimpleJsonCodec());
 
         assertEquals("", cfg.activeProvider());
     }

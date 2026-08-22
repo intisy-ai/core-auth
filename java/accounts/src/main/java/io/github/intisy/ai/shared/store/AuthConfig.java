@@ -1,10 +1,11 @@
 package io.github.intisy.ai.shared.store;
 
-import io.github.intisy.ai.shared.spi.JsonCodec;
-import io.github.intisy.ai.shared.spi.Store;
+import io.github.intisy.ai.api.seam.JsonCodec;
+import io.github.intisy.ai.api.seam.Store;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import io.github.intisy.ai.seam.JsonUtil;
 
 /**
  * core-auth config: the active provider (and, in the JS source, harness auto-model settings —

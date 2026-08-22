@@ -6,16 +6,16 @@ import io.github.intisy.ai.shared.oauth.OAuthConfig;
 import io.github.intisy.ai.shared.oauth.Refreshed;
 import io.github.intisy.ai.shared.oauth.TokenRefresh;
 import io.github.intisy.ai.shared.oauth.TokenRefreshError;
-import io.github.intisy.ai.shared.spi.Clock;
-import io.github.intisy.ai.shared.spi.HttpClient;
-import io.github.intisy.ai.shared.spi.JsonCodec;
-import io.github.intisy.ai.shared.spi.Random;
-import io.github.intisy.ai.shared.spi.Store;
-import io.github.intisy.ai.shared.spi.http.HttpRequest;
-import io.github.intisy.ai.shared.spi.http.HttpResponse;
+import io.github.intisy.ai.api.seam.Clock;
+import io.github.intisy.ai.api.seam.HttpClient;
+import io.github.intisy.ai.api.seam.JsonCodec;
+import io.github.intisy.ai.api.seam.Random;
+import io.github.intisy.ai.api.seam.Store;
+import io.github.intisy.ai.api.seam.HttpRequest;
+import io.github.intisy.ai.api.seam.HttpResponse;
 import io.github.intisy.ai.shared.store.AccountStore;
-import io.github.intisy.ai.shared.store.InMemoryStore;
-import io.github.intisy.ai.shared.store.TestJsonCodec;
+import io.github.intisy.ai.seam.InMemoryStore;
+import io.github.intisy.ai.seam.SimpleJsonCodec;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -112,7 +112,7 @@ class AccountManagerTest {
         FakeHttpClient fake = new FakeHttpClient();
         fake.responseStatus = 200;
         fake.responseBody = "{\"access_token\":\"new-access\",\"expires_in\":3600,\"refresh_token\":\"new-refresh\"}";
-        JsonCodec json = new TestJsonCodec();
+        JsonCodec json = new SimpleJsonCodec();
 
         Refreshed result = TokenRefresh.refresh("old-refresh", oauthConfig(), fake, json, now);
 
@@ -134,7 +134,7 @@ class AccountManagerTest {
         FakeHttpClient fake = new FakeHttpClient();
         fake.responseBody = "{\"access_token\":\"new-access\",\"expires_in\":60}";
 
-        Refreshed result = TokenRefresh.refresh("old-refresh", oauthConfig(), fake, new TestJsonCodec(), now);
+        Refreshed result = TokenRefresh.refresh("old-refresh", oauthConfig(), fake, new SimpleJsonCodec(), now);
 
         assertEquals("old-refresh", result.refresh); // JS: `refresh_token || refreshToken`
     }
@@ -146,7 +146,7 @@ class AccountManagerTest {
         fake.responseBody = "{\"error\":\"invalid_grant\"}";
 
         TokenRefreshError err = assertThrows(TokenRefreshError.class,
-                () -> TokenRefresh.refresh("old-refresh", oauthConfig(), fake, new TestJsonCodec(), 1_000_000L));
+                () -> TokenRefresh.refresh("old-refresh", oauthConfig(), fake, new SimpleJsonCodec(), 1_000_000L));
 
         assertTrue(err.revoked);
     }
@@ -158,7 +158,7 @@ class AccountManagerTest {
         fake.responseBody = "{\"error\":\"server_error\"}";
 
         TokenRefreshError err = assertThrows(TokenRefreshError.class,
-                () -> TokenRefresh.refresh("old-refresh", oauthConfig(), fake, new TestJsonCodec(), 1_000_000L));
+                () -> TokenRefresh.refresh("old-refresh", oauthConfig(), fake, new SimpleJsonCodec(), 1_000_000L));
 
         assertFalse(err.revoked);
     }
@@ -168,7 +168,7 @@ class AccountManagerTest {
     @Test
     void acquire_returnsEnabledAccountAndRefreshesExpiredTokenViaFakeHttpClient() {
         Store rawStore = new InMemoryStore();
-        JsonCodec json = new TestJsonCodec();
+        JsonCodec json = new SimpleJsonCodec();
         AccountStore store = new AccountStore(rawStore, json);
 
         Account account = new Account();
@@ -205,7 +205,7 @@ class AccountManagerTest {
     @Test
     void selectAndClaim_claimsWithoutTriggeringNetworkRefresh() {
         Store rawStore = new InMemoryStore();
-        JsonCodec json = new TestJsonCodec();
+        JsonCodec json = new SimpleJsonCodec();
         AccountStore store = new AccountStore(rawStore, json);
 
         Account account = new Account();
@@ -237,25 +237,25 @@ class AccountManagerTest {
 
     @Test
     void selectAndClaim_returnsNullWhenPoolIsEmpty() {
-        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+        AccountStore store = new AccountStore(new InMemoryStore(), new SimpleJsonCodec());
         AccountManager manager = manager("provider", store, new ManagerOptions(),
-                new FakeHttpClient(), new FixedClock(1_000_000L), () -> 0.5, new TestJsonCodec());
+                new FakeHttpClient(), new FixedClock(1_000_000L), () -> 0.5, new SimpleJsonCodec());
 
         assertNull(manager.selectAndClaim("messages"));
     }
 
     @Test
     void acquire_returnsNullWhenPoolIsEmpty() {
-        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+        AccountStore store = new AccountStore(new InMemoryStore(), new SimpleJsonCodec());
         AccountManager manager = manager("provider", store, new ManagerOptions(),
-                new FakeHttpClient(), new FixedClock(1_000_000L), () -> 0.5, new TestJsonCodec());
+                new FakeHttpClient(), new FixedClock(1_000_000L), () -> 0.5, new SimpleJsonCodec());
 
         assertNull(manager.acquire("messages"));
     }
 
     @Test
     void ensureAccess_disablesAccountWhenRefreshTokenRevoked() {
-        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+        AccountStore store = new AccountStore(new InMemoryStore(), new SimpleJsonCodec());
 
         Account account = new Account();
         account.id = "acc1";
@@ -271,7 +271,7 @@ class AccountManagerTest {
         ManagerOptions opts = new ManagerOptions();
         opts.oauth = oauthConfig();
 
-        AccountManager manager = manager("provider", store, opts, fake, new FixedClock(1_000_000L), () -> 0.5, new TestJsonCodec());
+        AccountManager manager = manager("provider", store, opts, fake, new FixedClock(1_000_000L), () -> 0.5, new SimpleJsonCodec());
 
         assertThrows(TokenRefreshError.class, () -> manager.ensureAccess("acc1"));
 
@@ -284,7 +284,7 @@ class AccountManagerTest {
 
     @Test
     void reportRateLimit_thenNextAcquireSkipsTheRateLimitedAccount() {
-        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+        AccountStore store = new AccountStore(new InMemoryStore(), new SimpleJsonCodec());
 
         Account a0 = new Account();
         a0.id = "acc0";
@@ -299,7 +299,7 @@ class AccountManagerTest {
         ManagerOptions opts = new ManagerOptions();
         opts.strategy = Strategy.ROUND_ROBIN;
         FixedClock clock = new FixedClock(1_000_000L);
-        AccountManager manager = manager("provider", store, opts, new FakeHttpClient(), clock, () -> 0.5, new TestJsonCodec());
+        AccountManager manager = manager("provider", store, opts, new FakeHttpClient(), clock, () -> 0.5, new SimpleJsonCodec());
 
         Acquired first = manager.acquire("messages");
         assertNotNull(first);
@@ -313,7 +313,7 @@ class AccountManagerTest {
 
     @Test
     void reportError_setsCoolingDownUntilViaDeterministicBackoff() {
-        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+        AccountStore store = new AccountStore(new InMemoryStore(), new SimpleJsonCodec());
 
         Account account = new Account();
         account.id = "acc1";
@@ -322,7 +322,7 @@ class AccountManagerTest {
 
         FixedClock clock = new FixedClock(1_000_000L);
         Random rng = () -> 0.5;
-        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, rng, new TestJsonCodec());
+        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, rng, new SimpleJsonCodec());
 
         manager.reportError("acc1", "chat", 0, "boom");
 
@@ -334,7 +334,7 @@ class AccountManagerTest {
 
     @Test
     void reportError_sameLane_yieldsToActiveProviderReset_doesNotSetCoolingDownUntil() {
-        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+        AccountStore store = new AccountStore(new InMemoryStore(), new SimpleJsonCodec());
 
         Account account = new Account();
         account.id = "acc1";
@@ -342,7 +342,7 @@ class AccountManagerTest {
         store.add("provider", account);
 
         FixedClock clock = new FixedClock(1_000_000L);
-        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new TestJsonCodec());
+        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new SimpleJsonCodec());
 
         manager.reportRateLimit("acc1", "chat", clock.now() + 60_000L); // provider reset still active
         manager.reportError("acc1", "chat", 0, "boom"); // same lane as the active reset
@@ -355,7 +355,7 @@ class AccountManagerTest {
 
     @Test
     void reportError_crossLane_doesNotYieldToAnUnrelatedLanesActiveReset() {
-        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+        AccountStore store = new AccountStore(new InMemoryStore(), new SimpleJsonCodec());
 
         Account account = new Account();
         account.id = "acc1";
@@ -363,7 +363,7 @@ class AccountManagerTest {
         store.add("provider", account);
 
         FixedClock clock = new FixedClock(1_000_000L);
-        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new TestJsonCodec());
+        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new SimpleJsonCodec());
 
         manager.reportRateLimit("acc1", "gemini-pro", clock.now() + 60_000L); // unrelated lane's reset, still active
         manager.reportError("acc1", "gemini-flash", 0, "boom"); // a DIFFERENT lane's generic error
@@ -378,7 +378,7 @@ class AccountManagerTest {
 
     @Test
     void reportError_missingLane_treatsItAsNoSameLaneResetKnownAndCoolsDownNormally() {
-        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+        AccountStore store = new AccountStore(new InMemoryStore(), new SimpleJsonCodec());
 
         Account account = new Account();
         account.id = "acc1";
@@ -386,7 +386,7 @@ class AccountManagerTest {
         store.add("provider", account);
 
         FixedClock clock = new FixedClock(1_000_000L);
-        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new TestJsonCodec());
+        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new SimpleJsonCodec());
 
         manager.reportRateLimit("acc1", "chat", clock.now() + 60_000L); // active reset on SOME lane
         manager.reportError("acc1", null, 0, "boom"); // caller doesn't know the failing request's lane
@@ -398,7 +398,7 @@ class AccountManagerTest {
 
     @Test
     void reportError_appliesBackoffWhenNoActiveProviderReset() {
-        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+        AccountStore store = new AccountStore(new InMemoryStore(), new SimpleJsonCodec());
 
         Account account = new Account();
         account.id = "acc1";
@@ -408,7 +408,7 @@ class AccountManagerTest {
         store.add("provider", account);
 
         FixedClock clock = new FixedClock(1_000_000L);
-        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new TestJsonCodec());
+        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new SimpleJsonCodec());
 
         manager.reportError("acc1", "chat", 0, "boom");
 
@@ -419,7 +419,7 @@ class AccountManagerTest {
 
     @Test
     void reportSuccess_clearsCooldownAndBumpsLastUsed() {
-        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+        AccountStore store = new AccountStore(new InMemoryStore(), new SimpleJsonCodec());
 
         FixedClock clock = new FixedClock(1_000_000L);
         Account account = new Account();
@@ -429,7 +429,7 @@ class AccountManagerTest {
         account.cooldownReason = "boom";
         store.add("provider", account);
 
-        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new TestJsonCodec());
+        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new SimpleJsonCodec());
         manager.reportSuccess("acc1");
 
         Account persisted = store.list("provider").get(0);
@@ -442,7 +442,7 @@ class AccountManagerTest {
 
     @Test
     void nextAvailableAt_returnsSoonestResetAcrossPool() {
-        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+        AccountStore store = new AccountStore(new InMemoryStore(), new SimpleJsonCodec());
 
         FixedClock clock = new FixedClock(1_000_000L);
         long now = clock.now();
@@ -458,7 +458,7 @@ class AccountManagerTest {
         a1.coolingDownUntil = now + 2_000L;
         store.add("provider", a1);
 
-        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new TestJsonCodec());
+        AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(), clock, () -> 0.5, new SimpleJsonCodec());
         Long next = manager.nextAvailableAt(null);
 
         assertEquals(now + 2_000L, next); // soonest of the two
@@ -466,7 +466,7 @@ class AccountManagerTest {
 
     @Test
     void nextAvailableAt_returnsNullWhenNoAccountEverBecomesAvailable() {
-        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+        AccountStore store = new AccountStore(new InMemoryStore(), new SimpleJsonCodec());
 
         Account disabled = new Account();
         disabled.id = "acc0";
@@ -474,7 +474,7 @@ class AccountManagerTest {
         store.add("provider", disabled);
 
         AccountManager manager = manager("provider", store, new ManagerOptions(), new FakeHttpClient(),
-                new FixedClock(1_000_000L), () -> 0.5, new TestJsonCodec());
+                new FixedClock(1_000_000L), () -> 0.5, new SimpleJsonCodec());
         Long next = manager.nextAvailableAt(null);
 
         assertNull(next);
@@ -482,7 +482,7 @@ class AccountManagerTest {
 
     @Test
     void refresh_forcesRefreshRegardlessOfExpiry() {
-        AccountStore store = new AccountStore(new InMemoryStore(), new TestJsonCodec());
+        AccountStore store = new AccountStore(new InMemoryStore(), new SimpleJsonCodec());
 
         Account account = new Account();
         account.id = "acc1";
@@ -498,7 +498,7 @@ class AccountManagerTest {
         ManagerOptions opts = new ManagerOptions();
         opts.oauth = oauthConfig();
 
-        AccountManager manager = manager("provider", store, opts, fake, new FixedClock(1_000_000L), () -> 0.5, new TestJsonCodec());
+        AccountManager manager = manager("provider", store, opts, fake, new FixedClock(1_000_000L), () -> 0.5, new SimpleJsonCodec());
         String access = manager.refresh("acc1");
 
         assertEquals("forced-access", access);

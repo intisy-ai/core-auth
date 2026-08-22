@@ -1,10 +1,10 @@
 package io.github.intisy.ai.shared.oauth;
 
-import io.github.intisy.ai.shared.spi.HttpClient;
-import io.github.intisy.ai.shared.spi.JsonCodec;
-import io.github.intisy.ai.shared.spi.http.HttpRequest;
-import io.github.intisy.ai.shared.spi.http.HttpResponse;
-import io.github.intisy.ai.shared.store.TestJsonCodec;
+import io.github.intisy.ai.api.seam.HttpClient;
+import io.github.intisy.ai.api.seam.JsonCodec;
+import io.github.intisy.ai.api.seam.HttpRequest;
+import io.github.intisy.ai.api.seam.HttpResponse;
+import io.github.intisy.ai.seam.SimpleJsonCodec;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -16,9 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OAuthExchangeTest {
 
-    // Reuse the hermetic TestJsonCodec double from the store tests rather than a real
+    // Reuse the hermetic SimpleJsonCodec double from the store tests rather than a real
     // gson-backed impl (:accounts must not drag in :jvm) or a new inner class.
-    private static final JsonCodec JSON = new TestJsonCodec();
+    private static final JsonCodec JSON = new SimpleJsonCodec();
 
     private static final class Captor implements HttpClient {
         HttpRequest last;

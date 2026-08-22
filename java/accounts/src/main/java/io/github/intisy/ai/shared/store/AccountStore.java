@@ -2,8 +2,8 @@ package io.github.intisy.ai.shared.store;
 
 import io.github.intisy.ai.shared.model.Account;
 import io.github.intisy.ai.shared.model.AccountPool;
-import io.github.intisy.ai.shared.spi.JsonCodec;
-import io.github.intisy.ai.shared.spi.Store;
+import io.github.intisy.ai.api.seam.JsonCodec;
+import io.github.intisy.ai.api.seam.Store;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
+import io.github.intisy.ai.seam.JsonUtil;
 
 /**
  * Generic per-provider account store, keyed by provider id. Java analog of

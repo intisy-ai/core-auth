@@ -11,12 +11,13 @@ import io.github.intisy.ai.shared.oauth.TokenRefreshError;
 import io.github.intisy.ai.shared.select.QuotaHealth;
 import io.github.intisy.ai.shared.select.RateLimitMath;
 import io.github.intisy.ai.shared.select.Strategy;
-import io.github.intisy.ai.shared.spi.Clock;
-import io.github.intisy.ai.shared.spi.HttpClient;
-import io.github.intisy.ai.shared.spi.JsonCodec;
-import io.github.intisy.ai.shared.spi.Random;
-import io.github.intisy.ai.shared.spi.Store;
+import io.github.intisy.ai.api.seam.Clock;
+import io.github.intisy.ai.api.seam.HttpClient;
+import io.github.intisy.ai.api.seam.JsonCodec;
+import io.github.intisy.ai.api.seam.Random;
+import io.github.intisy.ai.api.seam.Store;
 import io.github.intisy.ai.shared.store.AccountStore;
+import io.github.intisy.ai.seam.SimpleJsonCodec;
 
 import org.teavm.jso.JSExport;
 import org.teavm.jso.core.JSObjects;

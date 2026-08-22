@@ -1,8 +1,8 @@
 package io.github.intisy.ai.shared.store;
 
 import io.github.intisy.ai.shared.model.Account;
-import io.github.intisy.ai.shared.spi.JsonCodec;
-import io.github.intisy.ai.shared.spi.Store;
+import io.github.intisy.ai.api.seam.JsonCodec;
+import io.github.intisy.ai.api.seam.Store;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -11,13 +11,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import io.github.intisy.ai.seam.SimpleJsonCodec;
+import io.github.intisy.ai.seam.InMemoryStore;
 
 class AccountStoreTest {
 
     @Test
     void addListAndUpsertRoundTripExactJsonShape() {
         Store store = new InMemoryStore();
-        JsonCodec json = new TestJsonCodec();
+        JsonCodec json = new SimpleJsonCodec();
         AccountStore s = new AccountStore(store, json);
 
         Account a = new Account();
@@ -45,7 +47,7 @@ class AccountStoreTest {
     @Test
     void addUpsertsByRefreshWhenIdDiffersOrMissing() {
         Store store = new InMemoryStore();
-        AccountStore s = new AccountStore(store, new TestJsonCodec());
+        AccountStore s = new AccountStore(store, new SimpleJsonCodec());
 
         Account a = new Account();
         a.refresh = "same-refresh";
@@ -64,7 +66,7 @@ class AccountStoreTest {
     @Test
     void removeDropsAccountById() {
         Store store = new InMemoryStore();
-        AccountStore s = new AccountStore(store, new TestJsonCodec());
+        AccountStore s = new AccountStore(store, new SimpleJsonCodec());
 
         Account a = new Account();
         a.id = "acc1";
@@ -85,7 +87,7 @@ class AccountStoreTest {
     @Test
     void meta_wholeNumberSurvivesRoundTripWithoutTrailingZero() {
         Store store = new InMemoryStore();
-        AccountStore s = new AccountStore(store, new TestJsonCodec());
+        AccountStore s = new AccountStore(store, new SimpleJsonCodec());
 
         Account a = new Account();
         a.id = "acc-meta";
@@ -114,7 +116,7 @@ class AccountStoreTest {
     void list_returnsEmptyPoolWhenStoreContainsMalformedJson() {
         Store store = new InMemoryStore();
         store.put("accounts.json", "{ not json");
-        AccountStore s = new AccountStore(store, new TestJsonCodec());
+        AccountStore s = new AccountStore(store, new SimpleJsonCodec());
 
         assertTrue(s.list("claude-code").isEmpty());
     }

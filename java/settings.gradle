@@ -15,17 +15,16 @@ rootProject.name = "core-auth-java"
 include ":accounts"
 include ":auth-teavm"
 
-// :spi and :js-base - the plugin-to-host contract and the TeaVM implementations of its
-// host-injected services, from this repo's own core-contracts submodule.
-// core-auth needs the CONTRACT, never the routing engine: it hands a provider its accounts, and the
-// engine is a separate consumer of the same contract. The project paths are preserved and only
+// :seam and :js-base - api's implementations of the layer-1 seams a host injects (SimpleJsonCodec,
+// InMemoryStore) and their TeaVM bridges, reached through core-ir's own api submodule so every module
+// in this build resolves api at the same coordinates. The project paths are preserved and only
 // projectDir differs, the ecosystem convention, so a larger build folding this one in resolves the
 // same coordinates.
-include ":spi"
-project(":spi").projectDir = file("../core-contracts/java/spi")
+include ":seam"
+project(":seam").projectDir = file("../core-ir/api/java/seam")
 
 include ":js-base"
-project(":js-base").projectDir = file("../core-contracts/java/js-base")
+project(":js-base").projectDir = file("../core-ir/api/java/js-base")
 
 // :ir - core-ir's canonical IR types, from this repo's own core-ir submodule, which is also what
 // src/types.ts and src/provider-capability.ts import. One :ir per build, and no drift between
@@ -43,6 +42,6 @@ project(":processor").projectDir = file("../core-ir/api/java/processor")
 include ":contract"
 project(":contract").projectDir = file("../core-ir/api/java/contract")
 
-// :auth-contracts - the provider vocabulary core-auth mints: Provider and the account, quota and
-// config contracts a provider plugin implements.
+// :auth-contracts - the provider vocabulary core-auth mints: Provider, the lane descriptor, and the
+// OAuth, quota, catalog and config contracts a provider plugin implements.
 include ":auth-contracts"

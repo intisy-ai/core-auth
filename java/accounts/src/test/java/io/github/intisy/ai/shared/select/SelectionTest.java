@@ -2,7 +2,7 @@ package io.github.intisy.ai.shared.select;
 
 import io.github.intisy.ai.shared.model.Account;
 import io.github.intisy.ai.shared.model.AccountPool;
-import io.github.intisy.ai.shared.spi.Random;
+import io.github.intisy.ai.api.seam.Random;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
