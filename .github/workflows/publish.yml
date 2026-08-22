@@ -14,7 +14,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: read
+  contents: write
   packages: read
   id-token: write
 
@@ -27,4 +27,5 @@ jobs:
       patch_ceiling: 20
       scoped_only: true
       needs_java: true
+      jar_module: 'accounts auth-contracts'
       tag: ${{ inputs.tag }}
