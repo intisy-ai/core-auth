@@ -100,3 +100,12 @@ describe("defineProviderPlugin", () => {
     expect(createProviderPluginMock).toHaveBeenCalled();
   });
 });
+
+describe("defineProviderPlugin with neither a readme nor an action guard", () => {
+  it("boots the provider directly, since a provider that declares everything has nothing to run first", async () => {
+    createProviderPluginMock.mockReturnValue({ hooks: true });
+    const result = await defineProviderPlugin({ name: "custom-auth", driver });
+    expect(createProviderPluginMock).toHaveBeenCalledWith(driver);
+    expect(result).toEqual({ hooks: true });
+  });
+});

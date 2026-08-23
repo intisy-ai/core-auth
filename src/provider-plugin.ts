@@ -72,8 +72,8 @@ export interface ProviderPluginCore {
 export interface ProviderPluginOpts {
   name: string;                                     // the readme registration name
   driver: ProviderDef;
-  core: ProviderPluginCore;                          // the caller's own core imports
-  cliGuard: () => boolean | Promise<boolean>;        // the provider's own maybeRunCli(name), for actions like `accounts`
+  core?: ProviderPluginCore;                         // the caller's own core imports; needed only for a readme
+  cliGuard?: () => boolean | Promise<boolean>;       // the provider's own maybeRunCli(), for actions like `accounts`
   readme?: ReadmeSpec;
   exit?: (code: number) => void;                     // defaults to process.exit; overridable for tests
 }
@@ -83,14 +83,15 @@ export interface ProviderPluginOpts {
 export async function defineProviderPlugin(opts: ProviderPluginOpts): Promise<ProviderPlugin | undefined> {
   const exit = opts.exit ?? ((code: number) => process.exit(code));
 
-  if (opts.readme) opts.core.defineReadme(opts.readme);
-
-  if (opts.readme && opts.core.maybeRunReadmeCli(opts.name)) {
-    exit(0);
-    return undefined;
+  if (opts.readme && opts.core) {
+    opts.core.defineReadme(opts.readme);
+    if (opts.core.maybeRunReadmeCli(opts.name)) {
+      exit(0);
+      return undefined;
+    }
   }
 
-  if (await opts.cliGuard()) {
+  if (opts.cliGuard && await opts.cliGuard()) {
     exit(0);
     return undefined;
   }
