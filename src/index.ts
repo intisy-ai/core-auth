@@ -33,6 +33,8 @@ export type {
 export { createProviderPlugin, dispatchFetch } from "./provider-plugin-runtime.js";
 export type { ProviderPlugin } from "./provider-plugin-runtime.js";
 export { descriptorFor, providerCapability } from "./provider-capability.js";
+export { PROVIDER_SUPPORT, providerSupport } from "./provider-support.js";
+export type { ProviderSupport } from "./provider-support.js";
 export type { ExtraLanes, Provider, ProviderDescriptor } from "./provider-capability.js";
 export { PROVIDER } from "./generated/auth-contracts.keys.js";
 export { resolveAppFrontDoor } from "./frontdoor.js";
