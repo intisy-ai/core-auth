@@ -13,9 +13,7 @@ tasks.named("compileJava") {
     options.compilerArgs += [
         "-Atsemit.name=auth-contracts",
         "-Atsemit.ext=.ts",
-        // Relative paths into the submodules rather than package specifiers: this repo reaches api
-        // and core-ir the same way its hand-written sources do, and neither is an npm dependency here.
-        "-Atsemit.keys=../../core-ir/api/generated/api.js",
-        "-Atsemit.imports=../../core-ir/dist/index.js=IrRequest,IrResponse,IrEventStream,HandlerCtx",
+        "-Atsemit.keys=@intisy-ai/api/contract",
+        "-Atsemit.imports=@intisy-ai/core-ir=IrRequest,IrResponse,IrEventStream,HandlerCtx",
     ]
 }
