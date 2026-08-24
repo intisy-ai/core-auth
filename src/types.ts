@@ -1,7 +1,7 @@
 // @ts-nocheck
 // The provider contract: a plugin supplies one of these and core-auth does all the app/loader integration.
 
-import type { HandlerCtx, IrEventStream, IrRequest, IrResponse } from "../core-ir/dist/index.js";
+import type { HandlerCtx, IrEventStream, IrRequest, IrResponse } from "@intisy-ai/core-ir";
 
 export interface ProviderCtx {
   configDir: string;

@@ -2,19 +2,18 @@
 // and :ir supplies types this module names but never constructs. So all three are compileOnly: this
 // module's jar carries none of them, and no :teavm module embeds a second copy of any.
 dependencies {
-    compileOnly project(":annotations")
-    compileOnly project(":contract")
-    compileOnly project(":ir")
-    annotationProcessor project(":processor")
+    githubCompileOnly "intisy-ai:api:1.0.1:annotations"
+    githubCompileOnly "intisy-ai:api:1.0.1:contract"
+    githubCompileOnly "intisy-ai:core-ir:1.0.2:ir"
+    githubAnnotationProcessor "intisy-ai:api:1.0.1:processor"
+    githubAnnotationProcessor "intisy-ai:api:1.0.1:annotations"
 }
 
 tasks.named("compileJava") {
     options.compilerArgs += [
         "-Atsemit.name=auth-contracts",
         "-Atsemit.ext=.ts",
-        // Relative paths into the submodules rather than package specifiers: this repo reaches api
-        // and core-ir the same way its hand-written sources do, and neither is an npm dependency here.
-        "-Atsemit.keys=../../core-ir/api/generated/api.js",
-        "-Atsemit.imports=../../core-ir/dist/index.js=IrRequest,IrResponse,IrEventStream,HandlerCtx",
+        "-Atsemit.keys=@intisy-ai/api/contract",
+        "-Atsemit.imports=@intisy-ai/core-ir=IrRequest,IrResponse,IrEventStream,HandlerCtx",
     ]
 }

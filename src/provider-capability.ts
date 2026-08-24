@@ -1,4 +1,4 @@
-import type { HandlerCtx } from "../core-ir/dist/index.js";
+import type { HandlerCtx } from "@intisy-ai/core-ir";
 import type { Provider, ProviderDescriptor } from "./generated/auth-contracts.js";
 import type { ProviderDef } from "./types.js";
 

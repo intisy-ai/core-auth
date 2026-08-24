@@ -1,6 +1,6 @@
 // Generated from Java sources. Do not edit.
 
-import type { HandlerCtx, IrEventStream, IrRequest, IrResponse } from "../../core-ir/dist/index.js";
+import type { HandlerCtx, IrEventStream, IrRequest, IrResponse } from "@intisy-ai/core-ir";
 
 /**
  * One upstream lane a provider plugin serves, as a host lists it.
