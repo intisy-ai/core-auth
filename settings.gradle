@@ -1,0 +1,47 @@
+plugins {
+    id "org.gradle.toolchains.foojay-resolver-convention" version "0.8.0"
+}
+
+rootProject.name = "core-auth-java"
+
+// :accounts    - AccountManager/AccountStore/AuthConfig/OAuth/Selection engine (Java 8, its only
+//                dependency is the plugin-to-host :spi contract, no gson/net/nio/reflect/threads,
+//                so it stays TeaVM-transpilable).
+// :auth-teavm  - TeaVM JS export surface over :accounts (CoreAuthJs) -> generateJavaScript emits
+//                an ES2015 module (core-auth.js). Reuses :js-base's TeaVM service implementations
+//                (SimpleJsonCodec/JsStoreBridge/JsHttpClientBridge) instead of duplicating them.
+//                Named "auth-teavm" rather than "teavm" so it cannot collide with another repo's
+//                own ":teavm" project path when this build is folded into a larger one.
+include ":accounts"
+include ":auth-teavm"
+
+// :seam and :js-base - api's implementations of the layer-1 seams a host injects (SimpleJsonCodec,
+// InMemoryStore) and their TeaVM bridges, reached through core-ir's own api submodule so every module
+// in this build resolves api at the same coordinates. The project paths are preserved and only
+// projectDir differs, the ecosystem convention, so a larger build folding this one in resolves the
+// same coordinates.
+include ":seam"
+project(":seam").projectDir = file("core-ir/api/seam")
+
+include ":js-base"
+project(":js-base").projectDir = file("core-ir/api/js-base")
+
+// :ir - core-ir's canonical IR types, from this repo's own core-ir submodule, which is also what
+// src/types.ts and src/provider-capability.ts import. One :ir per build, and no drift between
+// core-auth's Java and TypeScript views of core-ir.
+include ":ir"
+project(":ir").projectDir = file("core-ir/ir")
+
+// :annotations, :processor and :contract come from api, reached through core-ir's own api submodule
+// because :ir exports api's seam types in HandlerCtx's public fields, so any build including :ir must
+// resolve api at the same coordinates.
+include ":annotations"
+project(":annotations").projectDir = file("core-ir/api/annotations")
+include ":processor"
+project(":processor").projectDir = file("core-ir/api/processor")
+include ":contract"
+project(":contract").projectDir = file("core-ir/api/contract")
+
+// :auth-contracts - the provider vocabulary core-auth mints: Provider, the lane descriptor, and the
+// OAuth, quota, catalog and config contracts a provider plugin implements.
+include ":auth-contracts"

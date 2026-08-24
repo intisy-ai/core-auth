@@ -121,9 +121,13 @@ describe("reportError -> reportSuccess: cooldown lifecycle", () => {
 
     const before = Date.now();
     mgr.reportError("a", lane, 0, "boom");
+    // Bounded against the clock AFTER the call, not a fixed slack on the clock before it: the
+    // cooldown is stamped somewhere inside the call, and a loaded runner can spend longer in it
+    // than any slack worth hard-coding.
+    const after = Date.now();
     const a = mgr.list().find((x) => x.id === "a");
     expect(a.coolingDownUntil).toBeGreaterThan(before);
-    expect(a.coolingDownUntil).toBeLessThanOrEqual(before + 60);
+    expect(a.coolingDownUntil).toBeLessThanOrEqual(after + 50);
     expect(a.cooldownReason).toBe("boom");
 
     const claimed = await mgr.acquire(lane);

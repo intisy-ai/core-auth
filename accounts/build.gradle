@@ -1,0 +1,13 @@
+// AccountManager/AccountStore/AuthConfig/OAuth/Selection engine. Depends on api's :contract for the
+// injected seams (Store/HttpClient/JsonCodec/Clock/Random) rather than duplicating them, and `api`
+// rather than `implementation` so those types are visible on this module's own consumers' compile
+// classpath too: :auth-teavm's CoreAuthJs declares AccountManager fields typed against
+// Store/HttpClient/JsonCodec directly. Zero OTHER dependencies by design (no gson/java.net/java.nio/
+// reflection/threads) so this module stays TeaVM-transpilable.
+dependencies {
+    api project(":contract")
+
+    // :seam carries the JSON narrowing helpers the stores hand-roll their Map<->POJO conversion
+    // through, and the seam implementations the tests exercise instead of a local double.
+    implementation project(":seam")
+}

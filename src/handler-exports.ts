@@ -1,14 +1,8 @@
 // @ts-nocheck
-// The provider handler.ts export block (handleIr/accounts/loginFlow/menu/menuModel/def)
-// is near-identical across every provider that wraps a single driver. This builds that
-// common set from the driver so each provider's handler.ts spreads it instead of
-// hand-duplicating five lines of glue. A provider that also serves multiple first-class
-// providers off one driver (defs) or resolves them dynamically (resolveProviders) keeps
-// exporting those itself, alongside the spread:
-//
-//   export const { handleIr, accounts, loginFlow, menu, menuModel, def } = providerHandlerExports(driver);
-//   export const defs = [def, { ...secondDef }];               // antigravity-style
-//   export { resolveProviders } from "./driver.js";              // custom-auth-style
+// The provider handler.ts export block (handleIr/accounts/loginFlow/menu/menuModel) is
+// near-identical across every provider that wraps a single driver, so it is built from the driver
+// once here instead of hand-duplicated per provider. What a provider ADVERTISES is its `provider`
+// capability's business (see provider-capability.ts), not this module's.
 
 import { runProviderMenu } from "./menu.js";
 import { buildAccountMenu } from "./ui/menu-model.js";
@@ -17,14 +11,6 @@ export function providerHandlerExports(driver) {
   const hasOAuth = typeof driver.loginFlow === "function";
   const exports = {
     handleIr: driver.handleIr,
-    def: {
-      id: driver.id,
-      label: driver.label,
-      models: driver.models,
-      hasOAuth,
-      settings: driver.settings,
-      accountPool: driver.id,
-    },
   };
   if (driver.accounts) {
     exports.accounts = driver.accounts;

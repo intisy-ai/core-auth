@@ -42,7 +42,7 @@ export type ProviderPlugin = (input: any) => Promise<any>;
 
 export function createProviderPlugin(def) {
   return async function (input) {
-    await refreshModels(def, true);
+    await refreshModels(def);
     try { setAppClient(input && input.client); } catch { /* best-effort */ }
     const configDir = getConfigDir();
     const fd = await resolveAppFrontDoor({ configDir });

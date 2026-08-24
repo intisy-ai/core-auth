@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSyn
 import { join } from "path";
 import { randomBytes } from "crypto";
 import { withLock } from "./accounts.js";
+import { CONFIG_SUBDIR } from "./env.js";
 
 // Matches the npm core's `LiveStoreLike` (js/npm/index.d.ts) exactly so a
 // `createLiveStore(configDir)` instance is a drop-in `opts.store` for its fine-grained
@@ -33,7 +34,7 @@ export interface LiveStoreLike {
 // `dirOverride`, when given, replaces `<configDir>/config` outright -- matching
 // accounts.ts's `opts.dir` store-location override (AccountManager's `options.store.dir`).
 export function createLiveStore(configDir: string, dirOverride?: string): LiveStoreLike {
-  const dir = dirOverride || join(configDir, "config");
+  const dir = dirOverride || join(configDir, CONFIG_SUBDIR);
   const filePath = (key: string): string => join(dir, key);
   // `withLock`'s lock file is derived from {dir, file}, so each key gets its own
   // independent lock -- concurrent ops on different keys never contend.

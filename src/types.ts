@@ -1,6 +1,8 @@
 // @ts-nocheck
 // The provider contract: a plugin supplies one of these and core-auth does all the app/loader integration.
 
+import type { HandlerCtx, IrEventStream, IrRequest, IrResponse } from "../core-ir/dist/index.js";
+
 export interface ProviderCtx {
   configDir: string;
   log: (message: string) => void;
@@ -17,14 +19,26 @@ export interface ProviderDef {
   appProviderId?: string;             // app-side provider id to attach models to (defaults to the provider id)
   appNpm?: string;                    // SDK package for a custom (non-built-in) app-side provider
   models: Record<string, ProviderModel>;
-  handle: (request: Request, ctx: ProviderCtx) => Promise<Response>;
+  /**
+   * The app-wire entry point, for a host that supplies no translator. A provider that speaks
+   * canonical IR implements {@link handleIr} alone and leaves this unset.
+   */
+  handle?: (request: Request, ctx: ProviderCtx) => Promise<Response>;
   // when present, core exposes an opencode oauth "code" method; complete(input?)
   // persists the CoreAccount. input is opencode's pasted code / redirect URL;
   // when omitted (CLI path) the driver falls back to its own listener / readline.
   loginFlow?: (ctx: ProviderCtx) => Promise<{ url: string; instructions?: string; complete: (input?: string) => Promise<CoreAccount | null> }>;
   accounts?: AccountController;
   proxies?: boolean;   // opt into the shared proxy subsystem (Manage-proxies menu + per-account selection)
-  handleIr?: (request: unknown, ctx: unknown) => Promise<unknown>;
+  /**
+   * The canonical-IR entry point, which is the one every ecosystem provider implements.
+   *
+   * @remarks
+   * Typed against core-ir's own contract rather than `unknown`: the capability this becomes is
+   * declared there, so a driver whose return type does not match it is a compile error here instead
+   * of a runtime surprise at the front-door.
+   */
+  handleIr?: (request: IrRequest, ctx: HandlerCtx) => Promise<IrResponse | IrEventStream>;
   // A provider may contribute extra app-shaped plugin hooks (e.g. an `event` handler);
   // the injected app front-door merges these in. Generic passthrough; core-auth doesn't know what they do.
   appHooks?: (input: unknown) => unknown | Promise<unknown>;

@@ -7,11 +7,8 @@ import { defineProviderPlugin, type ProviderPluginCore } from "./provider-plugin
 
 function makeCore(order: string[]): ProviderPluginCore {
   return {
-    defineConfig: vi.fn((name, defaults) => { order.push("defineConfig"); return defaults; }),
-    defineCapabilities: vi.fn(() => { order.push("defineCapabilities"); }),
     defineReadme: vi.fn((spec) => { order.push("defineReadme"); return spec; }),
     maybeRunReadmeCli: vi.fn(() => { order.push("maybeRunReadmeCli"); return false; }),
-    deployCommands: vi.fn(() => { order.push("deployCommands"); return []; }),
   };
 }
 
@@ -22,10 +19,10 @@ describe("defineProviderPlugin", () => {
     createProviderPluginMock.mockReset();
   });
 
-  it("registers config, capabilities, readme and deploys commands in order before returning the provider plugin", async () => {
+  it("registers the readme and clears both guards before returning the provider plugin", async () => {
     const order: string[] = [];
     const core = makeCore(order);
-    const configCliGuard = vi.fn(() => { order.push("configCliGuard"); return false; });
+    const cliGuard = vi.fn(() => { order.push("cliGuard"); return false; });
     const sentinel = { hooks: true };
     createProviderPluginMock.mockReturnValue(sentinel);
 
@@ -33,118 +30,82 @@ describe("defineProviderPlugin", () => {
       name: "stub-auth",
       driver,
       core,
-      configCliGuard,
-      defaults: { logging: true },
-      capabilities: { fields: [{ key: "logging", type: "boolean" }] },
+      cliGuard,
       readme: { description: "stub" },
-      commands: [{ name: "stub-auth-config", description: "config" }],
     });
 
-    expect(order).toEqual([
-      "defineConfig",
-      "defineCapabilities",
-      "defineReadme",
-      "maybeRunReadmeCli",
-      "configCliGuard",
-      "deployCommands",
-    ]);
-    expect(core.defineConfig).toHaveBeenCalledWith("stub-auth", { logging: true });
-    expect(core.deployCommands).toHaveBeenCalledWith("stub-auth", [{ name: "stub-auth-config", description: "config" }]);
+    expect(order).toEqual(["defineReadme", "maybeRunReadmeCli", "cliGuard"]);
     expect(createProviderPluginMock).toHaveBeenCalledWith(driver);
     expect(result).toBe(sentinel);
   });
 
-  it("registers config before the config-CLI guard even when the guard short-circuits", async () => {
+  it("exits without booting the provider when the action guard takes the invocation", async () => {
     const order: string[] = [];
     const core = makeCore(order);
     const exit = vi.fn();
-    const configCliGuard = vi.fn(() => { order.push("configCliGuard"); return true; });
+    const cliGuard = vi.fn(() => { order.push("cliGuard"); return true; });
 
-    const result = await defineProviderPlugin({
-      name: "custom-auth",
-      driver,
-      core,
-      configCliGuard,
-      defaults: { endpoints: [] },
-      exit,
-    });
+    const result = await defineProviderPlugin({ name: "custom-auth", driver, core, cliGuard, exit });
 
-    expect(order).toEqual(["defineConfig", "configCliGuard"]);
+    expect(order).toEqual(["cliGuard"]);
     expect(exit).toHaveBeenCalledWith(0);
-    expect(core.deployCommands).not.toHaveBeenCalled();
     expect(createProviderPluginMock).not.toHaveBeenCalled();
     expect(result).toBeUndefined();
   });
 
-  it("short-circuits on the readme guard before the config-CLI guard ever runs", async () => {
+  it("short-circuits on the readme guard before the action guard ever runs", async () => {
     const order: string[] = [];
     const core = makeCore(order);
     core.maybeRunReadmeCli = vi.fn(() => { order.push("maybeRunReadmeCli"); return true; });
     const exit = vi.fn();
-    const configCliGuard = vi.fn(() => { order.push("configCliGuard"); return false; });
+    const cliGuard = vi.fn(() => { order.push("cliGuard"); return false; });
 
     const result = await defineProviderPlugin({
       name: "antigravity",
       driver,
       core,
-      configCliGuard,
+      cliGuard,
       readme: { description: "antigravity" },
       exit,
     });
 
-    expect(order).toEqual(["defineConfig", "defineReadme", "maybeRunReadmeCli"]);
+    expect(order).toEqual(["defineReadme", "maybeRunReadmeCli"]);
     expect(exit).toHaveBeenCalledWith(0);
-    expect(configCliGuard).not.toHaveBeenCalled();
+    expect(cliGuard).not.toHaveBeenCalled();
     expect(createProviderPluginMock).not.toHaveBeenCalled();
     expect(result).toBeUndefined();
   });
 
-  it("supports an async config-CLI guard (a provider's own maybeRunCli)", async () => {
+  it("supports an async action guard (a provider's own maybeRunCli)", async () => {
     const order: string[] = [];
     const core = makeCore(order);
     const exit = vi.fn();
-    const configCliGuard = vi.fn(async () => { order.push("configCliGuard"); return true; });
+    const cliGuard = vi.fn(async () => { order.push("cliGuard"); return true; });
 
-    await defineProviderPlugin({ name: "claude-code", driver, core, configCliGuard, exit });
+    await defineProviderPlugin({ name: "claude-code", driver, core, cliGuard, exit });
 
     expect(exit).toHaveBeenCalledWith(0);
     expect(createProviderPluginMock).not.toHaveBeenCalled();
   });
 
-  it("skips capabilities, readme and deployCommands when not provided, and never crashes on a deployCommands failure", async () => {
+  it("skips the readme entirely when none is supplied", async () => {
     const order: string[] = [];
     const core = makeCore(order);
-    core.deployCommands = vi.fn(() => { throw new Error("no configDirs"); });
-    const configCliGuard = vi.fn(() => false);
     createProviderPluginMock.mockReturnValue({});
 
-    await defineProviderPlugin({
-      name: "custom-auth",
-      driver,
-      core,
-      configCliGuard,
-      commands: [{ name: "custom-auth-config", description: "config" }],
-    });
+    await defineProviderPlugin({ name: "custom-auth", driver, core, cliGuard: () => false });
 
-    expect(core.defineCapabilities).not.toHaveBeenCalled();
     expect(core.defineReadme).not.toHaveBeenCalled();
     expect(core.maybeRunReadmeCli).not.toHaveBeenCalled();
     expect(createProviderPluginMock).toHaveBeenCalled();
   });
+});
 
-  it("falls back deployCommands' bundle name to `name` when packageName is omitted", async () => {
-    const order: string[] = [];
-    const core = makeCore(order);
-    createProviderPluginMock.mockReturnValue({});
-
-    await defineProviderPlugin({
-      name: "stub-auth",
-      driver,
-      core,
-      configCliGuard: () => false,
-      commands: [{ name: "stub-auth-config", description: "config" }],
-    });
-
-    expect(core.deployCommands).toHaveBeenCalledWith("stub-auth", [{ name: "stub-auth-config", description: "config" }]);
+describe("defineProviderPlugin with neither a readme nor an action guard", () => {
+  it("boots the provider directly, since a provider that declares everything has nothing to run first", async () => {
+    createProviderPluginMock.mockReturnValue({ hooks: true });
+    const result = await defineProviderPlugin({ name: "custom-auth", driver });
+    expect(createProviderPluginMock).toHaveBeenCalledWith(driver);
+    expect(result).toEqual({ hooks: true });
   });
 });

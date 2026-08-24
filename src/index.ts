@@ -32,6 +32,11 @@ export type {
 } from "./settings-schema.js";
 export { createProviderPlugin, dispatchFetch } from "./provider-plugin-runtime.js";
 export type { ProviderPlugin } from "./provider-plugin-runtime.js";
+export { descriptorFor, providerCapability } from "./provider-capability.js";
+export { PROVIDER_SUPPORT, providerSupport } from "./provider-support.js";
+export type { ProviderSupport } from "./provider-support.js";
+export type { ExtraLanes, Provider, ProviderDescriptor } from "./provider-capability.js";
+export { PROVIDER } from "./generated/auth-contracts.keys.js";
 export { resolveAppFrontDoor } from "./frontdoor.js";
 export type { AppFrontDoor, FrontDoorToolkit } from "./frontdoor.js";
 export { isOAuthAuth, accessTokenExpired, calculateTokenExpiry, encodeState, decodeState, refreshAccessToken, TokenRefreshError } from "./oauth.js";
@@ -44,7 +49,7 @@ export { accountControllerFromManager, refreshAccountToken, verifyAllAccounts } 
 export { isCoolingDown } from "./ratelimit.js";
 export { hasCapacity, ipSuspected } from "./quota-health.js";
 export type { QuotaPool } from "./quota-health.js";
-export { getConfigDir, configFolder, reposDir } from "./env.js";
+export { getConfigDir, configFolder, reposDir, cacheDir } from "./env.js";
 export { readConfig, writeConfig, activeProvider, setActiveProvider, getAutoConfig, setAutoConfig, getAutoCandidates } from "./config.js";
 export { readModelCache, resolveProviderModels } from "./models-cache.js";
 export { log } from "./log.js";

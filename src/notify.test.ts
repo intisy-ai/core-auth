@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { notify, setNotifier, notifyQueuePath } from "./notify.js";
+import { notify, setNotifier, notifyQueuePath, setAppClient } from "./notify.js";
 
 let home: string;
 let prevEnv: string | undefined;
@@ -33,5 +33,43 @@ describe("notify", () => {
     notify("queued", "info");
     const lines = readFileSync(notifyQueuePath(home), "utf8").trim().split("\n");
     expect(JSON.parse(lines[0])).toMatchObject({ message: "queued", level: "info" });
+  });
+});
+
+describe("notification delivery follows the client, not the app", () => {
+  beforeEach(() => { vi.resetModules(); });
+
+  it("uses the app client's toast when one is registered", async () => {
+    const { notify, setAppClient } = await import("./notify.js");
+    const showToast = vi.fn(() => Promise.resolve());
+    setAppClient({ tui: { showToast } });
+    notify("hello", "success");
+    expect(showToast).toHaveBeenCalledWith({ body: { message: "hello", variant: "success" } });
+    setAppClient(null);
+  });
+
+  it("queues to disk when no client is registered", async () => {
+    const { notify, notifyQueuePath, setAppClient } = await import("./notify.js");
+    setAppClient(null);
+    notify("queued", "info");
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync(notifyQueuePath(), "utf8")).toContain("queued");
+  });
+
+  it("delivers via registered client regardless of app id", async () => {
+    const prevAppId = process.env.HUB_APP_ID;
+    process.env.HUB_APP_ID = "claude";
+    try {
+      vi.resetModules();
+      const { notify, setAppClient } = await import("./notify.js");
+      const showToast = vi.fn(() => Promise.resolve());
+      setAppClient({ tui: { showToast } });
+      notify("cross-app", "warning");
+      expect(showToast).toHaveBeenCalledWith({ body: { message: "cross-app", variant: "warning" } });
+      setAppClient(null);
+    } finally {
+      if (prevAppId === undefined) delete process.env.HUB_APP_ID;
+      else process.env.HUB_APP_ID = prevAppId;
+    }
   });
 });

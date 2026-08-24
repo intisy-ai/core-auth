@@ -1,6 +1,6 @@
 {
   "name": "core-auth",
-  "version": "0.2.3",
+  "version": "1.0.0",
   "description": "Provider account, OAuth, and quota library for the intisy-ai AI-proxy ecosystem.",
   "type": "module",
   "main": "dist/index.js",
@@ -29,10 +29,12 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "build": "npm run build:teavm && npx tsc && node copy-generated.mjs",
-    "build:teavm": "node teavm-build.mjs --java-dir java --module :auth-teavm --out src/generated/core-auth.teavm.js",
-    "test": "vitest run",
-    "prepublishOnly": "npm run build"
+    "build": "npm run build:deps && npm run build:teavm && npx tsc && node copy-generated.mjs",
+    "build:teavm": "node teavm-build.mjs --java-dir . --module :auth-teavm --out src/generated/core-auth.teavm.js",
+    "test": "npm run build && vitest run",
+    "prepublishOnly": "npm run build",
+    "build:deps": "npm --prefix core-ir install && npm --prefix core-ir run build",
+    "emit": "node core-ir/api/scripts/emit-dts.mjs --java-dir . --module :auth-contracts --module-dir auth-contracts --out src/generated"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",
