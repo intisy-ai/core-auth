@@ -4,17 +4,15 @@
 // registered here: what remains is the README generator and the guard that lets an action
 // invocation (`node <bundle> accounts`) exit before the provider boots.
 //
-// core-auth has no "core" submodule of its own (only a provider repo nests both core/ and
-// core-auth/ side by side), so defineReadme/maybeRunReadmeCli cannot be imported here directly. The
-// caller passes its own "../core/dist/index.js" imports in via `core`, and its own action guard via
-// `cliGuard`.
+// core-auth may not depend on core (both are layer 2), so defineReadme/maybeRunReadmeCli cannot be
+// imported here. The caller passes its own `@intisy-ai/core` imports in via `core`, and its own
+// action guard via `cliGuard`.
 
 import { createProviderPlugin, type ProviderPlugin } from "./provider-plugin-runtime.js";
 import type { ProviderDef } from "./types.js";
 
-// core-auth carries no "core" submodule of its own (only a provider repo nests core/ and
-// core-auth/ side by side), so these mirror core's CommandDef / CapabilitySchema / ReadmeSpec
-// shapes structurally instead of importing them. A real value from "../core/dist/index.js"
+// core-auth may not depend on core, so these mirror core's CommandDef / CapabilitySchema /
+// ReadmeSpec shapes structurally instead of importing them. A real value from `@intisy-ai/core`
 // slots in with no casting: TypeScript matches these by shape, not by shared identity.
 export interface CommandDef {
   name: string;
