@@ -1,5 +1,5 @@
 plugins {
-    id "io.github.intisy.github-gradle" version "1.8.2.1" apply false
+    id "io.github.intisy.github-gradle" version "1.10.3" apply false
 }
 
 // core-auth's Java module -- self-contained Gradle build living alongside core-auth's TS (../src,
