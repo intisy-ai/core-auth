@@ -3,7 +3,7 @@
 // The refresh call itself is single-sourced in Java (TokenRefresh, java/accounts) behind
 // CoreAuthJs.refreshToken; what stays here is the transport it runs over and the error shape
 // callers branch on.
-import { getCoreAuth, initCoreAuth } from "./core-auth-loader.js";
+import { getCoreAuth } from "./core-auth-loader.js";
 import { proxiedFetch } from "./net.js";
 
 export function isOAuthAuth(auth) {
@@ -11,9 +11,7 @@ export function isOAuthAuth(auth) {
 }
 
 // Delegates to CoreAuthJs.accessTokenExpired (TokenRefresh.accessTokenExpired, java/accounts),
-// the single-sourced expired-or-missing predicate with the 60s clock-skew buffer. Callers must
-// have awaited initCoreAuth() first; AccountManager.acquire and AccountManager.ensureAccess both
-// self-init, so calling either is safe on its own.
+// the single-sourced expired-or-missing predicate with the 60s clock-skew buffer.
 export function accessTokenExpired(auth) {
   return getCoreAuth().accessTokenExpired(JSON.stringify(auth || {}), Date.now());
 }
@@ -77,7 +75,6 @@ function httpSendVia(transport) {
 // upstream sees one IP for a refresh and for the requests it authorizes.
 export async function refreshAccessToken(refreshToken, opts, transport = {}) {
   if (!refreshToken) return undefined;
-  await initCoreAuth();
   const config = JSON.stringify({
     tokenUrl: opts.tokenUrl,
     clientId: opts.clientId,

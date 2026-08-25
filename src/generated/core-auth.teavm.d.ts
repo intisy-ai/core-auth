@@ -80,6 +80,25 @@ export function reportSuccess(providerId: string, id: string, jsStore: CoreAuthJ
 export function nextAvailableAt(providerId: string, lane: string, jsStore: CoreAuthJsStore): string;
 
 /**
+ * `AccountStore.loadRaw` -- the provider's pool as stored, as the JSON
+ * `{accounts, activeIndex, activeIndexByLane}` with all three always present.
+ */
+export function poolLoad(providerId: string, jsStore: CoreAuthJsStore): string;
+
+/** `AccountStore.saveRaw` -- replaces this provider's pool, leaving every other one be. */
+export function poolSave(providerId: string, poolJson: string, jsStore: CoreAuthJsStore): void;
+
+/**
+ * `AccountStore.upsertRaw` -- upsert by `id`, else by `refresh`, merging the incoming fields over
+ * the stored record. Returns `"added"`, `"updated"` or `"unchanged"`; a caller reports an activity
+ * event for the first two only.
+ */
+export function accountUpsert(providerId: string, accountJson: string, jsStore: CoreAuthJsStore): string;
+
+/** `AccountStore.removeRaw` -- true when an account with this id was there to remove. */
+export function accountRemove(providerId: string, id: string, jsStore: CoreAuthJsStore): boolean;
+
+/**
  * `TokenRefresh.accessTokenExpired` -- pure predicate. `accountJson` supplies `{access, expires}`
  * (only fields this predicate reads).
  */

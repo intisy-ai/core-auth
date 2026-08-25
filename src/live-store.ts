@@ -10,7 +10,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 import { randomBytes } from "crypto";
-import { withLock } from "./accounts.js";
+import { withLock } from "./store-lock.js";
 import { CONFIG_SUBDIR } from "./env.js";
 
 // Matches the npm core's `LiveStoreLike` (js/npm/index.d.ts) exactly so a
@@ -27,22 +27,32 @@ export interface LiveStoreLike {
   listKeys(prefix: string): string[];
 }
 
+export interface LiveStoreOpts {
+  /**
+   * Set false when the CALLER already holds the lock for the keys this store will touch, which is
+   * what a read-modify-write spanning several ops needs: the lock is not re-entrant, so an inner
+   * lock would spin to its deadline and throw.
+   */
+  locked?: boolean;
+}
+
 // `configDir` is the app home (e.g. ~/.claude), matching core-auth's own
 // `getConfigDir()` convention: every key lives at `<configDir>/config/<key>`
 // (accounts.json, models.json, a routing profile's configFile, ...) -- the same
 // location core-auth's own default store (accounts.ts) already uses.
 // `dirOverride`, when given, replaces `<configDir>/config` outright -- matching
 // accounts.ts's `opts.dir` store-location override (AccountManager's `options.store.dir`).
-export function createLiveStore(configDir: string, dirOverride?: string): LiveStoreLike {
+export function createLiveStore(configDir: string, dirOverride?: string, opts?: LiveStoreOpts): LiveStoreLike {
   const dir = dirOverride || join(configDir, CONFIG_SUBDIR);
   const filePath = (key: string): string => join(dir, key);
   // `withLock`'s lock file is derived from {dir, file}, so each key gets its own
   // independent lock -- concurrent ops on different keys never contend.
-  const lockOpts = (key: string) => ({ dir, file: key });
+  const locking = opts?.locked !== false;
+  const withLockFor = <T>(key: string, fn: () => T): T => (locking ? withLock({ dir, file: key }, fn) : fn());
 
   return {
     get(key: string): string | null {
-      return withLock(lockOpts(key), () => {
+      return withLockFor(key, () => {
         try {
           const file = filePath(key);
           return existsSync(file) ? readFileSync(file, "utf8") : null;
@@ -52,7 +62,7 @@ export function createLiveStore(configDir: string, dirOverride?: string): LiveSt
       });
     },
     put(key: string, value: string): void {
-      withLock(lockOpts(key), () => {
+      withLockFor(key, () => {
         if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
         const target = filePath(key);
         // atomic write: same temp-then-rename pattern as core-auth's own writeStore.
@@ -62,10 +72,10 @@ export function createLiveStore(configDir: string, dirOverride?: string): LiveSt
       });
     },
     exists(key: string): boolean {
-      return withLock(lockOpts(key), () => existsSync(filePath(key)));
+      return withLockFor(key, () => existsSync(filePath(key)));
     },
     delete(key: string): void {
-      withLock(lockOpts(key), () => {
+      withLockFor(key, () => {
         try { unlinkSync(filePath(key)); } catch {}
       });
     },

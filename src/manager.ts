@@ -4,7 +4,7 @@
 import { loadAccounts, saveAccounts, updateAccounts, removeAccount } from "./accounts.js";
 import { accessTokenExpired, refreshAccessToken, TokenRefreshError } from "./oauth.js";
 import { proxyManager } from "./proxy/manager.js";
-import { initCoreAuth, getCoreAuth } from "./core-auth-loader.js";
+import { getCoreAuth } from "./core-auth-loader.js";
 import { createLiveStore } from "./live-store.js";
 import { getConfigDir } from "./env.js";
 import { emitActivity } from "./activity.js";
@@ -42,7 +42,6 @@ export class AccountManager {
   // accounts.json; the network token refresh still runs out here, outside that call, so a
   // slow refresh never blocks another writer.
   async acquire(lane) {
-    await initCoreAuth();
     const jsStore = this.jsStore();
     const available = this.extraAvailable
       ? (accountJson, laneArg) => this.extraAvailable(JSON.parse(accountJson), laneArg || undefined, Date.now())
@@ -58,7 +57,6 @@ export class AccountManager {
 
   // a revoked refresh token disables the account so selection skips it.
   async ensureAccess(id) {
-    await initCoreAuth();
     const account = this.load().accounts.find((candidate) => candidate.id === id);
     if (!account) return undefined;
     if (!accessTokenExpired(account)) return account.access;
@@ -82,10 +80,8 @@ export class AccountManager {
   // reportRateLimit/reportError/reportSuccess/nextAvailableAt delegate to CoreAuthJs (Java),
   // which persists the same rateLimitResetTimes/coolingDownUntil/cooldownReason fields onto this
   // same accounts.json via the jsStore bridge, so a subsequent acquire() (also delegated) sees
-  // the exact state this call just wrote. These stay SYNC (getCoreAuth(), not initCoreAuth()):
-  // callers invoke them unawaited over the Java orchestrator's sync jsAccountOps callbacks, so
-  // core-auth must already be initialized (acquire() self-inits it on the normal rotation path;
-  // a standalone caller needs its own await initCoreAuth() at setup, before getCoreAuth() runs).
+  // the exact state this call just wrote. They are sync because callers invoke them unawaited
+  // over the Java orchestrator's own sync callbacks.
   reportRateLimit(id, lane, resetMs) {
     getCoreAuth().reportRateLimit(this.providerId, id, lane || "", resetMs, this.jsStore());
     emitActivity({ topic: "account.rate_limited", action: "rate_limited", impact: "warning", outcome: "failed", subject: { kind: "account", id, label: id }, details: { provider: this.providerId, resetAt: resetMs } }, this.providerId);
