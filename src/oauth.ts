@@ -1,15 +1,17 @@
 // @ts-nocheck
 // Generic OAuth helpers + token refresh; the driver supplies its own tokenUrl/clientId/clientSecret.
+// The refresh call itself is single-sourced in Java (TokenRefresh, java/accounts) behind
+// CoreAuthJs.refreshToken; what stays here is the transport it runs over and the error shape
+// callers branch on.
 import { getCoreAuth } from "./core-auth-loader.js";
+import { proxiedFetch } from "./net.js";
 
 export function isOAuthAuth(auth) {
   return !!auth && auth.type === "oauth";
 }
 
 // Delegates to CoreAuthJs.accessTokenExpired (TokenRefresh.accessTokenExpired, java/accounts),
-// the single-sourced expired-or-missing predicate with the 60s clock-skew buffer. Callers must
-// have awaited initCoreAuth() first; AccountManager.acquire and AccountManager.ensureAccess both
-// self-init, so calling either is safe on its own.
+// the single-sourced expired-or-missing predicate with the 60s clock-skew buffer.
 export function accessTokenExpired(auth) {
   return getCoreAuth().accessTokenExpired(JSON.stringify(auth || {}), Date.now());
 }
@@ -48,74 +50,55 @@ export class TokenRefreshError extends Error {
   }
 }
 
-// tolerate the varied error shapes OAuth token endpoints return
-function parseOAuthError(text) {
-  if (!text) return {};
-  try {
-    const payload = JSON.parse(text);
-    if (!payload || typeof payload !== "object") return { description: text };
-    let code;
-    if (typeof payload.error === "string") code = payload.error;
-    else if (payload.error && typeof payload.error === "object") {
-      code = payload.error.status || payload.error.code;
-      if (!payload.error_description && payload.error.message) return { code, description: payload.error.message };
-    }
-    if (payload.error_description) return { code, description: payload.error_description };
-    if (payload.error && typeof payload.error === "object" && payload.error.message) return { code, description: payload.error.message };
-    return { code };
-  } catch { return { description: text }; }
+// A JSON transport for the Java refresh call, built on net.ts's proxy-aware fetch so a dead proxy
+// falls back to a direct attempt in the ONE place that mechanic lives. Any reported status comes
+// back as data; only an unreachable endpoint rejects, which is what the Java side reads as a
+// transport failure rather than as a refusal by the token endpoint.
+function httpSendVia(transport) {
+  return async (requestJson) => {
+    const request = JSON.parse(requestJson);
+    const { response, transportFailed } = await proxiedFetch(
+      request.url,
+      { method: request.method, headers: request.headers, body: request.body || undefined },
+      transport,
+    );
+    if (transportFailed || !response) throw new Error("the token endpoint could not be reached");
+    const headers = {};
+    for (const [name, value] of response.headers) headers[name] = value;
+    return JSON.stringify({ status: response.status, headers, body: await response.text() });
+  };
 }
 
-// opts: { tokenUrl, clientId, clientSecret?, extraParams? }; returns { access, expires, refresh } or throws TokenRefreshError.
-export async function refreshAccessToken(refreshToken, opts) {
+// opts: { tokenUrl, clientId, clientSecret?, extraParams?, proxy? }; returns { access, expires,
+// refresh } or throws TokenRefreshError. `transport` is net.ts's ProxiedFetchOpts: passing
+// { proxyManager, accountId, providerId } binds the refresh to the account's sticky proxy, so
+// upstream sees one IP for a refresh and for the requests it authorizes.
+export async function refreshAccessToken(refreshToken, opts, transport = {}) {
   if (!refreshToken) return undefined;
-  const startTime = Date.now();
-  const params = {
-    grant_type: "refresh_token",
-    refresh_token: refreshToken,
-    client_id: opts.clientId,
-  };
-  if (opts.clientSecret) params.client_secret = opts.clientSecret;
-  Object.assign(params, opts.extraParams || {});
+  const config = JSON.stringify({
+    tokenUrl: opts.tokenUrl,
+    clientId: opts.clientId,
+    clientSecret: opts.clientSecret,
+    extraParams: opts.extraParams,
+  });
+  const via = opts.proxy && !transport.proxy ? { ...transport, proxy: opts.proxy } : transport;
 
-  const init = {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(params),
-  };
-  if (opts.proxy) init.proxy = opts.proxy;   // Bun fetch honors .proxy; keeps refresh on the account's IP
-  let response;
+  let raw;
   try {
-    response = await fetch(opts.tokenUrl, init);
-  } catch (err) {
-    // A dead/unreachable proxy must not strand the account on an expired token:
-    // a token refresh that never reached the server can be safely retried direct.
-    const message = String((err && err.message) || err);
-    if (init.proxy && /unable to connect|failed to connect|could not connect|fetch failed|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EHOSTUNREACH|EAI_AGAIN|socket|proxy|tunnel|network/i.test(message)) {
-      delete init.proxy;
-      response = await fetch(opts.tokenUrl, init);
-    } else {
-      throw err;
-    }
+    raw = await getCoreAuth().refreshToken(refreshToken, config, httpSendVia(via));
+  } catch (error) {
+    throw new TokenRefreshError({ message: String((error && error.message) || error) });
   }
 
-  if (!response.ok) {
-    let errorText;
-    try { errorText = await response.text(); } catch { errorText = undefined; }
-    const { code, description } = parseOAuthError(errorText);
-    const details = [code, description || errorText].filter(Boolean).join(": ");
-    const base = "OAuth token refresh failed (" + response.status + " " + response.statusText + ")";
+  const result = JSON.parse(raw);
+  if (result.failed) {
     throw new TokenRefreshError({
-      message: details ? base + " - " + details : base,
-      code, description: description || errorText,
-      status: response.status, statusText: response.statusText,
+      message: result.failed.message,
+      // Restated as the code, so `revoked` keeps deriving from one place rather than two.
+      code: result.failed.revoked ? "invalid_grant" : result.failed.code,
+      description: result.failed.description,
+      status: result.failed.status,
     });
   }
-
-  const payload = await response.json();
-  return {
-    access: payload.access_token,
-    expires: calculateTokenExpiry(startTime, payload.expires_in),
-    refresh: payload.refresh_token || refreshToken,
-  };
+  return { access: result.access, expires: result.expires, refresh: result.refresh };
 }

@@ -71,7 +71,8 @@ public final class TokenRefresh {
             String details = joinNonNull(parsed.code, parsed.description != null ? parsed.description : response.body);
             String base = "OAuth token refresh failed (" + response.status + ")";
             String message = details != null ? base + " - " + details : base;
-            throw new TokenRefreshError(message, revoked);
+            throw new TokenRefreshError(message, revoked, response.status, parsed.code,
+                    parsed.description != null ? parsed.description : response.body);
         }
 
         Map<String, Object> payload;

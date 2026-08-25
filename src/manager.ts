@@ -4,16 +4,16 @@
 import { loadAccounts, saveAccounts, updateAccounts, removeAccount } from "./accounts.js";
 import { accessTokenExpired, refreshAccessToken, TokenRefreshError } from "./oauth.js";
 import { proxyManager } from "./proxy/manager.js";
-import { initCoreAuth, getCoreAuth } from "./core-auth-loader.js";
+import { getCoreAuth } from "./core-auth-loader.js";
 import { createLiveStore } from "./live-store.js";
 import { getConfigDir } from "./env.js";
 import { emitActivity } from "./activity.js";
 
-// token refresh rides the account's sticky proxy so Google sees the same IP for
-// refresh as for requests; null when proxying is off -> direct refresh as before
-function oauthWithProxy(oauth, id, providerId) {
-  const proxy = proxyManager.selectForAccount(id, providerId);
-  return proxy ? { ...oauth, proxy } : oauth;
+// A token refresh rides the account's sticky proxy so upstream sees the same IP for a refresh as
+// for the requests it authorizes; the transport picks and reports it, and refreshes directly when
+// proxying is off.
+function transportFor(id, providerId) {
+  return { proxyManager, accountId: id, providerId };
 }
 
 export class AccountManager {
@@ -42,7 +42,6 @@ export class AccountManager {
   // accounts.json; the network token refresh still runs out here, outside that call, so a
   // slow refresh never blocks another writer.
   async acquire(lane) {
-    await initCoreAuth();
     const jsStore = this.jsStore();
     const available = this.extraAvailable
       ? (accountJson, laneArg) => this.extraAvailable(JSON.parse(accountJson), laneArg || undefined, Date.now())
@@ -58,13 +57,12 @@ export class AccountManager {
 
   // a revoked refresh token disables the account so selection skips it.
   async ensureAccess(id) {
-    await initCoreAuth();
     const account = this.load().accounts.find((candidate) => candidate.id === id);
     if (!account) return undefined;
     if (!accessTokenExpired(account)) return account.access;
     if (!this.oauth || !account.refresh) return account.access;
     try {
-      const refreshed = await refreshAccessToken(account.refresh, oauthWithProxy(this.oauth, id, this.providerId));
+      const refreshed = await refreshAccessToken(account.refresh, this.oauth, transportFor(id, this.providerId));
       this.mutate(id, (a) => {
         a.access = refreshed.access;
         a.expires = refreshed.expires;
@@ -82,10 +80,8 @@ export class AccountManager {
   // reportRateLimit/reportError/reportSuccess/nextAvailableAt delegate to CoreAuthJs (Java),
   // which persists the same rateLimitResetTimes/coolingDownUntil/cooldownReason fields onto this
   // same accounts.json via the jsStore bridge, so a subsequent acquire() (also delegated) sees
-  // the exact state this call just wrote. These stay SYNC (getCoreAuth(), not initCoreAuth()):
-  // callers invoke them unawaited over the Java orchestrator's sync jsAccountOps callbacks, so
-  // core-auth must already be initialized (acquire() self-inits it on the normal rotation path;
-  // a standalone caller needs its own await initCoreAuth() at setup, before getCoreAuth() runs).
+  // the exact state this call just wrote. They are sync because callers invoke them unawaited
+  // over the Java orchestrator's own sync callbacks.
   reportRateLimit(id, lane, resetMs) {
     getCoreAuth().reportRateLimit(this.providerId, id, lane || "", resetMs, this.jsStore());
     emitActivity({ topic: "account.rate_limited", action: "rate_limited", impact: "warning", outcome: "failed", subject: { kind: "account", id, label: id }, details: { provider: this.providerId, resetAt: resetMs } }, this.providerId);
@@ -133,7 +129,7 @@ export class AccountManager {
   async refresh(id) {
     const account = this.load().accounts.find((candidate) => candidate.id === id);
     if (!account || !this.oauth || !account.refresh) return false;
-    const refreshed = await refreshAccessToken(account.refresh, oauthWithProxy(this.oauth, id, this.providerId));
+    const refreshed = await refreshAccessToken(account.refresh, this.oauth, transportFor(id, this.providerId));
     this.mutate(id, (a) => {
       a.access = refreshed.access;
       a.expires = refreshed.expires;

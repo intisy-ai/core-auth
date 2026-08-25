@@ -1,9 +1,7 @@
-// Regression test for ensureAccess self-init: dedicated file (vitest isolates module state per
-// test file) with NO beforeAll(initCoreAuth) and no preceding acquire() call, so this proves
-// AccountManager.ensureAccess awaits initCoreAuth() itself rather than relying on a caller that
-// already did. Before the fix, calling ensureAccess directly (as provider account-management code
-// does for model discovery/quota refresh/verify/token refresh, off the acquire() path) threw
-// "core-auth TeaVM not initialized" the first time it ran in a fresh process.
+// ensureAccess is reached directly, off the acquire() path, by provider account-management code
+// (model discovery, quota refresh, verify, token refresh). Its own file because vitest isolates
+// module state per test file, so this is the one place that proves the call needs no setup of any
+// kind ahead of it.
 import { afterEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -20,7 +18,7 @@ describe("AccountManager.ensureAccess self-init", () => {
     if (homeDir) rmSync(homeDir, { recursive: true, force: true });
   });
 
-  it("resolves for a valid unexpired token without a preceding acquire() or initCoreAuth() call", async () => {
+  it("resolves for a valid unexpired token with no preceding acquire() call", async () => {
     homeDir = mkdtempSync(join(tmpdir(), "core-auth-manager-selfinit-"));
     const store = createLiveStore(homeDir, homeDir);
     const account = { id: "a", enabled: true, access: "tok", expires: Date.now() + 60 * 60 * 1000 };

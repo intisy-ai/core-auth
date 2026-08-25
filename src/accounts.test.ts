@@ -1,4 +1,4 @@
-// Regression tests for withLock's fail-closed contract (see accounts.ts): when the lock
+// Regression tests for withLock's fail-closed contract (see store-lock.ts): when the lock
 // cannot be acquired, withLock must throw (LockTimeoutError) rather than run `fn()`
 // unlocked. Running `fn()` unlocked would let two writers racing the same store both
 // read-modify-write accounts.json, with the second `renameSync` silently clobbering the
@@ -20,7 +20,7 @@ const workerUrl = new URL("./accounts.lock-worker.mjs", import.meta.url);
 const holdWorkerUrl = new URL("./accounts.lock-hold-worker.mjs", import.meta.url);
 const contendWorkerUrl = new URL("./accounts.lock-contend-worker.mjs", import.meta.url);
 
-// LOCK_WAIT_MS in accounts.ts -- kept in sync manually since it isn't exported. The
+// LOCK_WAIT_MS in store-lock.ts -- kept in sync manually since it isn't exported. The
 // held-lock cross-thread test below must hold the lock for longer than this so the
 // contender genuinely times out rather than racing a lock that's released early.
 const LOCK_WAIT_MS = 5000;
@@ -232,5 +232,52 @@ describe("activity emit", () => {
     addAccount("p", { id: "a1", email: "a@b.c", tags: ["y", "x"] }, opts);
 
     expect(seen.map((s) => s.action)).toEqual(["account_updated"]);
+  });
+});
+
+// The store engine is Java (AccountStore) reached over the live-store bridge, and it must be
+// byte-faithful to what a JS writer would have kept: the typed Account model is narrower than the
+// file, so a narrowing read-modify-write would silently destroy a provider's own field.
+describe("fidelity of the delegated store", () => {
+  it("keeps a field outside the declared account shape across an update", () => {
+    const opts = { dir };
+    addAccount("fidelity-provider", { id: "a1", refresh: "r1" }, opts);
+    updateAccounts("fidelity-provider", (pool: any) => {
+      pool.accounts[0].vendorOnly = { nested: [1, 2] };
+    }, opts);
+
+    updateAccounts("fidelity-provider", (pool: any) => {
+      pool.accounts[0].access = "tok";
+    }, opts);
+
+    const stored = loadAccounts("fidelity-provider", opts).accounts[0] as any;
+    expect(stored.vendorOnly).toEqual({ nested: [1, 2] });
+    expect(stored.access).toBe("tok");
+  });
+
+  it("reads an absent provider as an empty pool with its fields defaulted", () => {
+    expect(loadAccounts("never-written", { dir })).toEqual({ accounts: [], activeIndex: 0, activeIndexByLane: {} });
+  });
+
+  it("keeps a lane cursor a caller saved", () => {
+    const opts = { dir };
+    saveAccounts("cursor-provider", { accounts: [{ id: "a1" }], activeIndex: 1, activeIndexByLane: { fast: 2 } }, opts);
+
+    expect(loadAccounts("cursor-provider", opts)).toEqual({
+      accounts: [{ id: "a1" }],
+      activeIndex: 1,
+      activeIndexByLane: { fast: 2 },
+    });
+  });
+
+  it("leaves another provider's pool untouched when one is written", () => {
+    const opts = { dir };
+    addAccount("provider-a", { id: "a1", refresh: "ra" }, opts);
+    addAccount("provider-b", { id: "b1", refresh: "rb" }, opts);
+
+    removeAccount("provider-a", "a1", opts);
+
+    expect(loadAccounts("provider-a", opts).accounts).toEqual([]);
+    expect(loadAccounts("provider-b", opts).accounts.map((a: any) => a.id)).toEqual(["b1"]);
   });
 });

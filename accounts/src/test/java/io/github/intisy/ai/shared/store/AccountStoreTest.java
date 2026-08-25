@@ -5,7 +5,9 @@ import io.github.intisy.ai.api.seam.JsonCodec;
 import io.github.intisy.ai.api.seam.Store;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -106,6 +108,114 @@ class AccountStoreTest {
         assertTrue(raw.contains("\"count\":5"));
         assertFalse(raw.contains("\"count\":5.0"));
         assertTrue(raw.contains("\"remainingFraction\":0.5"));
+    }
+
+    /**
+     * The store is byte-compatible with a JS writer that keeps whatever it was given, so a field
+     * outside the declared {@link Account} shape must survive a read-modify-write instead of being
+     * narrowed away.
+     */
+    @Test
+    void upsert_keepsFieldsOutsideTheDeclaredAccountShape() {
+        Store store = new InMemoryStore();
+        store.put("accounts.json",
+                "{\"version\":1,\"providers\":{\"prov\":{\"accounts\":["
+                        + "{\"id\":\"acc1\",\"refresh\":\"r1\",\"vendorOnly\":\"keep-me\"}"
+                        + "],\"activeIndex\":0,\"activeIndexByLane\":{}}}}");
+        AccountStore s = new AccountStore(store, new SimpleJsonCodec());
+
+        Map<String, Object> incoming = new LinkedHashMap<>();
+        incoming.put("id", "acc1");
+        incoming.put("access", "tok");
+        assertEquals(AccountStore.Upsert.UPDATED, s.upsertRaw("prov", incoming));
+
+        assertTrue(store.get("accounts.json").contains("\"vendorOnly\":\"keep-me\""));
+    }
+
+    @Test
+    void upsert_reportsAddedThenUpdatedThenUnchanged() {
+        Store store = new InMemoryStore();
+        AccountStore s = new AccountStore(store, new SimpleJsonCodec());
+
+        Map<String, Object> account = new LinkedHashMap<>();
+        account.put("id", "acc1");
+        account.put("refresh", "r1");
+
+        assertEquals(AccountStore.Upsert.ADDED, s.upsertRaw("prov", account));
+        assertEquals(AccountStore.Upsert.UNCHANGED, s.upsertRaw("prov", account));
+
+        Map<String, Object> changed = new LinkedHashMap<>();
+        changed.put("id", "acc1");
+        changed.put("email", "someone@example.com");
+        assertEquals(AccountStore.Upsert.UPDATED, s.upsertRaw("prov", changed));
+    }
+
+    /**
+     * A login refresh re-upserts the same account on every call, so an object-valued field whose
+     * keys arrive in a different order must not read as a change; array order IS content.
+     */
+    @Test
+    void upsert_isUnchangedForAReorderedObjectButUpdatedForAReorderedArray() {
+        Store store = new InMemoryStore();
+        AccountStore s = new AccountStore(store, new SimpleJsonCodec());
+
+        Map<String, Object> firstMeta = new LinkedHashMap<>();
+        firstMeta.put("a", 1L);
+        firstMeta.put("b", 2L);
+        Map<String, Object> first = new LinkedHashMap<>();
+        first.put("id", "acc1");
+        first.put("meta", firstMeta);
+        first.put("lanes", Arrays.asList("x", "y"));
+        s.upsertRaw("prov", first);
+
+        Map<String, Object> reorderedMeta = new LinkedHashMap<>();
+        reorderedMeta.put("b", 2L);
+        reorderedMeta.put("a", 1L);
+        Map<String, Object> reordered = new LinkedHashMap<>();
+        reordered.put("id", "acc1");
+        reordered.put("meta", reorderedMeta);
+        reordered.put("lanes", Arrays.asList("x", "y"));
+        assertEquals(AccountStore.Upsert.UNCHANGED, s.upsertRaw("prov", reordered));
+
+        Map<String, Object> swappedLanes = new LinkedHashMap<>();
+        swappedLanes.put("id", "acc1");
+        swappedLanes.put("meta", reorderedMeta);
+        swappedLanes.put("lanes", Arrays.asList("y", "x"));
+        assertEquals(AccountStore.Upsert.UPDATED, s.upsertRaw("prov", swappedLanes));
+    }
+
+    @Test
+    void remove_reportsWhetherAnAccountWasThere() {
+        Store store = new InMemoryStore();
+        AccountStore s = new AccountStore(store, new SimpleJsonCodec());
+
+        Account a = new Account();
+        a.id = "acc1";
+        s.add("prov", a);
+
+        assertTrue(s.removeRaw("prov", "acc1"));
+        assertFalse(s.removeRaw("prov", "acc1"));
+    }
+
+    @Test
+    void loadRaw_defaultsThePoolFieldsAndSaveRawLeavesOtherProvidersAlone() {
+        Store store = new InMemoryStore();
+        AccountStore s = new AccountStore(store, new SimpleJsonCodec());
+
+        Account other = new Account();
+        other.id = "keep";
+        s.add("other-prov", other);
+
+        String empty = s.loadRaw("prov");
+        assertTrue(empty.contains("\"accounts\":[]"));
+        assertTrue(empty.contains("\"activeIndex\":0"));
+        assertTrue(empty.contains("\"activeIndexByLane\":{}"));
+
+        s.saveRaw("prov", "{\"accounts\":[{\"id\":\"acc1\"}],\"activeIndex\":3}");
+
+        assertEquals(1, s.list("prov").size());
+        assertEquals(3, s.load("prov").activeIndex);
+        assertEquals(1, s.list("other-prov").size());
     }
 
     /**
