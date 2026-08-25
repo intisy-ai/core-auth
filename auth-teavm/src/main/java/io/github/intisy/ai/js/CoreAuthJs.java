@@ -1,5 +1,6 @@
 package io.github.intisy.ai.js;
 
+import io.github.intisy.ai.shared.chat.ChatError;
 import io.github.intisy.ai.shared.manager.AccountManager;
 import io.github.intisy.ai.shared.manager.Acquired;
 import io.github.intisy.ai.shared.manager.ManagerOptions;
@@ -431,6 +432,19 @@ public final class CoreAuthJs {
             }
         }
         return cfg;
+    }
+
+    // ---- terminal chat errors (ChatError) -----------------------------------------------------
+
+    /**
+     * {@code ChatError.build} -- the response to send for a TERMINAL provider failure, as
+     * {@code {status, body, headers}} JSON. The caller constructs the actual Response, which is a
+     * web-platform type with no Java equivalent.
+     */
+    @JSExport
+    public static String chatError(String message, String optsJson) {
+        JsonCodec json = new SimpleJsonCodec();
+        return json.stringify(ChatError.build(message, parseObject(optsJson), json));
     }
 
     // ---- OAuth callback + state wire (OAuthWire) ----------------------------------------------

@@ -210,3 +210,9 @@ export function encodeState(payloadJson: string): string;
  * surrounding JS recognises.
  */
 export function decodeState(state: string): string;
+
+/**
+ * `ChatError.build` -- the response to send for a TERMINAL provider failure, as
+ * `{status, body, headers}` JSON. The caller constructs the Response, which has no Java equivalent.
+ */
+export function chatError(message: string, optsJson: string): string;
