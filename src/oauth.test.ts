@@ -1,6 +1,6 @@
 import { beforeAll, describe, it, expect } from "vitest";
 import { initCoreAuth } from "./core-auth-loader.js";
-import { accessTokenExpired, encodeState, decodeState } from "./oauth.js";
+import { accessTokenExpired, calculateTokenExpiry, encodeState, decodeState } from "./oauth.js";
 
 describe("accessTokenExpired", () => {
   beforeAll(async () => {
@@ -55,5 +55,23 @@ describe("encodeState/decodeState", () => {
   it("throws when the decoded payload has no PKCE verifier", () => {
     const state = encodeState({ foo: "bar" });
     expect(() => decodeState(state)).toThrow(/Missing PKCE verifier/);
+  });
+});
+
+// The expiry maths runs in Java (OAuthWire), shared by the refresh and the code exchange, so these
+// pin what crosses the boundary: a non-number becomes NaN, which the engine reads as "absent".
+describe("calculateTokenExpiry", () => {
+  it("adds the reported lifetime in milliseconds", () => {
+    expect(calculateTokenExpiry(1_000_000, 1800)).toBe(1_000_000 + 1800 * 1000);
+  });
+
+  it("defaults to an hour when the endpoint reported no expires_in", () => {
+    expect(calculateTokenExpiry(1_000_000, undefined)).toBe(1_000_000 + 3600 * 1000);
+    expect(calculateTokenExpiry(1_000_000, "not-a-number" as unknown as number)).toBe(1_000_000 + 3600 * 1000);
+  });
+
+  it("collapses a non-positive lifetime to the request time, so the token reads as expired", () => {
+    expect(calculateTokenExpiry(1_000_000, 0)).toBe(1_000_000);
+    expect(calculateTokenExpiry(1_000_000, -5)).toBe(1_000_000);
   });
 });

@@ -1,5 +1,5 @@
 // Hand-authored ambient types for the TeaVM-generated ES module staged into this same directory
-// by `npm run build:teavm` (teavm-build.mjs), from java/auth-teavm's CoreAuthJs @JSExport surface.
+// by `npm run build:teavm` (teavm-build.mjs), from auth-teavm's CoreAuthJs @JSExport surface.
 // The generated core-auth.teavm.js itself is gitignored (build output); this .d.ts is committed
 // source so tsc can type-check consumers of `getCoreAuth()` without needing the build to have run
 // first. Export names verified against the actual generated file's `export { ... }` statement.
@@ -103,6 +103,12 @@ export function accountRemove(providerId: string, id: string, jsStore: CoreAuthJ
  * (only fields this predicate reads).
  */
 export function accessTokenExpired(accountJson: string, now: number): boolean;
+
+/**
+ * `OAuthWire.calculateTokenExpiry` -- the shared expiry maths behind both OAuth grants. Pass `NaN`
+ * for `expiresInSeconds` when the token endpoint reported none; the default lives on the Java side.
+ */
+export function calculateTokenExpiry(requestTimeMs: number, expiresInSeconds: number): number;
 
 /**
  * `RateLimitMath.calculateBackoffMs` over the `jitter === false` exact-value path. `argsJson` is

@@ -5,6 +5,7 @@ import io.github.intisy.ai.shared.manager.Acquired;
 import io.github.intisy.ai.shared.manager.ManagerOptions;
 import io.github.intisy.ai.shared.model.Account;
 import io.github.intisy.ai.shared.oauth.OAuthConfig;
+import io.github.intisy.ai.shared.oauth.OAuthWire;
 import io.github.intisy.ai.shared.oauth.Refreshed;
 import io.github.intisy.ai.shared.oauth.TokenRefresh;
 import io.github.intisy.ai.shared.oauth.TokenRefreshError;
@@ -208,6 +209,22 @@ public final class CoreAuthJs {
      * {@code {"attempt":int,"baseMs":long,"maxMs":long,"jitter":boolean}}; returns the bare JSON
      * number result (a {@code Long}, so a whole value never gets a spurious {@code .0}).
      */
+    /**
+     * {@code OAuthWire.calculateTokenExpiry} -- the shared expiry maths behind both OAuth grants.
+     *
+     * <p>A non-finite {@code expiresInSeconds} means the token endpoint reported none, so the
+     * default lives on the Java side rather than being restated by each caller. Both parameters are
+     * {@code double} because a raw JS number handed to a declared Java {@code long} is not
+     * remarshalled at this boundary (see {@link #reportRateLimit}).
+     */
+    @JSExport
+    public static double calculateTokenExpiry(double requestTimeMs, double expiresInSeconds) {
+        Double seconds = Double.isNaN(expiresInSeconds) || Double.isInfinite(expiresInSeconds)
+                ? null
+                : expiresInSeconds;
+        return OAuthWire.calculateTokenExpiry((long) requestTimeMs, seconds);
+    }
+
     @JSExport
     public static String calculateBackoffMsJson(String argsJson) {
         JsonCodec json = new SimpleJsonCodec();

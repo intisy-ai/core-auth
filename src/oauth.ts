@@ -16,10 +16,11 @@ export function accessTokenExpired(auth) {
   return getCoreAuth().accessTokenExpired(JSON.stringify(auth || {}), Date.now());
 }
 
+// Delegates to CoreAuthJs.calculateTokenExpiry (OAuthWire, java/accounts), which both OAuth grants
+// use. A non-number crosses as NaN, which the engine reads as "the endpoint reported no expires_in".
 export function calculateTokenExpiry(requestTimeMs, expiresInSeconds) {
-  const seconds = typeof expiresInSeconds === "number" ? expiresInSeconds : 3600;
-  if (isNaN(seconds) || seconds <= 0) return requestTimeMs;
-  return requestTimeMs + seconds * 1000;
+  const seconds = typeof expiresInSeconds === "number" ? expiresInSeconds : NaN;
+  return getCoreAuth().calculateTokenExpiry(requestTimeMs, seconds);
 }
 
 // Packs an OAuth `state` param as URL-safe base64 so it survives a redirect roundtrip.

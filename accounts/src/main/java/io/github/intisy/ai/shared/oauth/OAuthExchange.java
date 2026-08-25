@@ -5,7 +5,6 @@ import io.github.intisy.ai.api.seam.JsonCodec;
 import io.github.intisy.ai.api.seam.HttpRequest;
 import io.github.intisy.ai.api.seam.HttpResponse;
 
-import java.io.UnsupportedEncodingException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -16,9 +15,8 @@ import java.util.Map;
  * PKCE {@code code_verifier} and the {@code redirect_uri} used at authorize time), it returns the
  * initial {@link Refreshed} token set. {@code now} is passed in explicitly for deterministic expiry.
  *
- * <p>Intentionally carries its own form-encode/response-parse helpers rather than sharing
- * {@link TokenRefresh}'s (which is live-critical and left untouched); unifying the two is a later,
- * separately-consented change.
+ * <p>The form encoding, error parsing and expiry maths it shares with {@link TokenRefresh} live in
+ * {@link OAuthWire}; what stays here is the JSON request body, which only this grant sends.
  */
 public final class OAuthExchange {
 
@@ -46,7 +44,7 @@ public final class OAuthExchange {
             request.body = jsonEncode(params);
         } else {
             request.headers.put("content-type", "application/x-www-form-urlencoded");
-            request.body = formEncode(params);
+            request.body = OAuthWire.formEncode(params);
         }
 
         HttpResponse response;
@@ -57,42 +55,26 @@ public final class OAuthExchange {
         }
 
         if (response.status < 200 || response.status >= 300) {
-            String errCode = errorCode(response.body, json);
-            boolean revoked = "invalid_grant".equals(errCode);
+            OAuthWire.OAuthError parsed = OAuthWire.parseOAuthError(response.body, json);
+            boolean revoked = "invalid_grant".equals(parsed.code);
+            String details = OAuthWire.joinNonNull(parsed.code, parsed.description);
             String base = "OAuth code exchange failed (" + response.status + ")";
-            String message = errCode != null ? base + " - " + errCode : base;
-            throw new TokenRefreshError(message, revoked);
+            String message = details != null ? base + " - " + details : base;
+            throw new TokenRefreshError(message, revoked, response.status, parsed.code, parsed.description);
         }
 
         Map<String, Object> payload;
         try {
-            Map<String, Object> parsed = asMap(json.parse(response.body == null ? "" : response.body));
+            Map<String, Object> parsed = OAuthWire.asMap(json.parse(response.body == null ? "" : response.body));
             if (parsed == null) throw new IllegalArgumentException("response body is not a JSON object");
             payload = parsed;
         } catch (Exception e) {
             throw new TokenRefreshError("OAuth code exchange returned an unparseable body: " + response.body, e);
         }
-        String access = stringField(payload, "access_token");
-        Double expiresIn = numberField(payload, "expires_in");
-        String refresh = stringField(payload, "refresh_token");
-        return new Refreshed(access, calculateTokenExpiry(now, expiresIn), refresh);
-    }
-
-    private static long calculateTokenExpiry(long requestTimeMs, Double expiresInSeconds) {
-        double seconds = expiresInSeconds != null ? expiresInSeconds : 3600;
-        if (Double.isNaN(seconds) || seconds <= 0) return requestTimeMs;
-        return requestTimeMs + (long) (seconds * 1000);
-    }
-
-    private static String formEncode(Map<String, String> params) {
-        StringBuilder sb = new StringBuilder();
-        boolean first = true;
-        for (Map.Entry<String, String> e : params.entrySet()) {
-            if (!first) sb.append('&');
-            first = false;
-            sb.append(percentEncode(e.getKey())).append('=').append(percentEncode(e.getValue()));
-        }
-        return sb.toString();
+        String access = OAuthWire.stringField(payload, "access_token");
+        Double expiresIn = OAuthWire.numberField(payload, "expires_in");
+        String refresh = OAuthWire.stringField(payload, "refresh_token");
+        return new Refreshed(access, OAuthWire.calculateTokenExpiry(now, expiresIn), refresh);
     }
 
     private static String jsonEncode(Map<String, String> params) {
@@ -131,61 +113,4 @@ public final class OAuthExchange {
         return sb.append('"').toString();
     }
 
-    private static String percentEncode(String s) {
-        if (s == null) return "";
-        byte[] bytes;
-        try {
-            bytes = s.getBytes("UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            throw new IllegalStateException(e);
-        }
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            int c = b & 0xFF;
-            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-                    || c == '-' || c == '_' || c == '.' || c == '*') {
-                sb.append((char) c);
-            } else if (c == ' ') {
-                sb.append('+');
-            } else {
-                sb.append('%');
-                String hex = Integer.toHexString(c).toUpperCase();
-                if (hex.length() < 2) sb.append('0');
-                sb.append(hex);
-            }
-        }
-        return sb.toString();
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> asMap(Object o) {
-        return o instanceof Map ? (Map<String, Object>) o : null;
-    }
-
-    private static String stringField(Map<String, Object> obj, String field) {
-        Object v = obj.get(field);
-        return v instanceof String ? (String) v : null;
-    }
-
-    private static Double numberField(Map<String, Object> obj, String field) {
-        Object v = obj.get(field);
-        return v instanceof Number ? ((Number) v).doubleValue() : null;
-    }
-
-    private static String errorCode(String text, JsonCodec json) {
-        if (text == null || text.isEmpty()) return null;
-        try {
-            Map<String, Object> payload = asMap(json.parse(text));
-            if (payload == null) return null;
-            Object err = payload.get("error");
-            if (err instanceof String) return (String) err;
-            if (err instanceof Map) {
-                Object status = ((Map<?, ?>) err).get("status");
-                if (status instanceof String) return (String) status;
-            }
-            return null;
-        } catch (Exception e) {
-            return null;
-        }
-    }
 }
