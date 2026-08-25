@@ -15,3 +15,6 @@ graphify-out/
 # TeaVM-generated JS, staged by build:teavm -- the .d.ts alongside it is hand-authored and committed
 src/generated/*.js
 src/generated/*.js.map
+
+# Generated on the default branch by the release readme job.
+README.md
