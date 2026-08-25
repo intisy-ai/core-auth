@@ -3,7 +3,7 @@ package io.github.intisy.ai.shared.oauth;
 /**
  * Java analog of the JS {@code TokenRefreshError} (see {@code libs/core-auth/src/oauth.ts:22-32}).
  * {@code revoked} is {@code true} exactly when the token endpoint reported
- * {@code error=invalid_grant} — the refresh token itself was revoked/expired, so the account
+ * {@code error=invalid_grant} - the refresh token itself was revoked/expired, so the account
  * needs re-auth rather than a retry.
  *
  * @implNote {@code status}/{@code code}/{@code description} are carried as fields rather than only

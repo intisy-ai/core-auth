@@ -27,7 +27,7 @@ import java.util.function.Consumer;
  * "claim under the lock, refresh outside it" behavior without any actual locking in this class.
  *
  * <p>Note the JS proxy-aware {@code oauthWithProxy} wrapper (routing the refresh call through
- * the account's sticky proxy) is NOT ported here — proxy support doesn't exist in this module
+ * the account's sticky proxy) is NOT ported here - proxy support doesn't exist in this module
  * yet; {@link ManagerOptions#oauth} is passed to {@link TokenRefresh#refresh} unmodified.
  */
 public class AccountManager {

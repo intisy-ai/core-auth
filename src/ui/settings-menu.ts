@@ -33,7 +33,7 @@ function fieldItem(def, field) {
   }
   // number | string -> in-tab input (blank resets to default)
   const range = field.type === "number" && (field.min != null || field.max != null)
-    ? "  (range " + (field.min != null ? field.min : "") + "–" + (field.max != null ? field.max : "") + ")" : "";
+    ? "  (range " + (field.min != null ? field.min : "") + "-" + (field.max != null ? field.max : "") + ")" : "";
   return {
     label, hint: field.hint || "",
     run: () => ({ input: {
@@ -63,10 +63,10 @@ export function buildSettingsMenu(def, groupIndex) {
   if (groupIndex === undefined && groups.length > 1) {
     const items = [{ label: "Back", run: () => ({ pop: true }) }];
     groups.forEach((g, i) => items.push({ label: g.title, hint: (g.fields || []).length + " options", run: () => ({ push: () => buildSettingsMenu(def, i) }) }));
-    return { title: def.label + " — Settings", subtitle: "Pick a section · changes apply on restart · Esc to go back", items };
+    return { title: def.label + " - Settings", subtitle: "Pick a section · changes apply on restart · Esc to go back", items };
   }
   const group = groups[groupIndex || 0] || { title: "Settings", fields: [] };
   const items = [{ label: "Back", run: () => ({ pop: true }) }];
   for (const field of group.fields) items.push(fieldItem(def, field));
-  return { title: def.label + " — " + group.title, subtitle: "Enter to change · blank input resets to default · applies on restart", items };
+  return { title: def.label + " - " + group.title, subtitle: "Enter to change · blank input resets to default · applies on restart", items };
 }

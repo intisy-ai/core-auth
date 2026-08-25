@@ -9,7 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Non-interactive OAuth {@code authorization_code} exchange — the login counterpart to
+ * Non-interactive OAuth {@code authorization_code} exchange - the login counterpart to
  * {@link TokenRefresh}'s {@code refresh_token} grant, on the same {@link HttpClient}/{@link JsonCodec}
  * SPIs so it stays transpilable. Given the {@code code} an authorize redirect delivered (plus the
  * PKCE {@code code_verifier} and the {@code redirect_uri} used at authorize time), it returns the

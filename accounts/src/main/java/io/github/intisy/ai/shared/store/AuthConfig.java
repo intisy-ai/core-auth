@@ -8,9 +8,9 @@ import java.util.Map;
 import io.github.intisy.ai.seam.JsonUtil;
 
 /**
- * core-auth config: the active provider (and, in the JS source, harness auto-model settings —
+ * core-auth config: the active provider (and, in the JS source, harness auto-model settings -
  * not ported here). Java analog of {@code libs/core-auth/src/config.ts}, rewired onto the
- * {@link Store} + {@link JsonCodec} SPIs. Stored under the key {@code "auth.json"} — no
+ * {@link Store} + {@link JsonCodec} SPIs. Stored under the key {@code "auth.json"} - no
  * fallback/legacy paths (those were a filesystem-directory concept; the {@code Store}
  * implementation owns key-to-location mapping now).
  */

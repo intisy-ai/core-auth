@@ -71,7 +71,7 @@ function buildProxyMenu(def) {
   const sel = new Set(proxyManager.getScopeSelection(proxyScopeKey));
   const rows = proxyManager.proxiesForScope(proxyScopeKey);
   items.push({ label: proxyScopeLabel(proxyScopeKey) + " proxies (" + rows.length + ")", kind: "heading" });
-  if (!rows.length) items.push({ label: "None — add one above.", kind: "note" });
+  if (!rows.length) items.push({ label: "None - add one above.", kind: "note" });
   for (const p of rows) {
     const q = qualityLabel(p);
     const ipHits = (p.stats && p.stats.ipRateLimitHits) || 0;
@@ -200,7 +200,7 @@ export function buildAutoMenu(def) {
     : "Order is automatic (" + current.label + "). Enter a model to include/exclude.")
     + (srcLabel ? " · models: " + srcLabel : "")
     + (autoCat.scoreSource ? " · scores: " + autoCat.scoreSource : "");
-  return { title: def.label + " — Auto model ranking", subtitle: sub, items };
+  return { title: def.label + " - Auto model ranking", subtitle: sub, items };
 }
 
 // Read-only-ish catalog browser: the FULL model list (not the Auto ranking) with a
@@ -225,7 +225,7 @@ function buildModelsBrowse(def) {
   items.push({ label: "", separator: true });
   const src = catalogSourceLabel(providerId);
   items.push({ label: "Models (" + matches.length + (browseQuery ? " match" + (matches.length === 1 ? "" : "es") : "") + ")" + (src ? " · " + src : ""), kind: "heading" });
-  if (!matches.length) items.push({ label: browseQuery ? "No models match." : "No models — log in or Refresh to fetch this provider's catalog.", kind: "note" });
+  if (!matches.length) items.push({ label: browseQuery ? "No models match." : "No models - log in or Refresh to fetch this provider's catalog.", kind: "note" });
   const scores = (cat && cat.scores) || {};
   const scoreTag = leaderboardSourceShort((cat && cat.scoreSource) || "");
   for (const id of matches) {
@@ -234,7 +234,7 @@ function buildModelsBrowse(def) {
     items.push({ label: (models[id] && models[id].name) || id, hint: s + id, run: () => ({ push: () => buildAutoModelEdit(def, id) }) });
   }
   const scoreSub = (cat && cat.scoreSource) ? " · scores: " + cat.scoreSource : "";
-  return { title: def.label + " — Models", subtitle: "Browse + search this provider's models · Enter a model to include/exclude" + scoreSub, items };
+  return { title: def.label + " - Models", subtitle: "Browse + search this provider's models · Enter a model to include/exclude" + scoreSub, items };
 }
 
 // ---- Account details --------------------------------------------------------
@@ -296,7 +296,7 @@ function pushQuotaArea(items, def, views) {
   if (!views.length) { items.push({ label: "Add an account to see quota.", kind: "note" }); return; }
   // Only enabled accounts contribute quota (quotaBars skips disabled). If none are
   // enabled, nothing will ever load; say so instead of a perpetual "Loading quota…".
-  if (!views.some((v) => v.enabled !== false)) { items.push({ label: "No enabled accounts — enable or add one to see quota.", kind: "note" }); return; }
+  if (!views.some((v) => v.enabled !== false)) { items.push({ label: "No enabled accounts - enable or add one to see quota.", kind: "note" }); return; }
   const bars = quotaBars(views);
   if (bars.length) { for (const bar of bars) items.push(bar); return; }
   if (typeof def.accounts.refreshQuota === "function") items.push({ label: "Loading quota…", kind: "note" });
@@ -321,7 +321,7 @@ function buildQuotaMenu(def) {
   }
   // refetch on open so the graphs are current even if the parent didn't just fetch
   const onOpen = typeof controller.refreshQuota === "function" ? async () => { try { await controller.refreshQuota(); } catch {} } : undefined;
-  return { title: def.label + " — Quota (all accounts)", subtitle: "Combined across accounts · Esc to go back", items, onOpen };
+  return { title: def.label + " - Quota (all accounts)", subtitle: "Combined across accounts · Esc to go back", items, onOpen };
 }
 
 // Less-used provider actions, grouped off the main menu into labeled sections.
@@ -348,7 +348,7 @@ function buildManageMenu(def) {
     items.push({ label: "Accounts", kind: "heading" });
     extraActions.forEach((a) => items.push({ label: a.label, color: a.color || "cyan", run: async () => { try { await a.run(); return { refresh: true, flash: (a.label || "Done") + " ✓" }; } catch (e) { return { refresh: true, flash: "Failed: " + (e && e.message || e) }; } } }));
   }
-  return { title: def.label + " — Manage", subtitle: "Esc to go back", items };
+  return { title: def.label + " - Manage", subtitle: "Esc to go back", items };
 }
 
 function fmtReset(ms) {
@@ -437,7 +437,7 @@ export function buildAccountMenu(def) {
   const items = [];
   const note = availabilityNote(views);
   items.push({ label: `Accounts (${views.length})`, hint: note || undefined, kind: "heading" });
-  if (!views.length) items.push({ label: "No accounts yet — add one below.", kind: "note" });
+  if (!views.length) items.push({ label: "No accounts yet - add one below.", kind: "note" });
   for (const view of views) {
     const hint = [view.detail, accountAvailabilityHint(view)].filter(Boolean).join(" · ");
     items.push({ label: `${view.email || view.id}${STATUS[view.status] ? " " + STATUS[view.status] : ""}`, hint, run: () => ({ push: () => buildAccountDetail(def, view) }) });
