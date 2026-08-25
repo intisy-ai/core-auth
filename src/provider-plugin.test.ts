@@ -1,27 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { createProviderPluginMock } = vi.hoisted(() => ({ createProviderPluginMock: vi.fn() }));
-vi.mock("./provider-plugin-runtime.js", () => ({ createProviderPlugin: createProviderPluginMock }));
-
-import { defineProviderPlugin, type ProviderPluginCore } from "./provider-plugin.js";
-
-function makeCore(order: string[]): ProviderPluginCore {
+const { createProviderPluginMock, defineReadmeMock, maybeRunReadmeCliMock, order } = vi.hoisted(() => {
+  const order: string[] = [];
   return {
-    defineReadme: vi.fn((spec) => { order.push("defineReadme"); return spec; }),
-    maybeRunReadmeCli: vi.fn(() => { order.push("maybeRunReadmeCli"); return false; }),
+    order,
+    createProviderPluginMock: vi.fn(),
+    defineReadmeMock: vi.fn((spec: unknown) => { order.push("defineReadme"); return spec; }),
+    maybeRunReadmeCliMock: vi.fn(() => { order.push("maybeRunReadmeCli"); return false; }),
   };
-}
+});
+vi.mock("./provider-plugin-runtime.js", () => ({ createProviderPlugin: createProviderPluginMock }));
+// The prologue's ORDER is what these pin, and core's readme helpers are now called directly rather
+// than handed in, so intercepting the module is the only place left to observe it from.
+vi.mock("@intisy-ai/core", () => ({ defineReadme: defineReadmeMock, maybeRunReadmeCli: maybeRunReadmeCliMock }));
+
+import { defineProviderPlugin } from "./provider-plugin.js";
 
 const driver = { id: "stub", label: "Stub", models: {} } as never;
 
 describe("defineProviderPlugin", () => {
   beforeEach(() => {
     createProviderPluginMock.mockReset();
+    defineReadmeMock.mockClear();
+    maybeRunReadmeCliMock.mockClear();
+    maybeRunReadmeCliMock.mockImplementation(() => { order.push("maybeRunReadmeCli"); return false; });
+    order.length = 0;
   });
 
   it("registers the readme and clears both guards before returning the provider plugin", async () => {
-    const order: string[] = [];
-    const core = makeCore(order);
     const cliGuard = vi.fn(() => { order.push("cliGuard"); return false; });
     const sentinel = { hooks: true };
     createProviderPluginMock.mockReturnValue(sentinel);
@@ -29,7 +35,6 @@ describe("defineProviderPlugin", () => {
     const result = await defineProviderPlugin({
       name: "stub-auth",
       driver,
-      core,
       cliGuard,
       readme: { description: "stub" },
     });
@@ -40,12 +45,10 @@ describe("defineProviderPlugin", () => {
   });
 
   it("exits without booting the provider when the action guard takes the invocation", async () => {
-    const order: string[] = [];
-    const core = makeCore(order);
     const exit = vi.fn();
     const cliGuard = vi.fn(() => { order.push("cliGuard"); return true; });
 
-    const result = await defineProviderPlugin({ name: "custom-auth", driver, core, cliGuard, exit });
+    const result = await defineProviderPlugin({ name: "custom-auth", driver, cliGuard, exit });
 
     expect(order).toEqual(["cliGuard"]);
     expect(exit).toHaveBeenCalledWith(0);
@@ -54,16 +57,13 @@ describe("defineProviderPlugin", () => {
   });
 
   it("short-circuits on the readme guard before the action guard ever runs", async () => {
-    const order: string[] = [];
-    const core = makeCore(order);
-    core.maybeRunReadmeCli = vi.fn(() => { order.push("maybeRunReadmeCli"); return true; });
+    maybeRunReadmeCliMock.mockImplementation(() => { order.push("maybeRunReadmeCli"); return true; });
     const exit = vi.fn();
     const cliGuard = vi.fn(() => { order.push("cliGuard"); return false; });
 
     const result = await defineProviderPlugin({
       name: "antigravity",
       driver,
-      core,
       cliGuard,
       readme: { description: "antigravity" },
       exit,
@@ -77,26 +77,22 @@ describe("defineProviderPlugin", () => {
   });
 
   it("supports an async action guard (a provider's own maybeRunCli)", async () => {
-    const order: string[] = [];
-    const core = makeCore(order);
     const exit = vi.fn();
     const cliGuard = vi.fn(async () => { order.push("cliGuard"); return true; });
 
-    await defineProviderPlugin({ name: "claude-code", driver, core, cliGuard, exit });
+    await defineProviderPlugin({ name: "claude-code", driver, cliGuard, exit });
 
     expect(exit).toHaveBeenCalledWith(0);
     expect(createProviderPluginMock).not.toHaveBeenCalled();
   });
 
   it("skips the readme entirely when none is supplied", async () => {
-    const order: string[] = [];
-    const core = makeCore(order);
     createProviderPluginMock.mockReturnValue({});
 
-    await defineProviderPlugin({ name: "custom-auth", driver, core, cliGuard: () => false });
+    await defineProviderPlugin({ name: "custom-auth", driver, cliGuard: () => false });
 
-    expect(core.defineReadme).not.toHaveBeenCalled();
-    expect(core.maybeRunReadmeCli).not.toHaveBeenCalled();
+    expect(defineReadmeMock).not.toHaveBeenCalled();
+    expect(maybeRunReadmeCliMock).not.toHaveBeenCalled();
     expect(createProviderPluginMock).toHaveBeenCalled();
   });
 });
