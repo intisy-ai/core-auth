@@ -13,6 +13,7 @@
 
 import { proxyManager } from "../proxy/manager.js";
 import { qualityLabel } from "../proxy/scoring.js";
+import { parseScopeKey } from "../proxy/scopes.js";
 import { getAutoConfig, setAutoConfig } from "../config.js";
 import { readModelCache } from "../models-cache.js";
 import { buildLoginInput } from "./url-auth.js";
@@ -55,12 +56,6 @@ function proxyScopeKeys(def) {
   return keys;
 }
 
-function parseScopeForKey(key) {
-  if (key === "global") return { type: "global" };
-  const i = key.indexOf(":");
-  return { type: key.slice(0, i), id: key.slice(i + 1) };
-}
-
 function buildProxyMenu(def) {
   const keys = proxyScopeKeys(def);
   if (!keys.includes(proxyScopeKey)) proxyScopeKey = "global";
@@ -69,7 +64,7 @@ function buildProxyMenu(def) {
     { label: "Back", run: () => ({ pop: true }) },
     { label: "Scope: " + proxyScopeLabel(proxyScopeKey), color: "cyan", run: () => { const i = keys.indexOf(proxyScopeKey); proxyScopeKey = keys[(i + 1) % keys.length]; return { refresh: true }; } },
     { label: "Mode: " + mode, color: "cyan", run: () => { const order = ["automatic", "manual", "disabled"]; const i = order.indexOf(mode); proxyManager.setMode(proxyScopeKey, order[(i + 1) % order.length]); return { refresh: true }; } },
-    { label: "Add proxy to this scope", color: "green", run: () => ({ input: { title: "Proxy URL", message: "host:port or http://...", complete: (url) => { if (url) proxyManager.addManual(url, parseScopeForKey(proxyScopeKey)); return { refresh: true }; } } }) },
+    { label: "Add proxy to this scope", color: "green", run: () => ({ input: { title: "Proxy URL", message: "host:port or http://...", complete: (url) => { if (url) proxyManager.addManual(url, parseScopeKey(proxyScopeKey)); return { refresh: true }; } } }) },
     { label: "Refresh from providers (global)", color: "cyan", run: async () => { var msg; try { const n = await proxyManager.refresh(); msg = "Fetched " + n; } catch (e) { msg = "Failed: " + (e && e.message || e); } return { refresh: true, flash: msg }; } },
     { label: "", separator: true },
   ];

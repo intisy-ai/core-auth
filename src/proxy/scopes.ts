@@ -1,57 +1,39 @@
 // @ts-nocheck
-import { scoreOf, countAssignments, isIpLimited, MAX_ACCOUNTS_PER_PROXY } from "./scoring.js";
+// Scope resolution over the proxy store: which proxies a scope may use, in which order. The
+// decisions are single-sourced in Java (ProxyScopes, accounts/proxy) behind CoreAuthJs's proxy*
+// exports; the selection calls return INDICES into store.proxies, which this module maps back onto
+// the caller's own objects so proxy identity survives the crossing.
+import { getCoreAuth } from "../core-auth-loader.js";
+
+function pick(store, indices) {
+  const proxies = store.proxies || [];
+  return indices.map((i) => proxies[i]);
+}
 
 export function scopeKey(scope) {
-  if (!scope || scope.type === "global") return "global";
-  return scope.type + ":" + scope.id;
+  return getCoreAuth().proxyScopeKey(JSON.stringify(scope || null));
 }
+
 export function parseScopeKey(key) {
-  if (key === "global") return { type: "global" };
-  const i = key.indexOf(":");
-  return { type: key.slice(0, i), id: key.slice(i + 1) };
+  return JSON.parse(getCoreAuth().proxyParseScopeKey(key));
 }
 
 export function effectiveMode(store, key) {
-  const m = store.modes || {};
-  return m[key] || m.default || "disabled";
+  return getCoreAuth().proxyEffectiveMode(JSON.stringify(store || {}), key);
 }
 
-// account -> provider -> global, dropping scopes whose effective mode is disabled
 export function resolveChain(store, accountId, providerId) {
-  const keys = [];
-  if (accountId) keys.push("account:" + accountId);
-  if (providerId) keys.push("provider:" + providerId);
-  keys.push("global");
-  return keys.filter((k) => effectiveMode(store, k) !== "disabled");
+  return JSON.parse(getCoreAuth().proxyResolveChain(JSON.stringify(store || {}), accountId || "", providerId || ""));
 }
 
 export function proxiesInScope(store, key) {
-  return (store.proxies || []).filter((p) => scopeKey(p.scope) === key);
+  return pick(store, JSON.parse(getCoreAuth().proxyProxiesInScope(JSON.stringify(store || {}), key)));
 }
 
-// usable proxies for a scope under its mode: manual = the scope's selected subset,
-// automatic = all; minus cap-bound + currently IP-limited; sorted best-first.
 export function candidatesForScope(store, key, accountId, now = Date.now()) {
-  const mode = effectiveMode(store, key);
-  let pool = proxiesInScope(store, key);
-  if (mode === "manual") {
-    const sel = new Set(store.manualSelection[key] || []);
-    pool = pool.filter((p) => sel.has(p.url));
-  }
-  return pool
-    .filter((p) => countAssignments(store, p.url) < MAX_ACCOUNTS_PER_PROXY && !isIpLimited(p, now))
-    .sort((a, b) => scoreOf(store, a) - scoreOf(store, b));
+  return pick(store, JSON.parse(getCoreAuth().proxyCandidatesForScope(JSON.stringify(store || {}), key, now)));
 }
 
-// Is a proxy the account ALREADY holds still valid to re-use in this scope? Same
-// checks as candidatesForScope MINUS the per-proxy cap: the account occupies its
-// own slot, so the cap (which gates NEW assignments) must not evict it. Without
-// this, an account on a cap-full proxy fails its own sticky check and churns (or,
-// with a one-proxy pool, deadlocks to direct).
 export function stickyUsable(store, key, url, now = Date.now()) {
-  if (effectiveMode(store, key) === "disabled") return false;
-  const p = proxiesInScope(store, key).find((x) => x.url === url);
-  if (!p || isIpLimited(p, now)) return false;
-  if (effectiveMode(store, key) === "manual" && !(store.manualSelection[key] || []).includes(url)) return false;
-  return true;
+  return getCoreAuth().proxyStickyUsable(JSON.stringify(store || {}), key, url, now);
 }

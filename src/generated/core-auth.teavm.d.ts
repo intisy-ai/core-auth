@@ -136,3 +136,42 @@ export function refreshToken(
   oauthConfigJson: string,
   httpSend: CoreAuthJsHttpSend,
 ): Promise<string>;
+
+/** The caps the scoring engine enforces, as `{maxAccountsPerProxy, ipLimitCooldownMs}` JSON. */
+export function proxyLimits(): string;
+
+/** `ProxyScopes.scopeKey` -- the bare key for a `{type, id}` scope, not a JSON string. */
+export function proxyScopeKey(scopeJson: string): string;
+
+/** `ProxyScopes.parseScopeKey` -- the scope as a JSON object; the global scope carries no `id`. */
+export function proxyParseScopeKey(key: string): string;
+
+/** `ProxyScopes.effectiveMode` -- the bare mode for a scope key, falling back to the store default. */
+export function proxyEffectiveMode(storeJson: string, key: string): string;
+
+/** `ProxyScopes.resolveChain` -- a JSON array of scope keys, most specific first, disabled dropped. */
+export function proxyResolveChain(storeJson: string, accountId: string, providerId: string): string;
+
+/**
+ * `ProxyScopes.proxiesInScope` -- a JSON array of INDICES into `store.proxies`, so the caller maps
+ * them back onto its own proxy objects and identity survives the crossing.
+ */
+export function proxyProxiesInScope(storeJson: string, key: string): string;
+
+/** `ProxyScopes.candidatesForScope` -- a JSON array of indices into `store.proxies`, best-first. */
+export function proxyCandidatesForScope(storeJson: string, key: string, now: number): string;
+
+/** `ProxyScopes.stickyUsable` -- whether a proxy the account already holds may be re-used. */
+export function proxyStickyUsable(storeJson: string, key: string, url: string, now: number): boolean;
+
+/** `ProxyScoring.scoreOf` -- lower is better. */
+export function proxyScoreOf(storeJson: string, proxyJson: string): number;
+
+/** `ProxyScoring.qualityLabel` -- `"good"`, `"fair"` or `"poor"`, as a bare string. */
+export function proxyQualityLabel(proxyJson: string): string;
+
+/** `ProxyScoring.isIpLimited` -- whether the proxy's exit IP is still inside its cooldown. */
+export function proxyIsIpLimited(proxyJson: string, now: number): boolean;
+
+/** `ProxyScoring.countAssignments` -- how many accounts currently hold `url`. */
+export function proxyCountAssignments(storeJson: string, url: string): number;

@@ -9,6 +9,8 @@ import io.github.intisy.ai.shared.oauth.OAuthWire;
 import io.github.intisy.ai.shared.oauth.Refreshed;
 import io.github.intisy.ai.shared.oauth.TokenRefresh;
 import io.github.intisy.ai.shared.oauth.TokenRefreshError;
+import io.github.intisy.ai.shared.proxy.ProxyScopes;
+import io.github.intisy.ai.shared.proxy.ProxyScoring;
 import io.github.intisy.ai.shared.select.QuotaHealth;
 import io.github.intisy.ai.shared.select.RateLimitMath;
 import io.github.intisy.ai.shared.select.Strategy;
@@ -203,13 +205,6 @@ public final class CoreAuthJs {
     }
 
     /**
-     * {@code RateLimitMath.calculateBackoffMs} over the {@code jitter == false} exact-value path
-     * (the deterministic one; {@code jitter == true} consults an RNG and is intentionally out of
-     * scope for a byte-identical parity check). {@code argsJson} is
-     * {@code {"attempt":int,"baseMs":long,"maxMs":long,"jitter":boolean}}; returns the bare JSON
-     * number result (a {@code Long}, so a whole value never gets a spurious {@code .0}).
-     */
-    /**
      * {@code OAuthWire.calculateTokenExpiry} -- the shared expiry maths behind both OAuth grants.
      *
      * <p>A non-finite {@code expiresInSeconds} means the token endpoint reported none, so the
@@ -225,6 +220,13 @@ public final class CoreAuthJs {
         return OAuthWire.calculateTokenExpiry((long) requestTimeMs, seconds);
     }
 
+    /**
+     * {@code RateLimitMath.calculateBackoffMs} over the {@code jitter == false} exact-value path
+     * (the deterministic one; {@code jitter == true} consults an RNG and is intentionally out of
+     * scope for a byte-identical parity check). {@code argsJson} is
+     * {@code {"attempt":int,"baseMs":long,"maxMs":long,"jitter":boolean}}; returns the bare JSON
+     * number result (a {@code Long}, so a whole value never gets a spurious {@code .0}).
+     */
     @JSExport
     public static String calculateBackoffMsJson(String argsJson) {
         JsonCodec json = new SimpleJsonCodec();
@@ -428,6 +430,104 @@ public final class CoreAuthJs {
             }
         }
         return cfg;
+    }
+
+    // ---- proxy selection (ProxyScoring/ProxyScopes) -------------------------------------------
+
+    /**
+     * The caps the scoring engine enforces, as {@code {maxAccountsPerProxy, ipLimitCooldownMs}}, so
+     * a caller states them once from here instead of restating the numbers on its own side.
+     */
+    @JSExport
+    public static String proxyLimits() {
+        JsonCodec json = new SimpleJsonCodec();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("maxAccountsPerProxy", (long) ProxyScoring.MAX_ACCOUNTS_PER_PROXY);
+        out.put("ipLimitCooldownMs", ProxyScoring.IP_LIMIT_COOLDOWN_MS);
+        return json.stringify(out);
+    }
+
+    /** {@code ProxyScopes.scopeKey} -- returns the bare key, not a JSON string. */
+    @JSExport
+    public static String proxyScopeKey(String scopeJson) {
+        return ProxyScopes.scopeKey(parseObject(scopeJson));
+    }
+
+    /** {@code ProxyScopes.parseScopeKey} -- returns the scope as a JSON object. */
+    @JSExport
+    public static String proxyParseScopeKey(String key) {
+        JsonCodec json = new SimpleJsonCodec();
+        return json.stringify(ProxyScopes.parseScopeKey(key));
+    }
+
+    /** {@code ProxyScopes.effectiveMode} -- returns the bare mode, not a JSON string. */
+    @JSExport
+    public static String proxyEffectiveMode(String storeJson, String key) {
+        return ProxyScopes.effectiveMode(parseObject(storeJson), key);
+    }
+
+    /** {@code ProxyScopes.resolveChain} -- returns a JSON array of scope keys. */
+    @JSExport
+    public static String proxyResolveChain(String storeJson, String accountId, String providerId) {
+        JsonCodec json = new SimpleJsonCodec();
+        return json.stringify(ProxyScopes.resolveChain(parseObject(storeJson), accountId, providerId));
+    }
+
+    /**
+     * {@code ProxyScopes.proxiesInScope} -- a JSON array of INDICES into {@code store.proxies}, so
+     * the caller maps them back onto its own proxy objects and identity survives the crossing.
+     */
+    @JSExport
+    public static String proxyProxiesInScope(String storeJson, String key) {
+        JsonCodec json = new SimpleJsonCodec();
+        return json.stringify(ProxyScopes.proxiesInScope(parseObject(storeJson), key));
+    }
+
+    /**
+     * {@code ProxyScopes.candidatesForScope} -- a JSON array of indices into {@code store.proxies},
+     * best-first. {@code now} is a {@code double}, not {@code long}: see {@link #reportRateLimit}.
+     */
+    @JSExport
+    public static String proxyCandidatesForScope(String storeJson, String key, double now) {
+        JsonCodec json = new SimpleJsonCodec();
+        return json.stringify(ProxyScopes.candidatesForScope(parseObject(storeJson), key, (long) now));
+    }
+
+    /** {@code ProxyScopes.stickyUsable} -- whether a proxy the account already holds may be re-used. */
+    @JSExport
+    public static boolean proxyStickyUsable(String storeJson, String key, String url, double now) {
+        return ProxyScopes.stickyUsable(parseObject(storeJson), key, url, (long) now);
+    }
+
+    /** {@code ProxyScoring.scoreOf} -- lower is better. */
+    @JSExport
+    public static double proxyScoreOf(String storeJson, String proxyJson) {
+        return ProxyScoring.scoreOf(parseObject(storeJson), parseObject(proxyJson));
+    }
+
+    /** {@code ProxyScoring.qualityLabel} -- returns the bare label, not a JSON string. */
+    @JSExport
+    public static String proxyQualityLabel(String proxyJson) {
+        return ProxyScoring.qualityLabel(parseObject(proxyJson));
+    }
+
+    /** {@code ProxyScoring.isIpLimited} -- whether the proxy's exit IP is still cooling down. */
+    @JSExport
+    public static boolean proxyIsIpLimited(String proxyJson, double now) {
+        return ProxyScoring.isIpLimited(parseObject(proxyJson), (long) now);
+    }
+
+    /** {@code ProxyScoring.countAssignments} -- how many accounts currently hold {@code url}. */
+    @JSExport
+    public static int proxyCountAssignments(String storeJson, String url) {
+        return ProxyScoring.countAssignments(parseObject(storeJson), url);
+    }
+
+    private static Map<String, Object> parseObject(String objectJson) {
+        Map<String, Object> parsed = objectJson == null
+                ? null
+                : JsonUtil.asMap(new SimpleJsonCodec().parse(objectJson));
+        return parsed == null ? new LinkedHashMap<String, Object>() : parsed;
     }
 
     private static int toInt(Object o) {
