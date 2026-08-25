@@ -6,9 +6,9 @@ OAuth and in-browser login flows, the shared provider settings surface,
 rate-limit and quota bookkeeping, and the front-door seam that lets a provider
 stay `handleIr`-only.
 
-Compiled from the submodule and bundled into each provider, and published as
-`@intisy-ai/core-auth` so a provider installed from npm resolves it as a
-dependency instead of inlining a copy.
+Published as `@intisy-ai/core-auth`, which every provider resolves as a dependency
+from its home's shared library store rather than inlining a copy: the library is left
+external in a provider's bundle and materialised once per home.
 
 ## Under-the-Hood Architecture
 
@@ -46,14 +46,6 @@ app-agnostic, so it never names an app or an app-proxy. A provider implements
 - `dist/` — compiled output (generated; not committed)
 
 ## Installation
-
-As a submodule, for a provider built in this ecosystem:
-
-```bash
-git submodule add https://github.com/intisy-ai/core-auth core-auth
-```
-
-Or as an npm dependency, for a provider that carries no submodules:
 
 ```bash
 npm install @intisy-ai/core-auth
