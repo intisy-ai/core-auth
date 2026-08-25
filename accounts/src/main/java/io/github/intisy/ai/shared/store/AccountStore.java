@@ -6,6 +6,7 @@ import io.github.intisy.ai.api.seam.JsonCodec;
 import io.github.intisy.ai.api.seam.Store;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -193,47 +194,144 @@ public class AccountStore {
 
     /** Upsert by {@code id}, else by {@code refresh}; merges non-null incoming fields onto the existing record. */
     public void add(String provider, Account account) {
-        update(provider, pool -> {
+        upsertRaw(provider, accountToMap(account));
+    }
+
+    public boolean remove(String provider, String id) {
+        return removeRaw(provider, id);
+    }
+
+    /**
+     * What an {@link #upsertRaw} did, so a caller can report a real change without re-reading the
+     * pool. {@code UNCHANGED} is a re-upsert of identical content, which a login refresh does on
+     * every call.
+     */
+    public enum Upsert { ADDED, UPDATED, UNCHANGED }
+
+    /**
+     * Upsert over the account's RAW json map rather than the typed {@link Account}.
+     *
+     * @implNote raw, because {@link Account} models the declared field set and this store must be
+     * byte-compatible with a JS writer that keeps whatever it was given: narrowing to the typed
+     * model on the way in would silently drop any field outside it on every read-modify-write.
+     */
+    public Upsert upsertRaw(String provider, Map<String, Object> account) {
+        Upsert[] outcome = { Upsert.ADDED };
+        updateRaw(provider, accounts -> {
+            String id = JsonUtil.asString(account.get("id"));
+            String refresh = JsonUtil.asString(account.get("refresh"));
             int idx = -1;
-            for (int i = 0; i < pool.accounts.size(); i++) {
-                Account a = pool.accounts.get(i);
-                boolean idMatch = account.id != null && account.id.equals(a.id);
-                boolean refreshMatch = account.refresh != null && account.refresh.equals(a.refresh);
+            for (int i = 0; i < accounts.size(); i++) {
+                Map<String, Object> existing = JsonUtil.asMap(accounts.get(i));
+                if (existing == null) continue;
+                boolean idMatch = id != null && id.equals(JsonUtil.asString(existing.get("id")));
+                boolean refreshMatch = refresh != null && refresh.equals(JsonUtil.asString(existing.get("refresh")));
                 if (idMatch || refreshMatch) {
                     idx = i;
                     break;
                 }
             }
-            if (idx >= 0) pool.accounts.set(idx, mergeAccount(pool.accounts.get(idx), account));
-            else pool.accounts.add(account);
+            if (idx < 0) {
+                accounts.add(account);
+                outcome[0] = Upsert.ADDED;
+                return;
+            }
+            Map<String, Object> existing = JsonUtil.asMap(accounts.get(idx));
+            Map<String, Object> merged = new LinkedHashMap<>(existing);
+            merged.putAll(account);
+            outcome[0] = stableJson(merged).equals(stableJson(existing)) ? Upsert.UNCHANGED : Upsert.UPDATED;
+            accounts.set(idx, merged);
+        });
+        return outcome[0];
+    }
+
+    /** Removes the account with this {@code id}, reporting whether one was there to remove. */
+    public boolean removeRaw(String provider, String id) {
+        boolean[] removed = { false };
+        updateRaw(provider, accounts -> {
+            int before = accounts.size();
+            accounts.removeIf(entry -> {
+                Map<String, Object> m = JsonUtil.asMap(entry);
+                return m != null && Objects.equals(id, JsonUtil.asString(m.get("id")));
+            });
+            removed[0] = accounts.size() != before;
+        });
+        return removed[0];
+    }
+
+    /** The provider's pool sub-document as stored, with the three pool fields defaulted. */
+    public String loadRaw(String provider) {
+        Map<String, Object> providers = providersOf(parseOrDefault(store.get(KEY)));
+        return json.stringify(rawPoolOf(providers, provider));
+    }
+
+    /** Replaces the provider's pool sub-document with {@code poolJson}, leaving other providers be. */
+    public void saveRaw(String provider, String poolJson) {
+        store.update(KEY, current -> {
+            Map<String, Object> doc = parseOrDefault(current);
+            doc.put("version", 1);
+            Map<String, Object> pool = JsonUtil.asMap(json.parse(poolJson == null ? "{}" : poolJson));
+            providersOf(doc).put(provider, normalizedPool(pool));
+            return json.stringify(doc);
         });
     }
 
-    public void remove(String provider, String id) {
-        update(provider, pool -> pool.accounts.removeIf(a -> Objects.equals(a.id, id)));
+    private void updateRaw(String provider, Consumer<List<Object>> mutator) {
+        store.update(KEY, current -> {
+            Map<String, Object> doc = parseOrDefault(current);
+            doc.put("version", 1);
+            Map<String, Object> providers = providersOf(doc);
+            Map<String, Object> pool = rawPoolOf(providers, provider);
+            // Copied rather than mutated in place: what the codec parsed need not be a mutable list.
+            List<Object> accounts = new ArrayList<>(JsonUtil.asList(pool.get("accounts")));
+            mutator.accept(accounts);
+            pool.put("accounts", accounts);
+            providers.put(provider, pool);
+            return json.stringify(doc);
+        });
+    }
+
+    private static Map<String, Object> rawPoolOf(Map<String, Object> providers, String provider) {
+        return normalizedPool(JsonUtil.asMap(providers.get(provider)));
+    }
+
+    /** The stored pool with its three fields present, so a reader never has to default them again. */
+    private static Map<String, Object> normalizedPool(Map<String, Object> stored) {
+        Map<String, Object> pool = stored != null ? new LinkedHashMap<>(stored) : new LinkedHashMap<>();
+        List<Object> accounts = JsonUtil.asList(pool.get("accounts"));
+        pool.put("accounts", accounts != null ? accounts : new ArrayList<>());
+        Integer activeIndex = JsonUtil.asInt(pool.get("activeIndex"));
+        pool.put("activeIndex", activeIndex != null ? activeIndex : 0);
+        Map<String, Object> lanes = JsonUtil.asMap(pool.get("activeIndexByLane"));
+        pool.put("activeIndexByLane", lanes != null ? lanes : new LinkedHashMap<String, Object>());
+        return pool;
     }
 
     /**
-     * Java analog of the JS {@code {...existing, ...incoming}} object-spread merge. JS spread
-     * overwrites only keys present on {@code incoming} (absent keys are skipped entirely); Java
-     * fields always exist, so "absent" is approximated as "null" — only incoming's non-null
-     * fields overwrite the existing record.
+     * Content equality that ignores object key ORDER at every depth, so a re-upsert of the same
+     * account with its nested objects serialized differently reads as unchanged. Array order is
+     * real content and is left alone.
      */
-    private static Account mergeAccount(Account existing, Account incoming) {
-        Account merged = new Account();
-        merged.id = incoming.id != null ? incoming.id : existing.id;
-        merged.email = incoming.email != null ? incoming.email : existing.email;
-        merged.refresh = incoming.refresh != null ? incoming.refresh : existing.refresh;
-        merged.access = incoming.access != null ? incoming.access : existing.access;
-        merged.expires = incoming.expires != null ? incoming.expires : existing.expires;
-        merged.addedAt = incoming.addedAt != null ? incoming.addedAt : existing.addedAt;
-        merged.lastUsed = incoming.lastUsed != null ? incoming.lastUsed : existing.lastUsed;
-        merged.enabled = incoming.enabled != null ? incoming.enabled : existing.enabled;
-        merged.rateLimitResetTimes = incoming.rateLimitResetTimes != null ? incoming.rateLimitResetTimes : existing.rateLimitResetTimes;
-        merged.coolingDownUntil = incoming.coolingDownUntil != null ? incoming.coolingDownUntil : existing.coolingDownUntil;
-        merged.cooldownReason = incoming.cooldownReason != null ? incoming.cooldownReason : existing.cooldownReason;
-        merged.disabledReason = incoming.disabledReason != null ? incoming.disabledReason : existing.disabledReason;
-        merged.meta = incoming.meta != null ? incoming.meta : existing.meta;
-        return merged;
+    private String stableJson(Object value) {
+        return json.stringify(sortKeysDeep(value));
     }
+
+    private static Object sortKeysDeep(Object value) {
+        Map<String, Object> asMap = JsonUtil.asMap(value);
+        if (asMap != null) {
+            List<String> keys = new ArrayList<>(asMap.keySet());
+            Collections.sort(keys);
+            Map<String, Object> sorted = new LinkedHashMap<>();
+            for (String key : keys) sorted.put(key, sortKeysDeep(asMap.get(key)));
+            return sorted;
+        }
+        List<Object> asList = JsonUtil.asList(value);
+        if (asList != null) {
+            List<Object> mapped = new ArrayList<>();
+            for (Object entry : asList) mapped.add(sortKeysDeep(entry));
+            return mapped;
+        }
+        return value;
+    }
+
 }

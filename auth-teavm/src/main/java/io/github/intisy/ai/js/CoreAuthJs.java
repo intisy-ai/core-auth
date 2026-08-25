@@ -17,6 +17,7 @@ import io.github.intisy.ai.api.seam.JsonCodec;
 import io.github.intisy.ai.api.seam.Random;
 import io.github.intisy.ai.api.seam.Store;
 import io.github.intisy.ai.shared.store.AccountStore;
+import io.github.intisy.ai.seam.JsonUtil;
 import io.github.intisy.ai.seam.SimpleJsonCodec;
 
 import org.teavm.jso.JSExport;
@@ -295,6 +296,46 @@ public final class CoreAuthJs {
                 reject.accept(JSString.valueOf("refreshToken failed: " + e));
             }
         }).start());
+    }
+
+    /**
+     * {@code AccountStore.loadRaw} -- the provider's pool as stored, with {@code accounts},
+     * {@code activeIndex} and {@code activeIndexByLane} always present.
+     */
+    @JSExport
+    public static String poolLoad(String providerId, JsStoreBridge.JsStore jsStore) {
+        return accountStoreFor(jsStore).loadRaw(providerId);
+    }
+
+    /** {@code AccountStore.saveRaw} -- replaces this provider's pool, leaving every other one be. */
+    @JSExport
+    public static void poolSave(String providerId, String poolJson, JsStoreBridge.JsStore jsStore) {
+        accountStoreFor(jsStore).saveRaw(providerId, poolJson);
+    }
+
+    /**
+     * {@code AccountStore.upsertRaw} -- upsert by {@code id}, else by {@code refresh}, merging the
+     * incoming fields over the stored record. Returns {@code "added"}, {@code "updated"} or
+     * {@code "unchanged"}; a caller reports an activity event for the first two only.
+     */
+    @JSExport
+    public static String accountUpsert(String providerId, String accountJson, JsStoreBridge.JsStore jsStore) {
+        JsonCodec json = new SimpleJsonCodec();
+        Map<String, Object> account = JsonUtil.asMap(json.parse(accountJson == null ? "{}" : accountJson));
+        AccountStore.Upsert outcome = accountStoreFor(jsStore)
+                .upsertRaw(providerId, account != null ? account : new LinkedHashMap<String, Object>());
+        return outcome.name().toLowerCase();
+    }
+
+    /** {@code AccountStore.removeRaw} -- true when an account with this id was there to remove. */
+    @JSExport
+    public static boolean accountRemove(String providerId, String id, JsStoreBridge.JsStore jsStore) {
+        return accountStoreFor(jsStore).removeRaw(providerId, id);
+    }
+
+    private static AccountStore accountStoreFor(JsStoreBridge.JsStore jsStore) {
+        JsonCodec json = new SimpleJsonCodec();
+        return new AccountStore(new JsStoreBridge(jsStore), json);
     }
 
     private static Map<String, Object> failure(String message, boolean revoked, Integer status,

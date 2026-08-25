@@ -39,7 +39,7 @@ function pathUnderConfigDir(subdir: string): string {
 }
 
 export function configFolder(): string {
-  return pathUnderConfigDir("config");
+  return pathUnderConfigDir(CONFIG_SUBDIR);
 }
 
 export function reposDir(): string {
