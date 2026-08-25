@@ -1,11 +1,8 @@
-# core-auth
-
 The provider library every account-backed plugin builds on. It owns everything a
 provider needs that is not its own upstream wire format: the account store, the
 OAuth and in-browser login flows, the shared provider settings surface,
 rate-limit and quota bookkeeping, and the front-door seam that lets a provider
 stay `handleIr`-only.
-
 Published as `@intisy-ai/core-auth`, which every provider resolves as a dependency
 from its home's shared library store rather than inlining a copy: the library is left
 external in a provider's bundle and materialised once per home.
@@ -62,6 +59,3 @@ created until a value is actually set.
 Logs are tagged `[core-auth]` and written to
 `<configDir>/logs/YYYY-MM-DD/core-auth-HH-MM-SS.log`. Console mirroring follows
 the ecosystem-wide `logConsole` setting in `config/settings.json`.
-
-## License
-MIT
