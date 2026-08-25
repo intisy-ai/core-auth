@@ -11,6 +11,7 @@ import io.github.intisy.ai.shared.oauth.TokenRefresh;
 import io.github.intisy.ai.shared.oauth.TokenRefreshError;
 import io.github.intisy.ai.shared.proxy.ProxyScopes;
 import io.github.intisy.ai.shared.proxy.ProxyScoring;
+import io.github.intisy.ai.shared.rank.Leaderboard;
 import io.github.intisy.ai.shared.select.QuotaHealth;
 import io.github.intisy.ai.shared.select.RateLimitMath;
 import io.github.intisy.ai.shared.select.Strategy;
@@ -430,6 +431,71 @@ public final class CoreAuthJs {
             }
         }
         return cfg;
+    }
+
+    // ---- leaderboard ranking (Leaderboard) ----------------------------------------------------
+
+    /**
+     * {@code Leaderboard.normalize} -- the matching key a caller stores each fetched score under.
+     * Returns the bare key, not a JSON string.
+     */
+    @JSExport
+    public static String leaderboardNormalize(String name) {
+        return Leaderboard.normalize(name);
+    }
+
+    /** {@code Leaderboard.sourceShort} -- the compact provenance tag for a row hint. */
+    @JSExport
+    public static String leaderboardSourceShort(String source) {
+        return Leaderboard.sourceShort(source);
+    }
+
+    /**
+     * {@code Leaderboard.order} -- {@code argsJson} is
+     * {@code {"ids":[..],"names":[..],"scores":[{"norm":..,"score":..}]}}, where {@code names}
+     * holds each id's display name at the same position. Returns the ids as a JSON array,
+     * best-first.
+     */
+    @JSExport
+    public static String leaderboardOrder(String argsJson) {
+        JsonCodec json = new SimpleJsonCodec();
+        Map<String, Object> args = parseObject(argsJson);
+        return json.stringify(Leaderboard.order(
+                stringList(args.get("ids")), stringList(args.get("names")), scoreList(args.get("scores"))));
+    }
+
+    /**
+     * {@code Leaderboard.scoresFor} -- the same {@code argsJson} as {@link #leaderboardOrder}.
+     * Returns a JSON object of id to score, carrying only the ids that matched a live score.
+     */
+    @JSExport
+    public static String leaderboardScores(String argsJson) {
+        JsonCodec json = new SimpleJsonCodec();
+        Map<String, Object> args = parseObject(argsJson);
+        return json.stringify(Leaderboard.scoresFor(
+                stringList(args.get("ids")), stringList(args.get("names")), scoreList(args.get("scores"))));
+    }
+
+    private static List<String> stringList(Object raw) {
+        List<String> out = new ArrayList<>();
+        List<Object> parsed = JsonUtil.asList(raw);
+        if (parsed == null) return out;
+        for (Object entry : parsed) out.add(JsonUtil.asString(entry));
+        return out;
+    }
+
+    private static List<Leaderboard.Score> scoreList(Object raw) {
+        List<Leaderboard.Score> out = new ArrayList<>();
+        List<Object> parsed = JsonUtil.asList(raw);
+        if (parsed == null) return out;
+        for (Object entry : parsed) {
+            Map<String, Object> m = JsonUtil.asMap(entry);
+            if (m == null) continue;
+            Object score = m.get("score");
+            if (!(score instanceof Number)) continue;
+            out.add(new Leaderboard.Score(JsonUtil.asString(m.get("norm")), ((Number) score).doubleValue()));
+        }
+        return out;
     }
 
     // ---- proxy selection (ProxyScoring/ProxyScopes) -------------------------------------------

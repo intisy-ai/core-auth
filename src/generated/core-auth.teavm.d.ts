@@ -175,3 +175,22 @@ export function proxyIsIpLimited(proxyJson: string, now: number): boolean;
 
 /** `ProxyScoring.countAssignments` -- how many accounts currently hold `url`. */
 export function proxyCountAssignments(storeJson: string, url: string): number;
+
+/** `Leaderboard.normalize` -- the bare matching key a caller stores each fetched score under. */
+export function leaderboardNormalize(name: string): string;
+
+/** `Leaderboard.sourceShort` -- the compact provenance tag for a row hint, as a bare string. */
+export function leaderboardSourceShort(source: string): string;
+
+/**
+ * `Leaderboard.order` -- `argsJson` is `{"ids":[..],"names":[..],"scores":[{"norm":..,"score":..}]}`,
+ * where `names` holds each id's display name at the same position. Returns the ids as a JSON array,
+ * best-first.
+ */
+export function leaderboardOrder(argsJson: string): string;
+
+/**
+ * `Leaderboard.scoresFor` -- the same `argsJson` as `leaderboardOrder`. Returns a JSON object of id
+ * to score, carrying only the ids that matched a live score.
+ */
+export function leaderboardScores(argsJson: string): string;
