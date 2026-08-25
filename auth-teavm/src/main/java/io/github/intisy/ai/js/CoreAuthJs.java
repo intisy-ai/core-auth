@@ -1,13 +1,18 @@
 package io.github.intisy.ai.js;
 
+import io.github.intisy.ai.shared.chat.ChatError;
 import io.github.intisy.ai.shared.manager.AccountManager;
 import io.github.intisy.ai.shared.manager.Acquired;
 import io.github.intisy.ai.shared.manager.ManagerOptions;
 import io.github.intisy.ai.shared.model.Account;
 import io.github.intisy.ai.shared.oauth.OAuthConfig;
+import io.github.intisy.ai.shared.oauth.OAuthWire;
 import io.github.intisy.ai.shared.oauth.Refreshed;
 import io.github.intisy.ai.shared.oauth.TokenRefresh;
 import io.github.intisy.ai.shared.oauth.TokenRefreshError;
+import io.github.intisy.ai.shared.proxy.ProxyScopes;
+import io.github.intisy.ai.shared.proxy.ProxyScoring;
+import io.github.intisy.ai.shared.rank.Leaderboard;
 import io.github.intisy.ai.shared.select.QuotaHealth;
 import io.github.intisy.ai.shared.select.RateLimitMath;
 import io.github.intisy.ai.shared.select.Strategy;
@@ -199,6 +204,22 @@ public final class CoreAuthJs {
     public static boolean accessTokenExpired(String accountJson, double now) {
         JsonCodec json = new SimpleJsonCodec();
         return TokenRefresh.accessTokenExpired(accountFromJson(json, accountJson), (long) now);
+    }
+
+    /**
+     * {@code OAuthWire.calculateTokenExpiry} -- the shared expiry maths behind both OAuth grants.
+     *
+     * <p>A non-finite {@code expiresInSeconds} means the token endpoint reported none, so the
+     * default lives on the Java side rather than being restated by each caller. Both parameters are
+     * {@code double} because a raw JS number handed to a declared Java {@code long} is not
+     * remarshalled at this boundary (see {@link #reportRateLimit}).
+     */
+    @JSExport
+    public static double calculateTokenExpiry(double requestTimeMs, double expiresInSeconds) {
+        Double seconds = Double.isNaN(expiresInSeconds) || Double.isInfinite(expiresInSeconds)
+                ? null
+                : expiresInSeconds;
+        return OAuthWire.calculateTokenExpiry((long) requestTimeMs, seconds);
     }
 
     /**
@@ -411,6 +432,223 @@ public final class CoreAuthJs {
             }
         }
         return cfg;
+    }
+
+    // ---- terminal chat errors (ChatError) -----------------------------------------------------
+
+    /**
+     * {@code ChatError.build} -- the response to send for a TERMINAL provider failure, as
+     * {@code {status, body, headers}} JSON. The caller constructs the actual Response, which is a
+     * web-platform type with no Java equivalent.
+     */
+    @JSExport
+    public static String chatError(String message, String optsJson) {
+        JsonCodec json = new SimpleJsonCodec();
+        return json.stringify(ChatError.build(message, parseObject(optsJson), json));
+    }
+
+    // ---- OAuth callback + state wire (OAuthWire) ----------------------------------------------
+
+    /**
+     * {@code OAuthWire.parsePastedCallback} -- returns {@code {code, state}} as JSON, or the literal
+     * JSON {@code "null"} when nothing was pasted.
+     */
+    @JSExport
+    public static String parsePastedCallback(String input) {
+        JsonCodec json = new SimpleJsonCodec();
+        return json.stringify(OAuthWire.parsePastedCallback(input));
+    }
+
+    /**
+     * {@code OAuthWire.encodeState} -- packs an already-serialised state payload as unpadded
+     * URL-safe base64. The caller serialises, so the encoded bytes are exactly its own JSON.
+     */
+    @JSExport
+    public static String encodeState(String payloadJson) {
+        return OAuthWire.encodeState(payloadJson);
+    }
+
+    /**
+     * {@code OAuthWire.decodeState} -- resolves {@code {payload}} carrying the decoded JSON text, or
+     * {@code {error}} when the state carries no PKCE verifier.
+     *
+     * @implNote the refusal crosses as DATA rather than as a thrown Java exception, because only the
+     * caller can raise an error the surrounding JS will recognise, and the message decides whether a
+     * driver re-runs the login or reports a tampered callback.
+     */
+    @JSExport
+    public static String decodeState(String state) {
+        JsonCodec json = new SimpleJsonCodec();
+        Map<String, Object> out = new LinkedHashMap<>();
+        try {
+            out.put("payload", OAuthWire.decodeState(state, json));
+        } catch (RuntimeException e) {
+            out.put("error", e.getMessage() != null ? e.getMessage() : "state could not be decoded");
+        }
+        return json.stringify(out);
+    }
+
+    // ---- leaderboard ranking (Leaderboard) ----------------------------------------------------
+
+    /**
+     * {@code Leaderboard.normalize} -- the matching key a caller stores each fetched score under.
+     * Returns the bare key, not a JSON string.
+     */
+    @JSExport
+    public static String leaderboardNormalize(String name) {
+        return Leaderboard.normalize(name);
+    }
+
+    /** {@code Leaderboard.sourceShort} -- the compact provenance tag for a row hint. */
+    @JSExport
+    public static String leaderboardSourceShort(String source) {
+        return Leaderboard.sourceShort(source);
+    }
+
+    /**
+     * {@code Leaderboard.order} -- {@code argsJson} is
+     * {@code {"ids":[..],"names":[..],"scores":[{"norm":..,"score":..}]}}, where {@code names}
+     * holds each id's display name at the same position. Returns the ids as a JSON array,
+     * best-first.
+     */
+    @JSExport
+    public static String leaderboardOrder(String argsJson) {
+        JsonCodec json = new SimpleJsonCodec();
+        Map<String, Object> args = parseObject(argsJson);
+        return json.stringify(Leaderboard.order(
+                stringList(args.get("ids")), stringList(args.get("names")), scoreList(args.get("scores"))));
+    }
+
+    /**
+     * {@code Leaderboard.scoresFor} -- the same {@code argsJson} as {@link #leaderboardOrder}.
+     * Returns a JSON object of id to score, carrying only the ids that matched a live score.
+     */
+    @JSExport
+    public static String leaderboardScores(String argsJson) {
+        JsonCodec json = new SimpleJsonCodec();
+        Map<String, Object> args = parseObject(argsJson);
+        return json.stringify(Leaderboard.scoresFor(
+                stringList(args.get("ids")), stringList(args.get("names")), scoreList(args.get("scores"))));
+    }
+
+    private static List<String> stringList(Object raw) {
+        List<String> out = new ArrayList<>();
+        List<Object> parsed = JsonUtil.asList(raw);
+        if (parsed == null) return out;
+        for (Object entry : parsed) out.add(JsonUtil.asString(entry));
+        return out;
+    }
+
+    private static List<Leaderboard.Score> scoreList(Object raw) {
+        List<Leaderboard.Score> out = new ArrayList<>();
+        List<Object> parsed = JsonUtil.asList(raw);
+        if (parsed == null) return out;
+        for (Object entry : parsed) {
+            Map<String, Object> m = JsonUtil.asMap(entry);
+            if (m == null) continue;
+            Object score = m.get("score");
+            if (!(score instanceof Number)) continue;
+            out.add(new Leaderboard.Score(JsonUtil.asString(m.get("norm")), ((Number) score).doubleValue()));
+        }
+        return out;
+    }
+
+    // ---- proxy selection (ProxyScoring/ProxyScopes) -------------------------------------------
+
+    /**
+     * The caps the scoring engine enforces, as {@code {maxAccountsPerProxy, ipLimitCooldownMs}}, so
+     * a caller states them once from here instead of restating the numbers on its own side.
+     */
+    @JSExport
+    public static String proxyLimits() {
+        JsonCodec json = new SimpleJsonCodec();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("maxAccountsPerProxy", (long) ProxyScoring.MAX_ACCOUNTS_PER_PROXY);
+        out.put("ipLimitCooldownMs", ProxyScoring.IP_LIMIT_COOLDOWN_MS);
+        return json.stringify(out);
+    }
+
+    /** {@code ProxyScopes.scopeKey} -- returns the bare key, not a JSON string. */
+    @JSExport
+    public static String proxyScopeKey(String scopeJson) {
+        return ProxyScopes.scopeKey(parseObject(scopeJson));
+    }
+
+    /** {@code ProxyScopes.parseScopeKey} -- returns the scope as a JSON object. */
+    @JSExport
+    public static String proxyParseScopeKey(String key) {
+        JsonCodec json = new SimpleJsonCodec();
+        return json.stringify(ProxyScopes.parseScopeKey(key));
+    }
+
+    /** {@code ProxyScopes.effectiveMode} -- returns the bare mode, not a JSON string. */
+    @JSExport
+    public static String proxyEffectiveMode(String storeJson, String key) {
+        return ProxyScopes.effectiveMode(parseObject(storeJson), key);
+    }
+
+    /** {@code ProxyScopes.resolveChain} -- returns a JSON array of scope keys. */
+    @JSExport
+    public static String proxyResolveChain(String storeJson, String accountId, String providerId) {
+        JsonCodec json = new SimpleJsonCodec();
+        return json.stringify(ProxyScopes.resolveChain(parseObject(storeJson), accountId, providerId));
+    }
+
+    /**
+     * {@code ProxyScopes.proxiesInScope} -- a JSON array of INDICES into {@code store.proxies}, so
+     * the caller maps them back onto its own proxy objects and identity survives the crossing.
+     */
+    @JSExport
+    public static String proxyProxiesInScope(String storeJson, String key) {
+        JsonCodec json = new SimpleJsonCodec();
+        return json.stringify(ProxyScopes.proxiesInScope(parseObject(storeJson), key));
+    }
+
+    /**
+     * {@code ProxyScopes.candidatesForScope} -- a JSON array of indices into {@code store.proxies},
+     * best-first. {@code now} is a {@code double}, not {@code long}: see {@link #reportRateLimit}.
+     */
+    @JSExport
+    public static String proxyCandidatesForScope(String storeJson, String key, double now) {
+        JsonCodec json = new SimpleJsonCodec();
+        return json.stringify(ProxyScopes.candidatesForScope(parseObject(storeJson), key, (long) now));
+    }
+
+    /** {@code ProxyScopes.stickyUsable} -- whether a proxy the account already holds may be re-used. */
+    @JSExport
+    public static boolean proxyStickyUsable(String storeJson, String key, String url, double now) {
+        return ProxyScopes.stickyUsable(parseObject(storeJson), key, url, (long) now);
+    }
+
+    /** {@code ProxyScoring.scoreOf} -- lower is better. */
+    @JSExport
+    public static double proxyScoreOf(String storeJson, String proxyJson) {
+        return ProxyScoring.scoreOf(parseObject(storeJson), parseObject(proxyJson));
+    }
+
+    /** {@code ProxyScoring.qualityLabel} -- returns the bare label, not a JSON string. */
+    @JSExport
+    public static String proxyQualityLabel(String proxyJson) {
+        return ProxyScoring.qualityLabel(parseObject(proxyJson));
+    }
+
+    /** {@code ProxyScoring.isIpLimited} -- whether the proxy's exit IP is still cooling down. */
+    @JSExport
+    public static boolean proxyIsIpLimited(String proxyJson, double now) {
+        return ProxyScoring.isIpLimited(parseObject(proxyJson), (long) now);
+    }
+
+    /** {@code ProxyScoring.countAssignments} -- how many accounts currently hold {@code url}. */
+    @JSExport
+    public static int proxyCountAssignments(String storeJson, String url) {
+        return ProxyScoring.countAssignments(parseObject(storeJson), url);
+    }
+
+    private static Map<String, Object> parseObject(String objectJson) {
+        Map<String, Object> parsed = objectJson == null
+                ? null
+                : JsonUtil.asMap(new SimpleJsonCodec().parse(objectJson));
+        return parsed == null ? new LinkedHashMap<String, Object>() : parsed;
     }
 
     private static int toInt(Object o) {

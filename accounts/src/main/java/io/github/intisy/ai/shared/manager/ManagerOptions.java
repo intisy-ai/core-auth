@@ -9,7 +9,7 @@ import java.util.function.BiPredicate;
 /**
  * Java analog of the {@code opts} object passed to the JS {@code AccountManager} constructor
  * (see {@code libs/core-auth/src/manager.ts:18-28}). The SPIs it needs (HttpClient/Clock/Random/
- * JsonCodec) are NOT fields here — they're injected straight into the {@link AccountManager}
+ * JsonCodec) are NOT fields here - they're injected straight into the {@link AccountManager}
  * constructor, since they're wiring concerns of the host app rather than manager policy.
  */
 public class ManagerOptions {

@@ -8,11 +8,14 @@
 // refetch on every model refresh. An optional ARTIFICIAL_ANALYSIS_API_KEY (or
 // cfg.leaderboard.apiKey) is used first when present (direct AA, finest coverage).
 // On a cold failure with no cache we return the catalog order unchanged; we never
-// fabricate a ranking.
+// fabricate a ranking. The ranking itself is single-sourced in Java (Leaderboard,
+// accounts/rank); what stays here is fetching the scores, caching them and choosing
+// between the two sources.
 
 import { readConfig } from "./config.js";
 import { getConfigDir } from "./env.js";
 import { log } from "./log.js";
+import { getCoreAuth } from "./core-auth-loader.js";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 
@@ -29,18 +32,6 @@ function apiKey(): string {
   if (fromEnv) return fromEnv;
   const cfg = readConfig().leaderboard || {};
   return String(cfg.apiKey || "").trim();
-}
-
-// normalize a model id/name for fuzzy matching: lowercase, drop tier/variant
-// suffixes and any non-alphanumerics so "claude-opus-4-6-thinking" ~ "Claude 4.6 Opus".
-function normalize(name: string): string {
-  return String(name || "")
-    .toLowerCase()
-    // strip effort/variant tokens regardless of separator so "Gemini Flash (High)",
-    // "gemini-flash-high" and "gemini flash low" all collapse to the SAME base key,
-    // so variants of one model share a score and group together.
-    .replace(/\b(minimal|extra[\s_-]?low|low|medium|high|thinking|agent|preview|customtools|reasoning)\b/g, "")
-    .replace(/[^a-z0-9]/g, "");
 }
 
 type Score = { norm: string; score: number };
@@ -65,8 +56,8 @@ async function fetchOpenRouter(): Promise<Score[]> {
     const score = r && r.benchmarks && r.benchmarks.artificial_analysis
       && r.benchmarks.artificial_analysis.intelligence_index;
     if (typeof score !== "number") continue;
-    if (r.name) out.push({ norm: normalize(r.name), score });
-    if (r.id) out.push({ norm: normalize(r.id), score });
+    if (r.name) out.push({ norm: getCoreAuth().leaderboardNormalize(r.name), score });
+    if (r.id) out.push({ norm: getCoreAuth().leaderboardNormalize(r.id), score });
   }
   return out;
 }
@@ -86,7 +77,7 @@ async function fetchAA(key: string): Promise<Score[]> {
       r.intelligenceIndex ?? r.intelligence_index ?? r.intelligence ??
       (r.evaluations && (r.evaluations.artificial_analysis_intelligence_index ?? r.evaluations.intelligence_index)) ??
       r.quality ?? r.elo ?? r.score;
-    if (name && typeof score === "number") out.push({ norm: normalize(String(name)), score });
+    if (name && typeof score === "number") out.push({ norm: getCoreAuth().leaderboardNormalize(String(name)), score });
   }
   return out;
 }
@@ -132,59 +123,10 @@ export async function leaderboardSource(): Promise<string> {
 
 // Compact tag for row hints ("score 50 · AA"); full name goes in a subtitle.
 export function leaderboardSourceShort(source: string): string {
-  return source ? "AA" : "";
+  return getCoreAuth().leaderboardSourceShort(source);
 }
 
 // ---- public order -----------------------------------------------------------
-
-// effort/variant weight (higher ranks higher), read from a model's DISPLAY NAME which
-// reliably carries "(Thinking)"/"(High)"/etc; the catalog id is an opaque API rawId.
-function effortRank(text: string): number {
-  const s = String(text).toLowerCase();
-  if (/(^|[^a-z])thinking([^a-z]|$)/.test(s)) return 6;
-  if (/extra[\s_-]?low/.test(s)) return 1;
-  if (/(^|[^a-z])high([^a-z]|$)/.test(s)) return 5;
-  if (/(^|[^a-z])medium([^a-z]|$)/.test(s)) return 4;
-  if (/(^|[^a-z])low([^a-z]|$)/.test(s)) return 2;
-  if (/(^|[^a-z])minimal([^a-z]|$)/.test(s)) return 1;
-  return 3;   // normal / no effort marker
-}
-
-// base matching key from a display name: drop ALL parenthetical tags (the effort
-// "(High)" and the provider label "(Antigravity)"), then normalize. Variants of one
-// model collapse to the same key (so they group + share a score).
-function baseKeyFromName(text: string): string {
-  return normalize(String(text).replace(/\([^)]*\)/g, " "));
-}
-
-/**
- * Returns `candidateIds` sorted best-first by live quality score (OpenRouter's
- * intelligence_index, keyless; or AA when a key is set). `nameOf` maps a catalog id to
- * its display name; matching + effort are derived from the NAME (the id is an opaque
- * API rawId that doesn't carry the model name or effort). Variants of one model group
- * together at the base score, ordered by effort among themselves; effort never decides
- * order between different models. With no live data (offline, no cache) the catalog
- * order is preserved (variants still effort-ordered within a base); never fabricated.
- */
-// version-tolerant score lookup for a normalized base key: exact/substring base-key
-// match wins; else a digit-stripped FAMILY match so "Claude Opus 4.6" still ranks by
-// the live opus family even if OpenRouter only lists Opus 4.8. -1 = no live score.
-function scoreForKey(key: string, scores: Score[]): number {
-  if (!scores.length) return -1;
-  const stripVer = (n: string): string => n.replace(/[0-9]+/g, "");
-  let best = -1;
-  for (const s of scores) {
-    if (s.norm === key || s.norm.includes(key) || key.includes(s.norm)) best = Math.max(best, s.score);
-  }
-  if (best >= 0) return best;
-  const fk = stripVer(key);
-  if (fk.length < 4) return -1;
-  for (const s of scores) {
-    const fs = stripVer(s.norm);
-    if (fs && (fs === fk || fs.includes(fk) || fk.includes(fs))) best = Math.max(best, s.score);
-  }
-  return best;
-}
 
 // Per-model live quality scores { id: number } for the given catalog ids (only ids
 // with a live score are included). Used to DISPLAY the score next to models; the
@@ -194,36 +136,26 @@ export async function computeLeaderboardScores(
   candidateIds: string[],
   nameOf: (id: string) => string = (id) => id,
 ): Promise<Record<string, number>> {
-  const { scores } = await getScores();
-  const out: Record<string, number> = {};
-  for (const id of candidateIds) {
-    const s = scoreForKey(baseKeyFromName(nameOf(id)), scores);
-    if (s >= 0) out[id] = s;
-  }
-  return out;
+  return JSON.parse(getCoreAuth().leaderboardScores(await rankingArgs(candidateIds, nameOf)));
 }
 
+/**
+ * Returns `candidateIds` sorted best-first by live quality score. `nameOf` maps a catalog id to its
+ * display name; matching and effort are derived from the NAME, since the id is an opaque vendor
+ * rawId carrying neither. Variants of one model group together at the base score and are ordered by
+ * effort among themselves; effort never decides order between different models. With no live data
+ * the catalog order is preserved, and a ranking is never fabricated.
+ */
 export async function computeLeaderboardOrder(
   candidateIds: string[],
   nameOf: (id: string) => string = (id) => id,
 ): Promise<string[]> {
-  const { scores } = await getScores();
-  const scoreFor = (key: string): number => scoreForKey(key, scores);
+  return JSON.parse(getCoreAuth().leaderboardOrder(await rankingArgs(candidateIds, nameOf)));
+}
 
-  const scored = candidateIds.map((id, i) => {
-    const name = nameOf(id);
-    const base = baseKeyFromName(name);
-    return { id, i, base, effort: effortRank(name), score: scoreFor(base) };
-  });
-  // Effort ONLY decides order between variants of the SAME base model, never between
-  // different models (those keep score order, then catalog order).
-  const tie = (a, b) => (a.base === b.base ? (b.effort - a.effort) : 0) || (a.i - b.i);
-  return scored
-    .sort((a, b) => {
-      if (a.score >= 0 && b.score >= 0) return (b.score - a.score) || tie(a, b);
-      if (a.score >= 0) return -1;       // scored before unscored
-      if (b.score >= 0) return 1;
-      return tie(a, b);                  // both unscored: same-base effort, else catalog
-    })
-    .map((s) => s.id);
+// The names are resolved here rather than behind the ranking engine because nameOf is a caller
+// callback: handing the engine a resolved array keeps the crossing to one call per ranking.
+async function rankingArgs(candidateIds: string[], nameOf: (id: string) => string): Promise<string> {
+  const { scores } = await getScores();
+  return JSON.stringify({ ids: candidateIds, names: candidateIds.map(nameOf), scores });
 }

@@ -1,5 +1,5 @@
 // Hand-authored ambient types for the TeaVM-generated ES module staged into this same directory
-// by `npm run build:teavm` (teavm-build.mjs), from java/auth-teavm's CoreAuthJs @JSExport surface.
+// by `npm run build:teavm` (teavm-build.mjs), from auth-teavm's CoreAuthJs @JSExport surface.
 // The generated core-auth.teavm.js itself is gitignored (build output); this .d.ts is committed
 // source so tsc can type-check consumers of `getCoreAuth()` without needing the build to have run
 // first. Export names verified against the actual generated file's `export { ... }` statement.
@@ -105,6 +105,12 @@ export function accountRemove(providerId: string, id: string, jsStore: CoreAuthJ
 export function accessTokenExpired(accountJson: string, now: number): boolean;
 
 /**
+ * `OAuthWire.calculateTokenExpiry` -- the shared expiry maths behind both OAuth grants. Pass `NaN`
+ * for `expiresInSeconds` when the token endpoint reported none; the default lives on the Java side.
+ */
+export function calculateTokenExpiry(requestTimeMs: number, expiresInSeconds: number): number;
+
+/**
  * `RateLimitMath.calculateBackoffMs` over the `jitter === false` exact-value path. `argsJson` is
  * `{"attempt":number,"baseMs":number,"maxMs":number,"jitter":boolean}`; returns the bare JSON number.
  */
@@ -130,3 +136,83 @@ export function refreshToken(
   oauthConfigJson: string,
   httpSend: CoreAuthJsHttpSend,
 ): Promise<string>;
+
+/** The caps the scoring engine enforces, as `{maxAccountsPerProxy, ipLimitCooldownMs}` JSON. */
+export function proxyLimits(): string;
+
+/** `ProxyScopes.scopeKey` -- the bare key for a `{type, id}` scope, not a JSON string. */
+export function proxyScopeKey(scopeJson: string): string;
+
+/** `ProxyScopes.parseScopeKey` -- the scope as a JSON object; the global scope carries no `id`. */
+export function proxyParseScopeKey(key: string): string;
+
+/** `ProxyScopes.effectiveMode` -- the bare mode for a scope key, falling back to the store default. */
+export function proxyEffectiveMode(storeJson: string, key: string): string;
+
+/** `ProxyScopes.resolveChain` -- a JSON array of scope keys, most specific first, disabled dropped. */
+export function proxyResolveChain(storeJson: string, accountId: string, providerId: string): string;
+
+/**
+ * `ProxyScopes.proxiesInScope` -- a JSON array of INDICES into `store.proxies`, so the caller maps
+ * them back onto its own proxy objects and identity survives the crossing.
+ */
+export function proxyProxiesInScope(storeJson: string, key: string): string;
+
+/** `ProxyScopes.candidatesForScope` -- a JSON array of indices into `store.proxies`, best-first. */
+export function proxyCandidatesForScope(storeJson: string, key: string, now: number): string;
+
+/** `ProxyScopes.stickyUsable` -- whether a proxy the account already holds may be re-used. */
+export function proxyStickyUsable(storeJson: string, key: string, url: string, now: number): boolean;
+
+/** `ProxyScoring.scoreOf` -- lower is better. */
+export function proxyScoreOf(storeJson: string, proxyJson: string): number;
+
+/** `ProxyScoring.qualityLabel` -- `"good"`, `"fair"` or `"poor"`, as a bare string. */
+export function proxyQualityLabel(proxyJson: string): string;
+
+/** `ProxyScoring.isIpLimited` -- whether the proxy's exit IP is still inside its cooldown. */
+export function proxyIsIpLimited(proxyJson: string, now: number): boolean;
+
+/** `ProxyScoring.countAssignments` -- how many accounts currently hold `url`. */
+export function proxyCountAssignments(storeJson: string, url: string): number;
+
+/** `Leaderboard.normalize` -- the bare matching key a caller stores each fetched score under. */
+export function leaderboardNormalize(name: string): string;
+
+/** `Leaderboard.sourceShort` -- the compact provenance tag for a row hint, as a bare string. */
+export function leaderboardSourceShort(source: string): string;
+
+/**
+ * `Leaderboard.order` -- `argsJson` is `{"ids":[..],"names":[..],"scores":[{"norm":..,"score":..}]}`,
+ * where `names` holds each id's display name at the same position. Returns the ids as a JSON array,
+ * best-first.
+ */
+export function leaderboardOrder(argsJson: string): string;
+
+/**
+ * `Leaderboard.scoresFor` -- the same `argsJson` as `leaderboardOrder`. Returns a JSON object of id
+ * to score, carrying only the ids that matched a live score.
+ */
+export function leaderboardScores(argsJson: string): string;
+
+/**
+ * `OAuthWire.parsePastedCallback` -- `{code, state}` as JSON for a full redirect URL, a bare
+ * `code#state` pair or a code alone; the literal JSON `null` when nothing was pasted.
+ */
+export function parsePastedCallback(input: string): string;
+
+/** `OAuthWire.encodeState` -- packs an already-serialised state payload as unpadded URL-safe base64. */
+export function encodeState(payloadJson: string): string;
+
+/**
+ * `OAuthWire.decodeState` -- `{payload}` carrying the decoded JSON text, or `{error}` when the state
+ * carries no PKCE verifier. The refusal crosses as data so the caller raises an error its own
+ * surrounding JS recognises.
+ */
+export function decodeState(state: string): string;
+
+/**
+ * `ChatError.build` -- the response to send for a TERMINAL provider failure, as
+ * `{status, body, headers}` JSON. The caller constructs the Response, which has no Java equivalent.
+ */
+export function chatError(message: string, optsJson: string): string;

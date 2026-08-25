@@ -16,26 +16,23 @@ export function accessTokenExpired(auth) {
   return getCoreAuth().accessTokenExpired(JSON.stringify(auth || {}), Date.now());
 }
 
+// Delegates to CoreAuthJs.calculateTokenExpiry (OAuthWire, java/accounts), which both OAuth grants
+// use. A non-number crosses as NaN, which the engine reads as "the endpoint reported no expires_in".
 export function calculateTokenExpiry(requestTimeMs, expiresInSeconds) {
-  const seconds = typeof expiresInSeconds === "number" ? expiresInSeconds : 3600;
-  if (isNaN(seconds) || seconds <= 0) return requestTimeMs;
-  return requestTimeMs + seconds * 1000;
+  const seconds = typeof expiresInSeconds === "number" ? expiresInSeconds : NaN;
+  return getCoreAuth().calculateTokenExpiry(requestTimeMs, seconds);
 }
 
 // Packs an OAuth `state` param as URL-safe base64 so it survives a redirect roundtrip.
 export function encodeState(payload) {
-  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  return getCoreAuth().encodeState(JSON.stringify(payload));
 }
 
 // Unpacks a `state` param produced by encodeState and asserts the PKCE verifier is present.
 export function decodeState(state) {
-  const normalized = String(state).replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
-  const parsed = JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
-  if (typeof parsed.verifier !== "string") {
-    throw new Error("Missing PKCE verifier in state");
-  }
-  return parsed;
+  const result = JSON.parse(getCoreAuth().decodeState(String(state)));
+  if (result.error) throw new Error(result.error);
+  return JSON.parse(result.payload);
 }
 
 export class TokenRefreshError extends Error {
@@ -45,6 +42,7 @@ export class TokenRefreshError extends Error {
     this.code = options.code;
     this.description = options.description;
     this.status = options.status;
+    // Always undefined: the layer-1 HttpResponse the Java refresh reads carries no status text.
     this.statusText = options.statusText;
     this.revoked = options.code === "invalid_grant";   // refresh token revoked -> reauth
   }
