@@ -15,11 +15,12 @@ import java.util.function.Consumer;
 import io.github.intisy.ai.seam.JsonUtil;
 
 /**
- * Generic per-provider account store, keyed by provider id. Java analog of
- * {@code libs/core-auth/src/accounts.ts}, rewired onto the {@link Store} + {@link JsonCodec}
- * SPIs (no direct nio/gson) so this class stays transpilable: JSON is built/read as plain
- * {@code Map}/{@code List} trees via {@link JsonUtil}, and atomicity of read-modify-write is
- * the {@code Store} implementation's concern, not this class's.
+ * Generic per-provider account store, keyed by provider id, and the only implementation of it:
+ * the TypeScript library reaches this class through the TeaVM bundle. Built on the {@link Store} +
+ * {@link JsonCodec} SPIs (no direct nio/gson) so it stays transpilable: JSON is built/read as
+ * plain {@code Map}/{@code List} trees via {@link JsonUtil}, and atomicity of read-modify-write is
+ * the caller's concern, not this class's -- the file-backed store holds a cross-process lock
+ * around a whole call rather than around each op.
  *
  * <p>On-disk shape (must match the JS store exactly): {@code {"version":1,"providers":
  * {"<id>":{"accounts":[...],"activeIndex":0,"activeIndexByLane":{}}}}}, under the key
@@ -42,7 +43,7 @@ public class AccountStore {
                 Map<String, Object> doc = JsonUtil.asMap(json.parse(raw));
                 if (doc != null) return doc;
             } catch (Exception ignored) {
-                // swallow-all, mirrors the JS readStore's try/catch degrading to an empty store
+                // swallow-all: a corrupted store degrades to an empty one rather than throwing
             }
         }
         Map<String, Object> doc = new LinkedHashMap<>();

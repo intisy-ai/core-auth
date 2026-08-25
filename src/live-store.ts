@@ -65,7 +65,7 @@ export function createLiveStore(configDir: string, dirOverride?: string, opts?: 
       withLockFor(key, () => {
         if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
         const target = filePath(key);
-        // atomic write: same temp-then-rename pattern as core-auth's own writeStore.
+        // atomic write: a reader can only ever observe a fully-written file.
         const tmp = target + "." + randomBytes(6).toString("hex") + ".tmp";
         writeFileSync(tmp, value, { encoding: "utf8", mode: 0o600 });
         renameSync(tmp, target);

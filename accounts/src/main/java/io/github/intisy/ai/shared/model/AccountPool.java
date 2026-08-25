@@ -6,9 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Java analog of the JS {@code AccountPool} (see {@code libs/core-auth/src/types.ts:45-49}).
- * Field order matches the JS object literal construction order in accounts.ts's
- * {@code saveAccounts}/{@code updateAccounts} for JSON byte-compatibility.
+ * The JS {@code AccountPool} (see {@code libs/core-auth/src/types.ts}) in Java. Field order is
+ * the serialized key order, which a JS reader of the same file depends on.
  */
 public class AccountPool {
     public List<Account> accounts;
