@@ -13,6 +13,9 @@ export interface ProxiedFetchOpts {
   accountId?: string;
   providerId?: string;
   proxyManager?: ProxyManagerLike;
+  // An already-chosen proxy, used instead of asking the manager for one. A caller that was
+  // handed a proxy URL rather than the account it belongs to has nothing to select with.
+  proxy?: string;
   log?: (message: string) => void;
   // Test seam only; production callers never set this (defaults to the global fetch).
   fetchImpl?: typeof fetch;
@@ -39,7 +42,7 @@ export async function proxiedFetch(
   const log = opts.log || (() => {});
   const doFetch = opts.fetchImpl || fetch;
 
-  const proxyUrl = opts.proxyManager ? opts.proxyManager.selectForAccount(opts.accountId, opts.providerId) : null;
+  const proxyUrl = opts.proxy || (opts.proxyManager ? opts.proxyManager.selectForAccount(opts.accountId, opts.providerId) : null);
   const proxiedInit = proxyUrl ? { ...init, proxy: proxyUrl } : init; // Bun fetch honors .proxy
 
   let response: Response;
@@ -50,7 +53,7 @@ export async function proxiedFetch(
     proxyOk = !!proxyUrl;
   } catch (error) {
     if (proxyUrl) {
-      opts.proxyManager.reportResult(proxyUrl, false);
+      opts.proxyManager?.reportResult(proxyUrl, false);
       // proxy unreachable -> retry directly (a dead proxy gives no isolation anyway)
       log("fetch via proxy " + proxyUrl + " failed: " + error + ", retrying directly");
       const directInit = { ...init };
@@ -66,7 +69,7 @@ export async function proxiedFetch(
       return { transportFailed: true, proxyUsed: false };
     }
   }
-  if (proxyOk) opts.proxyManager.reportResult(proxyUrl, true, Date.now() - started);
+  if (proxyOk) opts.proxyManager?.reportResult(proxyUrl, true, Date.now() - started);
 
   return { response, proxyUsed: !!proxyUrl, transportFailed: false };
 }

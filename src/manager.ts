@@ -9,11 +9,11 @@ import { createLiveStore } from "./live-store.js";
 import { getConfigDir } from "./env.js";
 import { emitActivity } from "./activity.js";
 
-// token refresh rides the account's sticky proxy so Google sees the same IP for
-// refresh as for requests; null when proxying is off -> direct refresh as before
-function oauthWithProxy(oauth, id, providerId) {
-  const proxy = proxyManager.selectForAccount(id, providerId);
-  return proxy ? { ...oauth, proxy } : oauth;
+// A token refresh rides the account's sticky proxy so upstream sees the same IP for a refresh as
+// for the requests it authorizes; the transport picks and reports it, and refreshes directly when
+// proxying is off.
+function transportFor(id, providerId) {
+  return { proxyManager, accountId: id, providerId };
 }
 
 export class AccountManager {
@@ -64,7 +64,7 @@ export class AccountManager {
     if (!accessTokenExpired(account)) return account.access;
     if (!this.oauth || !account.refresh) return account.access;
     try {
-      const refreshed = await refreshAccessToken(account.refresh, oauthWithProxy(this.oauth, id, this.providerId));
+      const refreshed = await refreshAccessToken(account.refresh, this.oauth, transportFor(id, this.providerId));
       this.mutate(id, (a) => {
         a.access = refreshed.access;
         a.expires = refreshed.expires;
@@ -133,7 +133,7 @@ export class AccountManager {
   async refresh(id) {
     const account = this.load().accounts.find((candidate) => candidate.id === id);
     if (!account || !this.oauth || !account.refresh) return false;
-    const refreshed = await refreshAccessToken(account.refresh, oauthWithProxy(this.oauth, id, this.providerId));
+    const refreshed = await refreshAccessToken(account.refresh, this.oauth, transportFor(id, this.providerId));
     this.mutate(id, (a) => {
       a.access = refreshed.access;
       a.expires = refreshed.expires;

@@ -258,10 +258,14 @@ public final class CoreAuthJs {
      * split.
      *
      * <p>{@code oauthConfigJson} supplies {@code {tokenUrl, clientId, clientSecret?,
-     * extraParams?}}. Resolves to {@code {access, expires, refresh}} on success, or {@code
-     * {revoked:true}} when the token endpoint reported {@code error=invalid_grant} (the refresh
-     * token itself was revoked -- not a transient failure). Any OTHER failure (network error,
-     * non-2xx/non-invalid_grant, unparseable body) rejects the promise.
+     * extraParams?}}. Resolves to {@code {access, expires, refresh}} on success, or to
+     * {@code {failed:{message, revoked, status?, code?, description?}}} for an outcome the token
+     * endpoint reported. Only a failure of the BRIDGE itself (the JS transport rejecting, an
+     * unreadable config) rejects the promise.
+     *
+     * @implNote a reported failure resolves as data rather than rejecting because a JS rejection
+     * can carry only a string: {@code revoked} decides whether the caller re-auths or retries, so
+     * it has to survive the crossing as a field instead of being parsed back out of a message.
      */
     @JSExport
     public static JSPromise<JSString> refreshToken(String refreshToken, String oauthConfigJson,
@@ -277,21 +281,31 @@ public final class CoreAuthJs {
                 try {
                     Refreshed refreshed = TokenRefresh.refresh(refreshToken, cfg, httpClient, json, now);
                     if (refreshed == null) {
-                        out.put("revoked", true); // no refresh token was supplied to refresh
+                        out.put("failed", failure("no refresh token to refresh", true, null, null, null));
                     } else {
                         out.put("access", refreshed.access);
                         out.put("expires", refreshed.expires);
                         out.put("refresh", refreshed.refresh);
                     }
                 } catch (TokenRefreshError e) {
-                    if (!e.revoked) throw e; // non-revocation failure -> reject below
-                    out.put("revoked", true);
+                    out.put("failed", failure(e.getMessage(), e.revoked, e.status, e.code, e.description));
                 }
                 resolve.accept(JSString.valueOf(json.stringify(out)));
             } catch (Throwable e) {
                 reject.accept(JSString.valueOf("refreshToken failed: " + e));
             }
         }).start());
+    }
+
+    private static Map<String, Object> failure(String message, boolean revoked, Integer status,
+                                               String code, String description) {
+        Map<String, Object> failed = new LinkedHashMap<>();
+        failed.put("message", message);
+        failed.put("revoked", revoked);
+        if (status != null) failed.put("status", status);
+        if (code != null) failed.put("code", code);
+        if (description != null) failed.put("description", description);
+        return failed;
     }
 
     private static Account accountFromJson(JsonCodec json, String accountJson) {

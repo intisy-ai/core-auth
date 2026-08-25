@@ -102,8 +102,9 @@ export function quotaHasCapacity(poolsJson: string): boolean;
 /**
  * `TokenRefresh.refresh` -- the network OAuth refresh call. `oauthConfigJson` supplies
  * `{tokenUrl, clientId, clientSecret?, extraParams?}`. Resolves to `{access, expires, refresh}` on
- * success, or `{revoked:true}` when the token endpoint reported `error=invalid_grant`. Any other
- * failure rejects the promise. Does not persist the result to any store.
+ * success, or to `{failed:{message, revoked, status?, code?, description?}}` for an outcome the
+ * token endpoint reported; only a failure of the bridge itself rejects. Does not persist the
+ * result to any store.
  */
 export function refreshToken(
   refreshToken: string,
