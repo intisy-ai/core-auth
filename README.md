@@ -1,14 +1,18 @@
 # core-auth
 
+[![npm version](https://img.shields.io/npm/v/core-auth)](https://www.npmjs.com/package/core-auth)
+[![npm downloads](https://img.shields.io/npm/dm/core-auth)](https://www.npmjs.com/package/core-auth)
+
+Provider account, OAuth, and quota library for the intisy-ai AI-proxy ecosystem.
+
 The provider library every account-backed plugin builds on. It owns everything a
 provider needs that is not its own upstream wire format: the account store, the
 OAuth and in-browser login flows, the shared provider settings surface,
 rate-limit and quota bookkeeping, and the front-door seam that lets a provider
 stay `handleIr`-only.
-
-Compiled from the submodule and bundled into each provider, and published as
-`@intisy-ai/core-auth` so a provider installed from npm resolves it as a
-dependency instead of inlining a copy.
+Published as `@intisy-ai/core-auth`, which every provider resolves as a dependency
+from its home's shared library store rather than inlining a copy: the library is left
+external in a provider's bundle and materialised once per home.
 
 ## Under-the-Hood Architecture
 
@@ -47,14 +51,6 @@ app-agnostic, so it never names an app or an app-proxy. A provider implements
 
 ## Installation
 
-As a submodule, for a provider built in this ecosystem:
-
-```bash
-git submodule add https://github.com/intisy-ai/core-auth core-auth
-```
-
-Or as an npm dependency, for a provider that carries no submodules:
-
 ```bash
 npm install @intisy-ai/core-auth
 ```
@@ -72,4 +68,5 @@ Logs are tagged `[core-auth]` and written to
 the ecosystem-wide `logConsole` setting in `config/settings.json`.
 
 ## License
-MIT
+
+[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
