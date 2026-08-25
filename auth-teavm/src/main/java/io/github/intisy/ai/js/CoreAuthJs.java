@@ -433,6 +433,47 @@ public final class CoreAuthJs {
         return cfg;
     }
 
+    // ---- OAuth callback + state wire (OAuthWire) ----------------------------------------------
+
+    /**
+     * {@code OAuthWire.parsePastedCallback} -- returns {@code {code, state}} as JSON, or the literal
+     * JSON {@code "null"} when nothing was pasted.
+     */
+    @JSExport
+    public static String parsePastedCallback(String input) {
+        JsonCodec json = new SimpleJsonCodec();
+        return json.stringify(OAuthWire.parsePastedCallback(input));
+    }
+
+    /**
+     * {@code OAuthWire.encodeState} -- packs an already-serialised state payload as unpadded
+     * URL-safe base64. The caller serialises, so the encoded bytes are exactly its own JSON.
+     */
+    @JSExport
+    public static String encodeState(String payloadJson) {
+        return OAuthWire.encodeState(payloadJson);
+    }
+
+    /**
+     * {@code OAuthWire.decodeState} -- resolves {@code {payload}} carrying the decoded JSON text, or
+     * {@code {error}} when the state carries no PKCE verifier.
+     *
+     * @implNote the refusal crosses as DATA rather than as a thrown Java exception, because only the
+     * caller can raise an error the surrounding JS will recognise, and the message decides whether a
+     * driver re-runs the login or reports a tampered callback.
+     */
+    @JSExport
+    public static String decodeState(String state) {
+        JsonCodec json = new SimpleJsonCodec();
+        Map<String, Object> out = new LinkedHashMap<>();
+        try {
+            out.put("payload", OAuthWire.decodeState(state, json));
+        } catch (RuntimeException e) {
+            out.put("error", e.getMessage() != null ? e.getMessage() : "state could not be decoded");
+        }
+        return json.stringify(out);
+    }
+
     // ---- leaderboard ranking (Leaderboard) ----------------------------------------------------
 
     /**

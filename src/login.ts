@@ -5,22 +5,12 @@
 // object AccountManager expects as its `oauth` option.
 
 import { createInterface } from "node:readline";
+import { getCoreAuth } from "./core-auth-loader.js";
 
 // Accepts a full redirect URL (?code=...&state=...), a bare `code#state` pair, or
 // a bare code pasted alone. Covers every pasted-callback shape used across drivers.
 export function parsePastedCallback(input) {
-  const text = (input || "").trim();
-  if (!text) return null;
-  const codeMatch = text.match(/[?&]code=([^&\s]+)/);
-  if (codeMatch) {
-    const stateMatch = text.match(/[?&]state=([^&\s]+)/);
-    return { code: decodeURIComponent(codeMatch[1]), state: stateMatch ? decodeURIComponent(stateMatch[1]) : null };
-  }
-  if (text.includes("#")) {
-    const [code, state] = text.split("#");
-    return { code: code.trim(), state: (state || "").trim() || null };
-  }
-  return { code: text, state: null };
+  return JSON.parse(getCoreAuth().parsePastedCallback(input || ""));
 }
 
 // Thin readline single-line prompt. Streams are injectable so it is testable

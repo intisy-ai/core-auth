@@ -194,3 +194,19 @@ export function leaderboardOrder(argsJson: string): string;
  * to score, carrying only the ids that matched a live score.
  */
 export function leaderboardScores(argsJson: string): string;
+
+/**
+ * `OAuthWire.parsePastedCallback` -- `{code, state}` as JSON for a full redirect URL, a bare
+ * `code#state` pair or a code alone; the literal JSON `null` when nothing was pasted.
+ */
+export function parsePastedCallback(input: string): string;
+
+/** `OAuthWire.encodeState` -- packs an already-serialised state payload as unpadded URL-safe base64. */
+export function encodeState(payloadJson: string): string;
+
+/**
+ * `OAuthWire.decodeState` -- `{payload}` carrying the decoded JSON text, or `{error}` when the state
+ * carries no PKCE verifier. The refusal crosses as data so the caller raises an error its own
+ * surrounding JS recognises.
+ */
+export function decodeState(state: string): string;
