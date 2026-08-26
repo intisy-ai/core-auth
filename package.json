@@ -1,6 +1,6 @@
 {
   "name": "core-auth",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Provider account, OAuth, and quota library for the intisy-ai AI-proxy ecosystem.",
   "type": "module",
   "main": "dist/index.js",
