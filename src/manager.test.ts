@@ -117,7 +117,9 @@ describe("reportError -> reportSuccess: cooldown lifecycle", () => {
   it("reportError sets a coolingDownUntil in the future using the manager's OWN backoff config, and makes the account unavailable", async () => {
     const lane = "chat";
     seed(pool([account("a"), account("b")], 0));
-    const mgr = manager({ selection: "sticky", backoff: { baseMs: 50, maxMs: 50 } });
+    // Long enough that the assertions below cannot outrun the cooldown they are checking, and far
+    // enough from the built-in 1s first attempt to prove the manager's own config is what applied.
+    const mgr = manager({ selection: "sticky", backoff: { baseMs: 7000, maxMs: 7000 } });
 
     const before = Date.now();
     mgr.reportError("a", lane, 0, "boom");
@@ -126,8 +128,8 @@ describe("reportError -> reportSuccess: cooldown lifecycle", () => {
     // than any slack worth hard-coding.
     const after = Date.now();
     const a = mgr.list().find((x) => x.id === "a");
-    expect(a.coolingDownUntil).toBeGreaterThan(before);
-    expect(a.coolingDownUntil).toBeLessThanOrEqual(after + 50);
+    expect(a.coolingDownUntil).toBeGreaterThan(before + 1000);
+    expect(a.coolingDownUntil).toBeLessThanOrEqual(after + 7000);
     expect(a.cooldownReason).toBe("boom");
 
     const claimed = await mgr.acquire(lane);

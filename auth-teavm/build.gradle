@@ -13,6 +13,11 @@ dependencies {
     // (io.github.intisy.ai.js) so it references those two unqualified.
     githubImplementation "intisy-ai:api:1.3.0:seam"
     githubImplementation "intisy-ai:api:1.3.0:js-base"
+    // SOURCE-retention, so nothing here reaches the bundle. The processor jar is a release asset and
+    // carries no transitive metadata, so the annotation types it reads are named beside it.
+    githubCompileOnly "intisy-ai:api:1.3.0:annotations"
+    githubAnnotationProcessor "intisy-ai:api:1.3.0:processor"
+    githubAnnotationProcessor "intisy-ai:api:1.3.0:annotations"
     teavm teavm.libs.jsoApis
 }
 
@@ -30,6 +35,7 @@ java {
 
 tasks.named("compileJava") {
     options.release = 17
+    options.compilerArgs << "-Atsemit.name=core-auth.teavm"
 }
 
 // Same JVM-version attribute matching problem as compileJava, now that the root block also
