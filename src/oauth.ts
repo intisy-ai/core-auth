@@ -42,8 +42,6 @@ export class TokenRefreshError extends Error {
     this.code = options.code;
     this.description = options.description;
     this.status = options.status;
-    // Always undefined: the layer-1 HttpResponse the Java refresh reads carries no status text.
-    this.statusText = options.statusText;
     this.revoked = options.code === "invalid_grant";   // refresh token revoked -> reauth
   }
 }
