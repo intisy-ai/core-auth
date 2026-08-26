@@ -11,8 +11,8 @@ dependencies {
     // :seam and :js-base carry the seam implementations (SimpleJsonCodec, InMemoryStore, JsStoreBridge,
     // JsHttpClientBridge), reused rather than duplicated; CoreAuthJs lives in :js-base's own package
     // (io.github.intisy.ai.js) so it references those two unqualified.
-    githubImplementation "intisy-ai:api:1.2.0:seam"
-    githubImplementation "intisy-ai:api:1.2.0:js-base"
+    githubImplementation "intisy-ai:api:1.3.0:seam"
+    githubImplementation "intisy-ai:api:1.3.0:js-base"
     teavm teavm.libs.jsoApis
 }
 
