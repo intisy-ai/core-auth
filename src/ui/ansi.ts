@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const ANSI = {
   hide: "\x1b[?25l",
   show: "\x1b[?25h",

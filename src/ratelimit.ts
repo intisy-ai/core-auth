@@ -1,4 +1,3 @@
-// @ts-nocheck
 // The availability/backoff MATH (isEnabled, isLaneRateLimited, isAvailable, availableAt,
 // calculateBackoffMs) is single-sourced in Java (RateLimitMath, java/accounts) behind
 // AccountManager's report*/nextAvailableAt exports; manager.ts delegates to those instead of

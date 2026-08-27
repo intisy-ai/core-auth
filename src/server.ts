@@ -1,8 +1,16 @@
-// @ts-nocheck
 // Generic local HTTP listener for an OAuth redirect; the driver passes its own redirect URI (port + callback path).
 
 import { createServer } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
+
+export interface StartOAuthListenerOptions {
+  timeoutMs?: number;
+}
+
+export interface OAuthListener {
+  waitForCallback: () => Promise<URL>;
+  close: () => Promise<void>;
+}
 
 // OrbStack host networking only forwards 127.0.0.1-bound ports to the host
 function isOrbStackDockerHost() {
@@ -52,8 +60,7 @@ function successPage() {
     "<p>Authentication succeeded. You can close this tab and return to your terminal.</p></div></body></html>";
 }
 
-// opts: { timeoutMs }
-export async function startOAuthListener(redirectUriString, opts) {
+export async function startOAuthListener(redirectUriString: string, opts?: StartOAuthListenerOptions): Promise<OAuthListener> {
   const options = opts || {};
   const timeoutMs = options.timeoutMs || 5 * 60 * 1000;
   const redirectUri = new URL(redirectUriString);
@@ -62,13 +69,14 @@ export async function startOAuthListener(redirectUriString, opts) {
   const origin = redirectUri.protocol + "//" + redirectUri.host;
 
   let settled = false;
-  let resolveCallback, rejectCallback, timeoutHandle;
-  const callbackPromise = new Promise((resolve, reject) => {
+  let resolveCallback: (url: URL) => void = () => {};
+  let rejectCallback: (error: Error) => void = () => {};
+  const callbackPromise = new Promise<URL>((resolve, reject) => {
     resolveCallback = (url) => { if (settled) return; settled = true; if (timeoutHandle) clearTimeout(timeoutHandle); resolve(url); };
     rejectCallback = (error) => { if (settled) return; settled = true; if (timeoutHandle) clearTimeout(timeoutHandle); reject(error); };
   });
 
-  timeoutHandle = setTimeout(() => rejectCallback(new Error("Timed out waiting for OAuth callback")), timeoutMs);
+  const timeoutHandle = setTimeout(() => rejectCallback(new Error("Timed out waiting for OAuth callback")), timeoutMs);
   if (timeoutHandle.unref) timeoutHandle.unref();
 
   const server = createServer((request, response) => {
@@ -81,8 +89,8 @@ export async function startOAuthListener(redirectUriString, opts) {
     setImmediate(() => server.close());
   });
 
-  await new Promise((resolve, reject) => {
-    const handleError = (error) => {
+  await new Promise<void>((resolve, reject) => {
+    const handleError = (error: NodeJS.ErrnoException) => {
       server.off("error", handleError);
       if (error && error.code === "EADDRINUSE") { reject(new Error("Port " + port + " is already in use.")); return; }
       reject(error);
@@ -95,8 +103,8 @@ export async function startOAuthListener(redirectUriString, opts) {
 
   return {
     waitForCallback: () => callbackPromise,
-    close: () => new Promise((resolve, reject) => {
-      server.close((error) => {
+    close: () => new Promise<void>((resolve, reject) => {
+      server.close((error?: NodeJS.ErrnoException) => {
         if (error && error.code !== "ERR_SERVER_NOT_RUNNING") { reject(error); return; }
         if (!settled) rejectCallback(new Error("OAuth listener closed before callback"));
         resolve();

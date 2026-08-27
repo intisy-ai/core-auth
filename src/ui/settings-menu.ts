@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Generic, schema-driven settings editor; the mechanism lives in core so every
 // provider can expose its config in the same UI (oc loader tab + `oc auth login`),
 // while the field list stays provider-specific. A provider declares:
@@ -14,14 +13,52 @@
 // bool toggles in place, enum cycles, number/string open the in-tab input. Values
 // shown are the effective ones (provider resolves defaults); "(default)" means unset.
 
-function formatValue(field, value) {
+import type { SettingsMenuField, SettingsMenuGroup } from "../settings-schema.js";
+
+export interface MenuInputRequest {
+  title: string;
+  message: string;
+  complete: (text: string | undefined) => MenuNavResult | Promise<MenuNavResult>;
+}
+
+export type MenuNavResult =
+  | { push: () => Menu }
+  | { pop: true | number }
+  | { refresh: true }
+  | { input: MenuInputRequest }
+  | void;
+
+export interface MenuItem {
+  label: string;
+  hint?: string;
+  run: () => MenuNavResult | Promise<MenuNavResult>;
+}
+
+export interface Menu {
+  title: string;
+  subtitle?: string;
+  items: MenuItem[];
+}
+
+export interface SettingsAccessor {
+  groups: SettingsMenuGroup[];
+  get(key: string): unknown;
+  set(key: string, value: unknown): void;
+}
+
+export interface SettingsMenuDef {
+  label: string;
+  settings?: SettingsAccessor;
+}
+
+function formatValue(field: SettingsMenuField, value: unknown): string {
   if (field.type === "bool") return value ? "on" : "off";
   if (value === undefined || value === null || value === "") return "default";
   return String(value);
 }
 
-function fieldItem(def, field) {
-  const settings = def.settings;
+function fieldItem(def: SettingsMenuDef, field: SettingsMenuField): MenuItem {
+  const settings = def.settings as SettingsAccessor;
   const value = settings.get(field.key);
   const label = field.label + "  " + "[" + formatValue(field, value) + "]";
   if (field.type === "bool") {
@@ -29,7 +66,7 @@ function fieldItem(def, field) {
   }
   if (field.type === "enum") {
     const options = field.options || [];
-    return { label, hint: field.hint || "", run: () => { const i = options.indexOf(value); settings.set(field.key, options[(i + 1) % options.length]); return { refresh: true }; } };
+    return { label, hint: field.hint || "", run: () => { const i = options.indexOf(String(value)); settings.set(field.key, options[(i + 1) % options.length]); return { refresh: true }; } };
   }
   // number | string -> in-tab input (blank resets to default)
   const range = field.type === "number" && (field.min != null || field.max != null)
@@ -57,16 +94,16 @@ function fieldItem(def, field) {
   };
 }
 
-export function buildSettingsMenu(def, groupIndex) {
+export function buildSettingsMenu(def: SettingsMenuDef, groupIndex?: number): Menu {
   const groups = (def.settings && def.settings.groups) || [];
   // more than one section: top level lists the sections
   if (groupIndex === undefined && groups.length > 1) {
-    const items = [{ label: "Back", run: () => ({ pop: true }) }];
+    const items: MenuItem[] = [{ label: "Back", run: () => ({ pop: true }) }];
     groups.forEach((g, i) => items.push({ label: g.title, hint: (g.fields || []).length + " options", run: () => ({ push: () => buildSettingsMenu(def, i) }) }));
     return { title: def.label + " - Settings", subtitle: "Pick a section · changes apply on restart · Esc to go back", items };
   }
-  const group = groups[groupIndex || 0] || { title: "Settings", fields: [] };
-  const items = [{ label: "Back", run: () => ({ pop: true }) }];
+  const group: SettingsMenuGroup = groups[groupIndex || 0] || { title: "Settings", fields: [] };
+  const items: MenuItem[] = [{ label: "Back", run: () => ({ pop: true }) }];
   for (const field of group.fields) items.push(fieldItem(def, field));
   return { title: def.label + " - " + group.title, subtitle: "Enter to change · blank input resets to default · applies on restart", items };
 }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Filesystem locations, derived from the active app's config dir. Resolution is
 // HUB_CONFIG_DIR (the loader's forced dir, reliable even headless under the proxy)
 // first, then the active app's declared home from the app registry (./app-registry.js).

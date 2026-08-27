@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Single-source proxy-aware transport, lifted out of the per-provider jsExec copies
 // (antigravity-auth's and claude-code-auth's driver/javaHandle.ts). Owns ONLY the
 // fetch + proxy-retry mechanics; rate-limit status classification stays with the

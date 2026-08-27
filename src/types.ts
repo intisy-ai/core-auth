@@ -1,4 +1,3 @@
-// @ts-nocheck
 // The provider contract: a plugin supplies one of these and core-auth does all the app/loader integration.
 
 import type { HandlerCtx, IrEventStream, IrRequest, IrResponse } from "@intisy-ai/core-ir";
@@ -56,7 +55,7 @@ export interface CoreAccount {
   rateLimitResetTimes?: Record<string, number>;  // lane -> epoch ms the lane is rate-limited until
   coolingDownUntil?: number;          // epoch ms; transient backoff across all lanes
   cooldownReason?: string | null;     // transient (raw error text), never shown in UI rows
-  disabledReason?: string | null;     // why the SYSTEM disabled the account (actionable, shown in UI)
+  disabledReason?: string | null;     // why the SYSTEM disabled the account, when enabled was set false by the system rather than by the user
   meta?: Record<string, unknown>;     // provider extras, opaque to the harness
 }
 

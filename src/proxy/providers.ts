@@ -1,15 +1,19 @@
-// @ts-nocheck
 // Proxy-list fetchers. Free sources fetch live; keyed providers are gated on a
 // config key and return [] until one is set. Each returns [{ url, provider }].
 
-async function getText(url, init) {
+export interface FetchedProxy {
+  url: string;
+  provider: string;
+}
+
+async function getText(url: string, init?: RequestInit): Promise<string> {
   const aborter = new AbortController();
   const timer = setTimeout(() => aborter.abort(), 10000);
   try { const r = await fetch(url, { ...(init || {}), signal: aborter.signal }); return r.ok ? await r.text() : ""; }
   catch { return ""; } finally { clearTimeout(timer); }
 }
 
-function linesToProxies(text, provider) {
+function linesToProxies(text: string, provider: string): FetchedProxy[] {
   return text.split(/\s+/).map((l) => l.trim()).filter(Boolean)
     .map((hostPort) => ({ url: hostPort.startsWith("http") ? hostPort : "http://" + hostPort, provider }));
 }
@@ -39,8 +43,13 @@ async function iplocate() {
   return linesToProxies(text, "iplocate");
 }
 
+export interface ProxyProviderConfig {
+  enabled?: boolean;
+  key?: string;
+}
+
 // keyed/premium providers: wire real endpoints once a key is configured
-async function keyed(provider, config) {
+async function keyed(provider: string, config: ProxyProviderConfig | undefined): Promise<FetchedProxy[]> {
   if (!config || !config.key) return [];
   return [];
 }
@@ -49,9 +58,9 @@ const FREE = { proxyscrape, proxifly, pubproxy, geonix, iplocate };
 const KEYED = ["webshare", "brightdata", "oxylabs", "litport"];
 
 // providersConfig: { <name>: { enabled, key? } }; "manual" is never fetched
-export async function fetchEnabledProxies(providersConfig) {
+export async function fetchEnabledProxies(providersConfig: Record<string, ProxyProviderConfig> | undefined): Promise<FetchedProxy[]> {
   const config = providersConfig || {};
-  const out = [];
+  const out: FetchedProxy[] = [];
   for (const [name, fn] of Object.entries(FREE)) {
     if (config[name] && config[name].enabled) { try { out.push(...await fn()); } catch {} }
   }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Quality scoring for the configured proxies a provider can route an account through. The maths is
 // single-sourced in Java (ProxyScoring, accounts/proxy) behind CoreAuthJs's proxy* exports; what
 // stays here is the export surface consumers already import.

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { getCoreAuth } from "./core-auth-loader.js";
 
 // Let a provider surface a TERMINAL error into the chat instead of looping forever.

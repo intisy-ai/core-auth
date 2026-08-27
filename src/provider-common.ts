@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Settings that belong to EVERY core-auth provider, declared once here instead of
 // hand-duplicated in each provider. Right now that is the account-selection
 // strategy: the AccountManager consumes it identically for every provider, so a
@@ -7,7 +6,7 @@
 // commonManagerOptions() to AccountManager, so the key name, default, and choice
 // list live in one place.
 
-import { toCapabilitiesFields, toSettingsGroups } from "./settings-schema.js";
+import { toCapabilitiesFields, toSettingsGroups, type ProviderSettingsSchema } from "./settings-schema.js";
 
 export const COMMON_PROVIDER_DEFAULTS = {
   account_selection_strategy: "hybrid",
@@ -31,9 +30,10 @@ export const COMMON_PROVIDER_CAPABILITIES = [
 // AccountManager options derived from the common settings, so no provider hardcodes
 // the config key or the default strategy at its construction site. Providers merge
 // their own opts (oauth, backoff, isAvailable) on top.
-export function commonManagerOptions(config) {
+export function commonManagerOptions(config?: Record<string, unknown>): { selection: string } {
   const cfg = config || {};
-  return { selection: cfg.account_selection_strategy || "hybrid" };
+  const strategy = cfg.account_selection_strategy;
+  return { selection: typeof strategy === "string" ? strategy : "hybrid" };
 }
 
 // Retry/backoff: same "base cooldown, doubles per attempt, capped at a max"
@@ -56,7 +56,7 @@ export interface RetryBackoffDefaults {
   maxSeconds: number;
 }
 
-function retryBackoffSchema(keys) {
+function retryBackoffSchema(keys: RetryBackoffKeys): ProviderSettingsSchema {
   return [
     {
       title: "Retry",

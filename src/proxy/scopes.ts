@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Scope resolution over the proxy store: which proxies a scope may use, in which order. The
 // decisions are single-sourced in Java (ProxyScopes, accounts/proxy) behind CoreAuthJs's proxy*
 // exports; the selection calls return INDICES into store.proxies, which this module maps back onto
