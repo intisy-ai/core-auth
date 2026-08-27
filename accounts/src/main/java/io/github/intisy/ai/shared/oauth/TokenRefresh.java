@@ -27,6 +27,10 @@ public final class TokenRefresh {
      * Expired or missing, with a buffer for clock skew. Matches JS: {@code !auth.access} or
      * {@code typeof auth.expires !== "number"} short-circuits to "expired", else
      * {@code auth.expires <= now + BUFFER}.
+     *
+     * @param a the account to check
+     * @param now the current epoch ms
+     * @return {@code true} when the account has no usable access token
      */
     public static boolean accessTokenExpired(Account a, long now) {
         if (a == null || a.access == null || a.expires == null) return true;
@@ -39,6 +43,13 @@ public final class TokenRefresh {
      * Returns the new {access, expires, refresh} on success; throws {@link TokenRefreshError}
      * on a non-2xx response ({@code revoked=true} iff the token endpoint reported
      * {@code error=invalid_grant}).
+     *
+     * @param refreshToken the refresh token to exchange
+     * @param cfg the OAuth endpoint and client configuration to use
+     * @param http the HTTP client used to make the request
+     * @param json the codec used to parse the token endpoint's response
+     * @param now the current epoch ms, used to compute the new token's expiry
+     * @return the refreshed access/expires/refresh triple, or {@code null} when {@code refreshToken} is null
      */
     public static Refreshed refresh(String refreshToken, OAuthConfig cfg, HttpClient http, JsonCodec json, long now) {
         if (refreshToken == null) return null;

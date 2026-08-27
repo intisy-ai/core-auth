@@ -23,6 +23,18 @@ public final class OAuthExchange {
     private OAuthExchange() {
     }
 
+    /**
+     * @param code the authorization code an authorize redirect delivered
+     * @param codeVerifier the PKCE verifier matching the challenge sent at authorize time, or
+     *                      {@code null} when the flow does not use PKCE
+     * @param redirectUri the redirect URI used at authorize time, or {@code null} to omit it
+     * @param cfg the OAuth endpoint and client configuration to use
+     * @param jsonBody whether to send the grant as a JSON body instead of form-urlencoded
+     * @param http the HTTP client used to make the request
+     * @param json the codec used to parse the token endpoint's response
+     * @param now the current epoch ms, used to compute the new token's expiry
+     * @return the initial access/expires/refresh token set
+     */
     public static Refreshed exchangeCode(String code, String codeVerifier, String redirectUri,
                                          OAuthConfig cfg, boolean jsonBody,
                                          HttpClient http, JsonCodec json, long now) {

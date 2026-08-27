@@ -16,7 +16,9 @@ import java.util.Map;
  * 2000ms unknown-latency default rather than as the fastest proxy in the pool.
  */
 public final class ProxyScoring {
+    /** The cap on accounts one proxy may hold at once, so no proxy absorbs too much traffic. */
     public static final int MAX_ACCOUNTS_PER_PROXY = 3;
+    /** How long a proxy stays excluded after an upstream IP rate-limit hit. */
     public static final long IP_LIMIT_COOLDOWN_MS = 5L * 60L * 1000L;
 
     private static final double UNKNOWN_LATENCY_MS = 2000;
@@ -25,7 +27,13 @@ public final class ProxyScoring {
     private ProxyScoring() {
     }
 
-    /** How many accounts currently hold an assignment to {@code url}. */
+    /**
+     * How many accounts currently hold an assignment to {@code url}.
+     *
+     * @param store the proxy store to read assignments from
+     * @param url the proxy url to count assignments for
+     * @return the number of accounts assigned to that url
+     */
     public static int countAssignments(Map<String, Object> store, String url) {
         Map<String, Object> assignments = store == null ? null : JsonUtil.asMap(store.get("assignments"));
         if (assignments == null) return 0;
@@ -36,13 +44,25 @@ public final class ProxyScoring {
         return count;
     }
 
+    /**
+     * Ranking score for choosing between candidate proxies; lower is better.
+     *
+     * @param store the proxy store to read assignments from
+     * @param proxy the proxy to score
+     * @return the ranking score, combining base quality, current load and a manual-entry penalty
+     */
     public static double scoreOf(Map<String, Object> store, Map<String, Object> proxy) {
         int inUse = countAssignments(store, JsonUtil.asString(proxy.get("url")));
         boolean manual = "manual".equals(JsonUtil.asString(proxy.get("provider")));
         return baseQuality(proxy) + inUse * 5 - (manual ? 10 : 0);
     }
 
-    /** Coarse UI quality from the same components, independent of how many accounts hold it. */
+    /**
+     * Coarse UI quality from the same components, independent of how many accounts hold it.
+     *
+     * @param proxy the proxy to label
+     * @return {@code "good"}, {@code "fair"}, or {@code "poor"}
+     */
     public static String qualityLabel(Map<String, Object> proxy) {
         double quality = baseQuality(proxy);
         if (quality < 3) return "good";
@@ -50,6 +70,11 @@ public final class ProxyScoring {
         return "poor";
     }
 
+    /**
+     * @param proxy the proxy to check
+     * @param now the current epoch ms
+     * @return whether the proxy is still inside its {@link #IP_LIMIT_COOLDOWN_MS} exclusion window
+     */
     public static boolean isIpLimited(Map<String, Object> proxy, long now) {
         Map<String, Object> stats = statsOf(proxy);
         Object at = stats.get("lastRateLimitAt");

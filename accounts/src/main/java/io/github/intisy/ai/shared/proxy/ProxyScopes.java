@@ -27,6 +27,10 @@ public final class ProxyScopes {
     private ProxyScopes() {
     }
 
+    /**
+     * @param scope the scope map to key, or {@code null} for the global scope
+     * @return the scope's storage key
+     */
     public static String scopeKey(Map<String, Object> scope) {
         if (scope == null) return GLOBAL;
         String type = JsonUtil.asString(scope.get("type"));
@@ -36,7 +40,12 @@ public final class ProxyScopes {
         return type + ":" + JsonUtil.asString(scope.get("id"));
     }
 
-    /** The inverse of {@link #scopeKey}. The global scope carries no id, so the key is absent. */
+    /**
+     * The inverse of {@link #scopeKey}. The global scope carries no id, so the key is absent.
+     *
+     * @param key the scope storage key to decompose
+     * @return the scope map the key was derived from
+     */
     public static Map<String, Object> parseScopeKey(String key) {
         Map<String, Object> scope = new LinkedHashMap<String, Object>();
         if (GLOBAL.equals(key)) {
@@ -49,6 +58,11 @@ public final class ProxyScopes {
         return scope;
     }
 
+    /**
+     * @param store the proxy store to read modes from
+     * @param key the scope storage key to look up
+     * @return the scope's configured mode, defaulting to the store default then to disabled
+     */
     public static String effectiveMode(Map<String, Object> store, String key) {
         Map<String, Object> modes = store == null ? null : JsonUtil.asMap(store.get("modes"));
         if (modes == null) return DISABLED;
@@ -58,7 +72,14 @@ public final class ProxyScopes {
         return fallback != null && !fallback.isEmpty() ? fallback : DISABLED;
     }
 
-    /** Account to provider to global, dropping any scope whose effective mode is disabled. */
+    /**
+     * Account to provider to global, dropping any scope whose effective mode is disabled.
+     *
+     * @param store the proxy store to read modes from
+     * @param accountId the account id to start the chain at, or {@code null}/empty to skip it
+     * @param providerId the provider id to include after the account, or {@code null}/empty to skip it
+     * @return the enabled scope keys, most specific first
+     */
     public static List<String> resolveChain(Map<String, Object> store, String accountId, String providerId) {
         List<String> keys = new ArrayList<String>();
         if (accountId != null && !accountId.isEmpty()) keys.add("account:" + accountId);
@@ -72,6 +93,11 @@ public final class ProxyScopes {
         return enabled;
     }
 
+    /**
+     * @param store the proxy store to read proxies from
+     * @param key the scope storage key to filter by
+     * @return the indices into {@code store.proxies} belonging to that scope
+     */
     public static List<Integer> proxiesInScope(Map<String, Object> store, String key) {
         List<Object> proxies = store == null ? null : JsonUtil.asList(store.get("proxies"));
         List<Integer> indices = new ArrayList<Integer>();
@@ -87,6 +113,11 @@ public final class ProxyScopes {
     /**
      * Usable proxies for a scope under its mode: manual takes the scope's selected subset,
      * automatic takes all. Minus the cap-bound and the currently IP-limited, best-first.
+     *
+     * @param store the proxy store to read proxies and scoring state from
+     * @param key the scope storage key to resolve candidates for
+     * @param now the current epoch ms
+     * @return the usable proxy indices, best-scoring first
      */
     public static List<Integer> candidatesForScope(final Map<String, Object> store, String key, long now) {
         String mode = effectiveMode(store, key);
@@ -119,6 +150,12 @@ public final class ProxyScopes {
      * slot, and the cap gates NEW assignments, so applying it here would evict the holder. Without
      * that exemption an account on a cap-full proxy fails its own sticky check and churns, or with a
      * one-proxy pool deadlocks to direct.
+     *
+     * @param store the proxy store to read proxies and scoring state from
+     * @param key the scope storage key the account is sticky to
+     * @param url the proxy url the account already holds
+     * @param now the current epoch ms
+     * @return whether the account may keep using that proxy in this scope
      */
     public static boolean stickyUsable(Map<String, Object> store, String key, String url, long now) {
         String mode = effectiveMode(store, key);

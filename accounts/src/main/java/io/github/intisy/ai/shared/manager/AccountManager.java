@@ -39,6 +39,15 @@ public class AccountManager {
     private final JsonCodec json;
     private final ManagerOptions opts;
 
+    /**
+     * @param providerId the provider id this manager's pool is keyed by
+     * @param store the account store backing this manager's pool
+     * @param http the HTTP client used for OAuth refresh calls
+     * @param clock the clock used for {@code now}, so callers stay deterministic in tests
+     * @param random the source of jitter randomness for backoff
+     * @param json the codec used by the OAuth refresh call
+     * @param opts tuning knobs and hooks; defaulted when {@code null}
+     */
     public AccountManager(String providerId, AccountStore store, HttpClient http, Clock clock, Random random,
                            JsonCodec json, ManagerOptions opts) {
         this.providerId = providerId;
@@ -58,13 +67,15 @@ public class AccountManager {
 
     /**
      * Selection + the {@code lastUsed} claim ONLY -- NO network token refresh. This is the
-     * persisted half of {@link #acquire}, split out (Phase 3 Task 1 of the npm migration) so a
-     * caller that wants to interleave the refresh call with its own proxy/fetch plumbing --
-     * rather than {@link #ensureAccess}'s built-in {@code HttpClient} -- can claim here and run
+     * persisted half of {@link #acquire}, split out so a caller that wants to interleave the
+     * refresh call with its own proxy/fetch plumbing -- rather than {@link #ensureAccess}'s
+     * built-in {@code HttpClient} -- can claim here and run
      * {@link io.github.intisy.ai.shared.oauth.TokenRefresh#refresh} itself afterward. Runs inside
-     * {@code store.update} (atomic per the {@code Store} SPI's contract). Returns the claimed
-     * account's CURRENT stored {@code access} token as-is (no expiry check, no refresh) --
-     * {@code null} when nobody in the pool is available.
+     * {@code store.update} (atomic per the {@code Store} SPI's contract).
+     *
+     * @param lane the rate-limit lane to select within
+     * @return the claimed account with its CURRENT stored {@code access} token as-is (no expiry
+     * check, no refresh), or {@code null} when nobody in the pool is available
      */
     public Acquired selectAndClaim(String lane) {
         long now = clock.now();
@@ -85,6 +96,10 @@ public class AccountManager {
      * {@link #selectAndClaim}, then a network token refresh ({@link #ensureAccess}) OUTSIDE the
      * store-update call so a slow refresh never blocks other writers (JS manager.ts: {@code
      * acquire}).
+     *
+     * @param lane the rate-limit lane to select within
+     * @return the claimed account with a freshly ensured access token, or {@code null} when
+     * nobody in the pool is available
      */
     public Acquired acquire(String lane) {
         Acquired claimed = selectAndClaim(lane);
@@ -100,6 +115,10 @@ public class AccountManager {
      * Refreshes the access token if expired (and a refresh token + oauth config are present),
      * persisting the new access/expires/refresh. A revoked refresh token disables the account
      * so selection skips it going forward (JS manager.ts: {@code ensureAccess}).
+     *
+     * @param id the account id to ensure a fresh access token for
+     * @return the account's access token, refreshed if it was expired, or {@code null} if the
+     * account is not found
      */
     public String ensureAccess(String id) {
         Account account = findAccount(id);
@@ -122,6 +141,13 @@ public class AccountManager {
         }
     }
 
+    /**
+     * Records an upstream-supplied reset time for one lane on one account.
+     *
+     * @param id the account id to update
+     * @param lane the lane the reset time applies to
+     * @param resetMs the epoch ms the lane becomes available again
+     */
     public void reportRateLimit(String id, String lane, long resetMs) {
         mutate(id, account -> {
             if (account.rateLimitResetTimes == null) account.rateLimitResetTimes = new LinkedHashMap<>();
@@ -133,6 +159,11 @@ public class AccountManager {
      * {@code lane} is the failing request's lane, or {@code null}/{@code ""} when the caller
      * doesn't know it (the safe default: no same-lane reset can be found, so this cools down via
      * core's own backoff exactly as if no reset existed).
+     *
+     * @param id the account id to cool down
+     * @param lane the failing request's lane, or {@code null}/empty when unknown
+     * @param attempt the zero-based retry attempt number, for backoff growth
+     * @param reason the cooldown reason to record, defaulted when {@code null}
      */
     public void reportError(String id, String lane, int attempt, String reason) {
         long now = clock.now();
@@ -148,6 +179,11 @@ public class AccountManager {
         });
     }
 
+    /**
+     * Clears any cooldown and marks the account as just used.
+     *
+     * @param id the account id to clear
+     */
     public void reportSuccess(String id) {
         long now = clock.now();
         mutate(id, account -> {
@@ -157,6 +193,13 @@ public class AccountManager {
         });
     }
 
+    /**
+     * Applies {@code fn} to the pool's account with this {@code id}, atomically per
+     * {@code store.update}. A no-op when no account matches.
+     *
+     * @param id the account id to mutate
+     * @param fn applied to the matching account
+     */
     public void mutate(String id, Consumer<Account> fn) {
         store.update(providerId, pool -> {
             for (Account a : pool.accounts) {
@@ -172,6 +215,9 @@ public class AccountManager {
      * Soonest epoch-ms any account in the pool becomes available for {@code lane}, or
      * {@code null} if none ever will (matches JS {@code manager.ts}: {@code best === Infinity
      * ? null : best}).
+     *
+     * @param lane the rate-limit lane to check
+     * @return the soonest epoch ms any account becomes available, or {@code null} if none ever will
      */
     public Long nextAvailableAt(String lane) {
         long now = clock.now();
@@ -182,7 +228,12 @@ public class AccountManager {
         return best == Long.MAX_VALUE ? null : best;
     }
 
-    /** Forces a token refresh regardless of expiry (manual "refresh token" action). Returns the new access token, or {@code null} if there's nothing to refresh. */
+    /**
+     * Forces a token refresh regardless of expiry (manual "refresh token" action).
+     *
+     * @param id the account id to refresh
+     * @return the new access token, or {@code null} if there's nothing to refresh
+     */
     public String refresh(String id) {
         Account account = findAccount(id);
         if (account == null || opts.oauth == null || account.refresh == null) return null;

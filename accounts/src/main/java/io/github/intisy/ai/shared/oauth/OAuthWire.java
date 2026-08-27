@@ -26,7 +26,13 @@ public final class OAuthWire {
     private OAuthWire() {
     }
 
-    /** Defaults to 3600s; a non-positive or non-numeric value collapses to {@code requestTimeMs}. */
+    /**
+     * Defaults to 3600s; a non-positive or non-numeric value collapses to {@code requestTimeMs}.
+     *
+     * @param requestTimeMs the epoch ms the token request was made at
+     * @param expiresInSeconds the grant's reported lifetime, or {@code null} to use the default
+     * @return the epoch ms the token expires at
+     */
     public static long calculateTokenExpiry(long requestTimeMs, Double expiresInSeconds) {
         double seconds = expiresInSeconds != null ? expiresInSeconds : 3600;
         if (Double.isNaN(seconds) || seconds <= 0) return requestTimeMs;
@@ -110,6 +116,9 @@ public final class OAuthWire {
      * Reads a pasted OAuth callback in any of the shapes a driver sees: a full redirect URL, a bare
      * {@code code#state} pair, or a code alone. Returns {@code {code, state}} with a null state when
      * none was pasted, or null when nothing was.
+     *
+     * @param input the pasted redirect URL, {@code code#state} pair, or bare code
+     * @return {@code {code, state}}, or {@code null} when {@code input} is blank
      */
     public static Map<String, Object> parsePastedCallback(String input) {
         String text = input == null ? "" : input.trim();
@@ -143,6 +152,9 @@ public final class OAuthWire {
      * Packs an already-serialised OAuth {@code state} payload as unpadded URL-safe base64, so it
      * survives a redirect round trip. The caller serialises, so the encoded bytes are exactly the
      * JSON it produced.
+     *
+     * @param payloadJson the already-serialised state payload
+     * @return the unpadded URL-safe base64 encoding of {@code payloadJson}
      */
     public static String encodeState(String payloadJson) {
         byte[] bytes;
@@ -159,6 +171,9 @@ public final class OAuthWire {
      * verifier. Returns the decoded JSON text, so the caller parses exactly the bytes that were
      * encoded rather than a re-serialisation of them.
      *
+     * @param state the base64 state produced by {@link #encodeState}
+     * @param json the codec used to parse the decoded payload
+     * @return the decoded JSON text
      * @throws IllegalArgumentException when the payload carries no string {@code verifier}
      */
     public static String decodeState(String state, JsonCodec json) {

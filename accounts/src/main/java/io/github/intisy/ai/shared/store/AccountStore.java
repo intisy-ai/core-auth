@@ -32,6 +32,10 @@ public class AccountStore {
     private final Store store;
     private final JsonCodec json;
 
+    /**
+     * @param store the key-value backing store, providing atomic read-modify-write per key
+     * @param json the codec used to parse and serialize the on-disk document
+     */
     public AccountStore(Store store, JsonCodec json) {
         this.store = store;
         this.json = json;
@@ -159,15 +163,27 @@ public class AccountStore {
         return m;
     }
 
+    /**
+     * @param provider the provider id the pool is keyed by
+     * @return the provider's pool, defaulted to empty if none is stored
+     */
     public AccountPool load(String provider) {
         Map<String, Object> providers = providersOf(parseOrDefault(store.get(KEY)));
         return poolFromEntry(providers.get(provider));
     }
 
+    /**
+     * @param provider the provider id the pool is keyed by
+     * @return the provider's accounts, defaulted to empty if none are stored
+     */
     public List<Account> list(String provider) {
         return load(provider).accounts;
     }
 
+    /**
+     * @param provider the provider id the pool is keyed by
+     * @param pool the pool to store, replacing whatever was there
+     */
     public void save(String provider, AccountPool pool) {
         store.update(KEY, current -> {
             Map<String, Object> doc = parseOrDefault(current);
@@ -177,7 +193,13 @@ public class AccountStore {
         });
     }
 
-    /** Atomic read-modify-write: mutator mutates the freshly-read pool in place. */
+    /**
+     * Atomic read-modify-write: mutator mutates the freshly-read pool in place.
+     *
+     * @param provider the provider id the pool is keyed by
+     * @param mutator applied to the freshly-read pool before it is written back
+     * @return the pool as written back, after {@code mutator} ran
+     */
     public AccountPool update(String provider, Consumer<AccountPool> mutator) {
         AccountPool[] result = new AccountPool[1];
         store.update(KEY, current -> {
@@ -193,11 +215,21 @@ public class AccountStore {
         return result[0];
     }
 
-    /** Upsert by {@code id}, else by {@code refresh}; merges non-null incoming fields onto the existing record. */
+    /**
+     * Upsert by {@code id}, else by {@code refresh}; merges non-null incoming fields onto the existing record.
+     *
+     * @param provider the provider id the pool is keyed by
+     * @param account the account to add or merge in
+     */
     public void add(String provider, Account account) {
         upsertRaw(provider, accountToMap(account));
     }
 
+    /**
+     * @param provider the provider id the pool is keyed by
+     * @param id the account id to remove
+     * @return whether an account with that id was there to remove
+     */
     public boolean remove(String provider, String id) {
         return removeRaw(provider, id);
     }
@@ -207,7 +239,14 @@ public class AccountStore {
      * pool. {@code UNCHANGED} is a re-upsert of identical content, which a login refresh does on
      * every call.
      */
-    public enum Upsert { ADDED, UPDATED, UNCHANGED }
+    public enum Upsert {
+        /** No existing account matched by {@code id} or {@code refresh}; a new record was added. */
+        ADDED,
+        /** An existing account matched and the merge changed its content. */
+        UPDATED,
+        /** An existing account matched but the merge produced content identical to what was there. */
+        UNCHANGED
+    }
 
     /**
      * Upsert over the account's RAW json map rather than the typed {@link Account}.
@@ -215,6 +254,10 @@ public class AccountStore {
      * @implNote raw, because {@link Account} models the declared field set and this store must be
      * byte-compatible with a JS writer that keeps whatever it was given: narrowing to the typed
      * model on the way in would silently drop any field outside it on every read-modify-write.
+     *
+     * @param provider the provider id the pool is keyed by
+     * @param account the raw account json map to add or merge in
+     * @return which of add, update or no-op the write turned out to be
      */
     public Upsert upsertRaw(String provider, Map<String, Object> account) {
         Upsert[] outcome = { Upsert.ADDED };
@@ -246,7 +289,13 @@ public class AccountStore {
         return outcome[0];
     }
 
-    /** Removes the account with this {@code id}, reporting whether one was there to remove. */
+    /**
+     * Removes the account with this {@code id}, reporting whether one was there to remove.
+     *
+     * @param provider the provider id the pool is keyed by
+     * @param id the account id to remove
+     * @return whether an account with that id was there to remove
+     */
     public boolean removeRaw(String provider, String id) {
         boolean[] removed = { false };
         updateRaw(provider, accounts -> {
@@ -260,13 +309,23 @@ public class AccountStore {
         return removed[0];
     }
 
-    /** The provider's pool sub-document as stored, with the three pool fields defaulted. */
+    /**
+     * The provider's pool sub-document as stored, with the three pool fields defaulted.
+     *
+     * @param provider the provider id the pool is keyed by
+     * @return the pool sub-document, serialized as raw json
+     */
     public String loadRaw(String provider) {
         Map<String, Object> providers = providersOf(parseOrDefault(store.get(KEY)));
         return json.stringify(rawPoolOf(providers, provider));
     }
 
-    /** Replaces the provider's pool sub-document with {@code poolJson}, leaving other providers be. */
+    /**
+     * Replaces the provider's pool sub-document with {@code poolJson}, leaving other providers be.
+     *
+     * @param provider the provider id the pool is keyed by
+     * @param poolJson the raw pool sub-document to store, or {@code null} for an empty one
+     */
     public void saveRaw(String provider, String poolJson) {
         store.update(KEY, current -> {
             Map<String, Object> doc = parseOrDefault(current);

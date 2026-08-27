@@ -5,10 +5,18 @@ package io.github.intisy.ai.shared.oauth;
  * {@code refreshAccessToken} (see {@code libs/core-auth/src/oauth.ts:99-103}).
  */
 public class Refreshed {
+    /** The new access token. */
     public final String access;
-    public final long expires;   // epoch ms
+    /** Epoch ms the new access token expires at. */
+    public final long expires;
+    /** The refresh token to store going forward, which may be unchanged from what was sent. */
     public final String refresh;
 
+    /**
+     * @param access the new access token
+     * @param expires epoch ms the new access token expires at
+     * @param refresh the refresh token to store going forward
+     */
     public Refreshed(String access, long expires, String refresh) {
         this.access = access;
         this.expires = expires;

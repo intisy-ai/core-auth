@@ -17,6 +17,10 @@ public final class Selection {
     }
 
     /**
+     * @param pool the pool to select from
+     * @param lane the lane to select within, or {@code null}/empty for the pool-wide cursor
+     * @param now the current epoch ms
+     * @param strat the selection strategy, defaulted to {@link Strategy#HYBRID} when {@code null}
      * @param available availability predicate {@code (account, lane) -> boolean}; pass
      *                   {@code null} to use {@link RateLimitMath#isAvailable} with {@code now}.
      * @return the selected index, or -1 when none are available (round-robin/sticky) or the
