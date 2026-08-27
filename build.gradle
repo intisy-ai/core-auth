@@ -71,6 +71,9 @@ subprojects {
         ]
         failOnError = true
     }
+
+    // check does not run javadoc by default, so without this a doclint finding fails no build.
+    tasks.named("check") { dependsOn tasks.named("javadoc") }
 }
 
 // The modules a downstream java repo resolves, mapped to the classifier its coordinate names.
