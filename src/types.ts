@@ -18,6 +18,16 @@ export interface ProviderModel {
   [key: string]: unknown;
 }
 
+/** One entry in {@link ProviderDef.sorts}: the built-in leaderboard sort, or a provider's own source. */
+export type ProviderSort = "leaderboard" | {
+  /** The sort's id, used as its `source` key in the Auto config. */
+  id: string;
+  /** Display label; defaults to `id` when omitted. */
+  label?: string;
+  /** Computes the sort's order for the given catalog ids. */
+  compute: (ids: string[]) => Promise<string[]> | string[];
+};
+
 /** The provider contract: a plugin supplies one of these and core-auth does all the app/loader integration. */
 export interface ProviderDef {
   /** The loader/proxy provider name, used for handler discovery and the Providers tab. */
@@ -57,7 +67,12 @@ export interface ProviderDef {
   accounts?: AccountController;
   /** Opts into the shared proxy subsystem: the Manage-proxies menu and per-account proxy selection. */
   proxies?: boolean;
-  /** Live model-catalog fetch, used only once the provider has at least one account. */
+  /**
+   * Live model-catalog fetch, used only once the provider has at least one account.
+   *
+   * @remarks `null` reads as "the live fetch failed or found nothing"; {@link resolveProviderModels}
+   * falls back to {@link models} and then to the last cached catalog.
+   */
   fetchModels?: (ctx: ProviderCtx & { hasAccounts: boolean }) => Promise<{
     /** The fetched catalog, replacing {@link models} for display. */
     models: Record<string, ProviderModel>;
@@ -65,20 +80,13 @@ export interface ProviderDef {
     ranking?: string[];
     /** The model to select by default, when the provider has one. */
     defaultModelId?: string;
-  }>;
+  } | null>;
   /**
    * Non-manual Auto-sort sources the provider opts into (manual, the user's hand-ordered list, is
    * always available and needs no declaration). `"leaderboard"` (or `{id:"leaderboard"}`) is the
    * built-in quality sort; anything else supplies its own `compute`.
    */
-  sorts?: Array<"leaderboard" | {
-    /** The sort's id, used as its `source` key in the Auto config. */
-    id: string;
-    /** Display label; defaults to `id` when omitted. */
-    label?: string;
-    /** Computes the sort's order for the given catalog ids. */
-    compute: (ids: string[]) => Promise<string[]> | string[];
-  }>;
+  sorts?: ProviderSort[];
   /** Schema-driven settings the provider menu's "Settings" screen renders and edits. */
   settings?: {
     /** The provider's settings, grouped for display. */

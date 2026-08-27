@@ -40,7 +40,7 @@ export { PROVIDER } from "./generated/auth-contracts.keys.js";
 export { resolveAppFrontDoor } from "./frontdoor.js";
 export type { AppFrontDoor, FrontDoorToolkit } from "./frontdoor.js";
 export { isOAuthAuth, accessTokenExpired, calculateTokenExpiry, encodeState, decodeState, refreshAccessToken, TokenRefreshError } from "./oauth.js";
-export type { RefreshedToken, RefreshAccessTokenOpts, TokenRefreshErrorOptions } from "./oauth.js";
+export type { RefreshedToken, RefreshAccessTokenOpts, TokenRefreshErrorOptions, DecodedState } from "./oauth.js";
 export { startOAuthListener } from "./server.js";
 export type { OAuthListener, StartOAuthListenerOptions } from "./server.js";
 export { loadAccounts, saveAccounts, updateAccounts, listAccounts, addAccount, removeAccount, clearAccounts, LockTimeoutError } from "./accounts.js";

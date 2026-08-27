@@ -115,8 +115,8 @@ export interface OAuthLoginFlowHandle {
   url: string;
   /** Extra guidance shown alongside the URL. */
   instructions?: string;
-  /** Completes the flow with a pasted code or redirect URL. */
-  complete: (input: string) => Promise<CoreAccount | null>;
+  /** Completes the flow with a pasted code or redirect URL; omitted when the caller relies on {@link loopback} instead. */
+  complete: (input?: string) => Promise<CoreAccount | null>;
   /** Present only when there is a listener to wait on; tells a caller whether a browser sign-in can complete without a paste. */
   loopback?: Promise<CoreAccount | null>;
   /** Releases the listener when the flow is dismissed or superseded. */
@@ -198,7 +198,7 @@ export function defineOAuthLogin(spec: OAuthLoginSpec): {
     return {
       url: authorization.url,
       instructions,
-      complete: (input: string) => finish(parsePastedCallback(input)),
+      complete: (input?: string) => finish(parsePastedCallback(input)),
       loopback: listener
         ? listener.waitForCallback()
             .then((url) => finish({ code: url.searchParams.get("code"), state: url.searchParams.get("state") }))

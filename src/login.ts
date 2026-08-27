@@ -18,10 +18,10 @@ export interface PastedCallback {
 /**
  * Parses whatever a user pastes back after an OAuth redirect.
  *
- * @param input a full redirect URL (`?code=...&state=...`), a bare `code#state` pair, or a bare code alone
+ * @param input a full redirect URL (`?code=...&state=...`), a bare `code#state` pair, or a bare code alone; empty or omitted reads as nothing pasted
  * @returns `null` if no code could be recovered
  */
-export function parsePastedCallback(input: string): PastedCallback | null {
+export function parsePastedCallback(input?: string): PastedCallback | null {
   return JSON.parse(getCoreAuth().parsePastedCallback(input || "")) as PastedCallback | null;
 }
 

@@ -42,9 +42,20 @@ export function encodeState(payload: unknown): string {
   return getCoreAuth().encodeState(JSON.stringify(payload));
 }
 
-interface DecodedState {
+interface DecodeStateEnvelope {
   error?: string;
   payload: string;
+}
+
+/**
+ * The payload {@link decodeState} hands back: whatever was passed to {@link encodeState}, which
+ * always carries a PKCE `verifier` because the Java side refuses to decode a state without one.
+ */
+export interface DecodedState {
+  /** The PKCE verifier {@link encodeState} was called with. */
+  verifier: string;
+  /** Whatever else the caller packed into the encoded payload. */
+  [key: string]: unknown;
 }
 
 /**
@@ -52,8 +63,8 @@ interface DecodedState {
  *
  * @throws if the state is malformed or its PKCE verifier is missing
  */
-export function decodeState(state: unknown): unknown {
-  const result: DecodedState = JSON.parse(getCoreAuth().decodeState(String(state)));
+export function decodeState(state: unknown): DecodedState {
+  const result: DecodeStateEnvelope = JSON.parse(getCoreAuth().decodeState(String(state)));
   if (result.error) throw new Error(result.error);
   return JSON.parse(result.payload);
 }
