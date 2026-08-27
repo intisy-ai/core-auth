@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Generic "Auto" sort framework. Every provider gets "manual" for free (the user's
 // hand-ordered list, handled in config.ts; always on) and may OPT INTO more via
 // def.sorts (none required):
@@ -9,16 +8,42 @@
 
 import { computeLeaderboardOrder, computeLeaderboardScores, leaderboardSource } from "./leaderboard.js";
 import { log } from "./log.js";
+import type { ProviderDef } from "./types.js";
 
 const BUILTIN_LABEL = { leaderboard: "Leaderboard (quality)" };
 
+export interface CustomSortSource {
+  id: string;
+  label?: string;
+  compute: (ids: string[]) => Promise<string[]> | string[];
+}
+
+/**
+ * A provider def widened with the Auto-sort capability {@link ProviderDef} does not yet declare.
+ * See models-cache.ts's {@link ModelFetchingProviderDef} remark for why this stays local.
+ */
+export interface SortableProviderDef extends ProviderDef {
+  sorts?: Array<"leaderboard" | CustomSortSource>;
+}
+
+export interface ComputedSorts {
+  sorts: Array<{ id: string; label: string }>;
+  sortOrders: Record<string, string[]>;
+  scores: Record<string, number>;
+  scoreSource: string;
+}
+
 // nameOf maps a catalog id -> its display name; the leaderboard ranks by NAME (the id
 // is an opaque API rawId). Defaults to identity when names aren't available.
-export async function computeSorts(def, ranking, nameOf = (id) => id) {
+export async function computeSorts(
+  def: SortableProviderDef,
+  ranking: string[],
+  nameOf: (id: string) => string = (id) => id,
+): Promise<ComputedSorts> {
   const ids = Array.isArray(ranking) ? ranking : [];
-  const sorts = [];                 // [{ id, label }], offered sources beyond manual
-  const sortOrders = {};            // { id: [modelId] }, precomputed order per source
-  let scores = {};                  // { id: number }, live leaderboard quality scores
+  const sorts: Array<{ id: string; label: string }> = [];    // offered sources beyond manual
+  const sortOrders: Record<string, string[]> = {};           // precomputed order per source
+  let scores: Record<string, number> = {};                   // live leaderboard quality scores
   let scoreSource = "";             // provenance of those scores (e.g. "Artificial Analysis via OpenRouter")
 
   for (const entry of (def && def.sorts) || []) {
@@ -35,7 +60,8 @@ export async function computeSorts(def, ranking, nameOf = (id) => id) {
         sortOrders[entry.id] = Array.isArray(order) && order.length ? order : ids.slice();
       }
     } catch (e) {
-      log("sort '" + (entry && entry.id || entry) + "' failed: " + e);
+      const entryId = entry && typeof entry === "object" ? entry.id : entry;
+      log("sort '" + entryId + "' failed: " + (e instanceof Error ? e.message : String(e)));
     }
   }
 

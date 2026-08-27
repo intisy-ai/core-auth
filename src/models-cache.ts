@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Shared model-catalog cache. core-auth fetches a provider's live models (via
 // def.fetchModels) and writes them here; both the app-config merge and the
 // loader's Providers tab read this file instead of a hardcoded list.
@@ -7,30 +6,66 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { configFolder } from "./env.js";
 import { log } from "./log.js";
+import type { ProviderDef, ProviderModel } from "./types.js";
 
 const MODELS_FILE = "models.json";
 
-function cachePath() {
+export interface ModelFetchCtx {
+  configDir: string;
+  log: (message: string) => void;
+  hasAccounts: boolean;
+}
+
+export interface ModelFetchResult {
+  models: Record<string, ProviderModel>;
+  ranking?: string[];
+  defaultModelId?: string;
+}
+
+/**
+ * A provider def widened with the live-fetch capability {@link ProviderDef} does not yet declare.
+ *
+ * @remarks
+ * `fetchModels` is read here (and `sorts`/`settings`/`quotaNote`/`quotaDisabled` elsewhere in this
+ * cycle) from real provider drivers that already supply them; the public contract in types.ts has
+ * not caught up. Kept local until that type is extended.
+ */
+export interface ModelFetchingProviderDef extends ProviderDef {
+  fetchModels?: (ctx: ModelFetchCtx) => Promise<ModelFetchResult>;
+}
+
+export interface ModelCacheEntry {
+  models: Record<string, ProviderModel>;
+  ranking?: string[];
+  defaultModelId?: string;
+  fetchedAt?: number;
+  source?: string;
+  sorts?: Array<{ id: string; label: string }>;
+  sortOrders?: Record<string, string[]>;
+  scores?: Record<string, number>;
+  scoreSource?: string;
+}
+
+function cachePath(): string {
   return join(configFolder(), MODELS_FILE);
 }
 
-function readAll() {
+function readAll(): Record<string, ModelCacheEntry> {
   try {
     if (existsSync(cachePath())) return JSON.parse(readFileSync(cachePath(), "utf8")) || {};
   } catch {}
   return {};
 }
 
-// returns { models, ranking, defaultModelId, fetchedAt, sorts, sortOrders, scores } | null
 // NOTE: derived fields (sorts/sortOrders) are returned AS CACHED; we do NOT wipe them
 // on read. Wiping would hide still-valid sources (e.g. leaderboard) until the next
 // refresh. Stale RETIRED sources are filtered surgically in config.getAutoSources by id.
-export function readModelCache(providerId) {
+export function readModelCache(providerId: string): ModelCacheEntry | null {
   const entry = readAll()[providerId];
   return entry && entry.models ? entry : null;
 }
 
-export function writeModelCache(providerId, entry) {
+export function writeModelCache(providerId: string, entry: ModelCacheEntry): void {
   try {
     const all = readAll();
     all[providerId] = { ...entry, fetchedAt: entry.fetchedAt || 0 };
@@ -38,7 +73,7 @@ export function writeModelCache(providerId, entry) {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(cachePath(), JSON.stringify(all, null, 2), "utf8");
   } catch (e) {
-    log("model cache write failed: " + (e && e.message));
+    log("model cache write failed: " + (e instanceof Error ? e.message : String(e)));
   }
 }
 
@@ -46,10 +81,14 @@ export function writeModelCache(providerId, entry) {
 // caching the result; otherwise the last cached catalog; otherwise empty
 // (models stay empty until the first `oc auth login`). `nowMs` is injected so
 // callers can stamp fetchedAt without this module touching Date.now directly.
-export async function resolveProviderModels(def, ctx, nowMs) {
+export async function resolveProviderModels(
+  def: ModelFetchingProviderDef,
+  ctx: ModelFetchCtx,
+  nowMs: number,
+): Promise<Record<string, ProviderModel>> {
   const providerId = def.id;
-  let catalog = null;   // { models, ranking, defaultModelId }
-  let source = null;    // "live" (fetched now) | "static" (shipped fallback list)
+  let catalog: ModelFetchResult | null = null;
+  let source: string | null = null;
 
   // 1. live fetch: providers that implement fetchModels and have an account
   if (typeof def.fetchModels === "function" && ctx && ctx.hasAccounts) {
@@ -87,16 +126,16 @@ export async function resolveProviderModels(def, ctx, nowMs) {
   }
 
   // preserve any previously computed sort metadata; refreshModels updates it.
-  const prev = readModelCache(providerId) || {};
+  const prev = readModelCache(providerId);
   writeModelCache(providerId, {
     models: catalog.models,
     ranking: catalog.ranking,
     defaultModelId: catalog.defaultModelId,
-    source: source || prev.source || "static",   // live vs static-fallback, for the UI badge
-    sorts: prev.sorts || [],
-    sortOrders: prev.sortOrders || {},
-    scores: prev.scores || {},
-    scoreSource: prev.scoreSource || "",
+    source: source || prev?.source || "static",   // live vs static-fallback, for the UI badge
+    sorts: prev?.sorts || [],
+    sortOrders: prev?.sortOrders || {},
+    scores: prev?.scores || {},
+    scoreSource: prev?.scoreSource || "",
     fetchedAt: nowMs || 0,
   });
   return catalog.models;

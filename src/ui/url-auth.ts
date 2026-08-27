@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Unified in-chrome URL authentication for any provider whose driver exposes a
 // loginFlow() (begin -> url, complete(pasted code), optional loopback auto-capture).
 // Builds a menu "input" action a renderer draws natively: it opens the browser,
@@ -18,18 +17,43 @@ import { getConfigDir } from "../env.js";
 import { log } from "../log.js";
 import { refreshModels } from "../refresh.js";
 import { emitActivity } from "../activity.js";
+import type { CoreAccount, ProviderCtx, ProviderDef } from "../types.js";
+import type { MenuInput, MenuNavigation } from "./menu-model.js";
 
-function loginFailedSpec(provider, message) {
+function loginFailedSpec(provider: string, message: string) {
   return { topic: "account", action: "login_failed", impact: "error", outcome: "failed", subject: { kind: "account", id: "?" }, details: { provider, message } };
 }
 
-function loginSucceededSpec(provider, account, durationMs) {
+function loginSucceededSpec(provider: string, account: CoreAccount, durationMs: number) {
   const subjectId = account.email || account.id;
   return { topic: "account", action: "login_succeeded", impact: "notice", outcome: "ok", durationMs, subject: { kind: "account", id: subjectId, label: subjectId }, details: { provider } };
 }
 
-export async function buildLoginInput(def) {
-  const flow = await def.loginFlow({ configDir: getConfigDir(), log });
+export interface LoginFlowResult {
+  url: string;
+  instructions?: string;
+  complete: (input?: string) => Promise<CoreAccount | null>;
+  /** Resolves when the browser hits the localhost redirect; omitted if the provider has no loopback. */
+  loopback?: Promise<CoreAccount | null>;
+  /** Releases the listener when the input is dismissed or superseded. */
+  cancel?: () => void;
+}
+
+/**
+ * A provider def whose {@link ProviderDef.loginFlow} resolves the full shape this module reads
+ * (loopback + cancel); {@link ProviderDef} itself declares only url/instructions/complete.
+ */
+export type LoginCapableProviderDef = Omit<ProviderDef, "loginFlow"> & {
+  loginFlow?: (ctx: ProviderCtx) => Promise<LoginFlowResult>;
+};
+
+/**
+ * @remarks
+ * Callers must confirm `def.loginFlow` exists first (e.g. `typeof def.loginFlow === "function"`,
+ * as menu-model.ts's addAccount item does); called otherwise, this throws immediately below.
+ */
+export async function buildLoginInput(def: LoginCapableProviderDef): Promise<{ input: MenuInput }> {
+  const flow = await def.loginFlow!({ configDir: getConfigDir(), log });
   openBrowser(flow.url);
   const provider = def.id;
   // a login is the one account operation a user WAITS on (browser round trip, token
@@ -45,12 +69,12 @@ export async function buildLoginInput(def) {
       pendingLabel: "Adding account… (exchanging the code, this can take a few seconds)",
       // paste fallback: trade the pasted code/redirect URL for an account, then pull
       // the now-authed account's models so they appear without an app restart
-      complete: async (text) => {
-        let account;
+      complete: async (text: string): Promise<MenuNavigation> => {
+        let account: CoreAccount | null;
         try {
           account = await flow.complete(text);
         } catch (error) {
-          emitActivity(loginFailedSpec(provider, (error && error.message) || String(error)), provider);
+          emitActivity(loginFailedSpec(provider, error instanceof Error ? error.message : String(error)), provider);
           throw error;
         }
         if (account && account.refresh) {
@@ -62,15 +86,15 @@ export async function buildLoginInput(def) {
         return { refresh: true };
       },
       // primary path: the loopback listener auto-completes the input when it fires
-      background: flow.loopback ? flow.loopback.then(async (account) => {
+      background: flow.loopback ? flow.loopback.then(async (account): Promise<{ refresh: true } | null> => {
         if (!account) { emitActivity(loginFailedSpec(provider, "loopback login returned no account"), provider); return null; }
         await refreshModels(def).catch(() => {});
         emitActivity(loginSucceededSpec(provider, account, elapsed()), provider);
         return { refresh: true };
-      }).catch((error) => {
-        emitActivity(loginFailedSpec(provider, (error && error.message) || String(error)), provider);
+      }).catch((error: unknown) => {
+        emitActivity(loginFailedSpec(provider, error instanceof Error ? error.message : String(error)), provider);
         return null;
-      }) : null,
+      }) : undefined,
       // release the listener when the input is dismissed / superseded
       onClose: typeof flow.cancel === "function" ? flow.cancel : undefined,
     },

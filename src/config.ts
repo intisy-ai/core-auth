@@ -1,4 +1,3 @@
-// @ts-nocheck
 // core-auth config: the active provider and harness settings, stored in
 // config/auth.json (preferred) with a top-level fallback.
 
@@ -55,6 +54,12 @@ export function setActiveProvider(name: string): void {
 // here when retiring a sort source.
 const RETIRED_SOURCES = new Set<string>(["recommended"]);
 
+interface StoredAutoConfig {
+  order?: string[];
+  excluded?: string[];
+  source?: string;
+}
+
 // Available sources for a provider: always manual, plus whatever the cache advertises
 // (minus any retired ids).
 export function getAutoSources(providerId: string): Array<{ id: string; label: string }> {
@@ -67,7 +72,7 @@ export function getAutoSources(providerId: string): Array<{ id: string; label: s
 export function getAutoConfig(providerId: string): {
   order: string[]; excluded: string[]; source: string; sources: Array<{ id: string; label: string }>;
 } {
-  const stored = (readConfig().auto || {})[providerId] || {};
+  const stored: StoredAutoConfig = (readConfig().auto || {})[providerId] || {};
   const cache = readModelCache(providerId);
   const catalogOrder: string[] = (cache && cache.ranking) || [];
   const sortOrders: Record<string, string[]> = (cache && cache.sortOrders) || {};

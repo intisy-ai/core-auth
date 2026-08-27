@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Generic in-process provider plugin. The app-specific hook shape and the app<->IR codec come
 // from the app-layer front-door resolved at runtime; core-auth names no app.
 
@@ -9,9 +8,12 @@ import { listAccounts } from "./accounts.js";
 import { isTTY } from "./ui/ansi.js";
 import { runProviderMenu } from "./menu.js";
 import { refreshModels } from "./refresh.js";
-import { resolveAppFrontDoor } from "./frontdoor.js";
+import { resolveAppFrontDoor, type FrontDoorToolkit } from "./frontdoor.js";
+import type { ProviderCtx, ProviderDef } from "./types.js";
 
-function proxyTarget(env) {
+type ProxyEnv = Record<string, string | undefined>;
+
+function proxyTarget(env: ProxyEnv | undefined): { mode: "proxy"; port: number } | { mode: "direct" } {
   if (env && env.HUB_OC_PROXY === "1") {
     const parsed = parseInt(env.HUB_PROXY_PORT || "34568", 10);
     const port = Number.isFinite(parsed) && parsed > 0 ? parsed : 34568;
@@ -20,7 +22,7 @@ function proxyTarget(env) {
   return { mode: "direct" };
 }
 
-export async function dispatchFetch(def, request, env, ctx) {
+export async function dispatchFetch(def: ProviderDef, request: Request, env: ProxyEnv | undefined, ctx: ProviderCtx): Promise<Response> {
   const target = proxyTarget(env);
   if (target.mode === "proxy") {
     const u = new URL(request.url);
@@ -34,14 +36,26 @@ export async function dispatchFetch(def, request, env, ctx) {
   );
 }
 
-function toolkit(configDir) {
-  return { refreshModels, listAccounts, runProviderMenu, dispatchFetch, setAppClient, isTTY, configDir, log };
+function toolkit(configDir: string): FrontDoorToolkit {
+  return {
+    // FrontDoorToolkit declares refreshModels as void-returning; core-auth's own refreshModels
+    // resolves the refreshed catalog for ITS callers, so this adapts the shape at the crossing
+    // without changing what runs (the app front door never read the resolved value anyway).
+    refreshModels: async (def: ProviderDef) => { await refreshModels(def); },
+    listAccounts,
+    runProviderMenu,
+    dispatchFetch,
+    setAppClient,
+    isTTY,
+    configDir,
+    log,
+  };
 }
 
 export type ProviderPlugin = (input: any) => Promise<any>;
 
-export function createProviderPlugin(def) {
-  return async function (input) {
+export function createProviderPlugin(def: ProviderDef): ProviderPlugin {
+  return async function (input: any) {
     await refreshModels(def);
     try { setAppClient(input && input.client); } catch { /* best-effort */ }
     const configDir = getConfigDir();

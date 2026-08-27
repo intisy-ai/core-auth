@@ -1,4 +1,3 @@
-// @ts-nocheck
 // App-agnostic model refresh, shared by the provider plugin startup, `oc auth login`,
 // and the loader's in-tab account menu. Resolving the catalog (live fetch -> static ->
 // cache) is host-neutral and auth-aware (a live fetch only runs when the provider has
@@ -17,6 +16,7 @@ import { listAccounts } from "./accounts.js";
 import { resolveProviderModels, readModelCache, writeModelCache } from "./models-cache.js";
 import { computeSorts } from "./sorts.js";
 import { emitActivity } from "./activity.js";
+import type { ProviderDef } from "./types.js";
 
 /** Whether the active app declares a config file this library merges a model catalog into. */
 export function mergesModelCatalog(): boolean {
@@ -71,7 +71,7 @@ export function mergeModels(providerId: string, models: Record<string, unknown>,
   try {
     if (!existsSync(dirname(path))) mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
-  } catch (e) { log("model catalog merge failed: " + (e && e.message)); }
+  } catch (e) { log("model catalog merge failed: " + (e instanceof Error ? e.message : String(e))); }
 }
 
 // Resolve the provider's catalog and persist it: always refresh the model cache, and merge the
@@ -82,7 +82,7 @@ export function mergeModels(providerId: string, models: Record<string, unknown>,
 // there is no target file and no provider key to write under, so there is nothing a caller could
 // force. A startup call inside the app's own process, where HUB_CONFIG_DIR may be unset, still
 // resolves its home from the descriptor's own declared candidates.
-export async function refreshModels(def): Promise<Record<string, unknown>> {
+export async function refreshModels(def: ProviderDef): Promise<Record<string, unknown>> {
   let models: Record<string, unknown> = {};
   const startedAt = Date.now();
   try {

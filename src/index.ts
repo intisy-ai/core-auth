@@ -1,9 +1,8 @@
-// @ts-nocheck
 // Public surface of the core-auth library, bundled into each provider plugin.
 
 export { defineProvider } from "./provider.js";
 export { defineProviderPlugin } from "./provider-plugin.js";
-export type { ProviderPluginOpts, ProviderPluginCore } from "./provider-plugin.js";
+export type { ProviderPluginOpts } from "./provider-plugin.js";
 export {
   COMMON_PROVIDER_DEFAULTS,
   COMMON_PROVIDER_CAPABILITIES,
