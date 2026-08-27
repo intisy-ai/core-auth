@@ -13,7 +13,6 @@ import { buildSettingsMenu } from "./settings-menu.js";
 import { refreshModels } from "../refresh.js";
 import { leaderboardSourceShort } from "../leaderboard.js";
 import type { SelectItemColor, SelectItemKind } from "./select.js";
-import type { ProxyScope } from "../proxy/store.js";
 import type { AccountQuota, AccountView, ProviderDef } from "../types.js";
 
 /** What a menu item's `run` tells the renderer to do next. */
@@ -150,9 +149,7 @@ function buildProxyMenu(def: ProviderDef): AccountMenu {
     {
       label: "Add proxy to this scope", color: "green",
       run: () => ({ input: { title: "Proxy URL", message: "host:port or http://...", complete: (url: string) => {
-        // parseScopeKey and ProxyScope are two faces of the same Java-side JSON encoding
-        // (see proxy/scopes.ts); the round trip is what makes this cast honest.
-        if (url) proxyManager.addManual(url, parseScopeKey(proxyScopeKey) as ProxyScope);
+        if (url) proxyManager.addManual(url, parseScopeKey(proxyScopeKey));
         return { refresh: true };
       } } }),
     },

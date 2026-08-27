@@ -18,13 +18,6 @@ export interface ReportRateLimitOpts {
   ipSuspected?: boolean;
 }
 
-// scopes.ts's proxy* lookups are typed generically (ProxyStoreLike / unknown[]) so that layer
-// stays agnostic to the store's concrete shape; every pick they return is an element of THIS
-// module's own store.proxies, so re-asserting the result as ProxyEntry[] here is honest.
-function asProxyEntries(list: unknown[]): ProxyEntry[] {
-  return list as ProxyEntry[];
-}
-
 function scored(store: ProxyStore, proxies: ProxyEntry[]): ScoredProxyEntry[] {
   return proxies.map((p) => ({ ...p, score: scoreOf(store, p), inUse: countAssignments(store, p.url) })).sort((a, b) => a.score - b.score);
 }
@@ -54,7 +47,7 @@ export class ProxyManager {
   /** Every proxy in a scope, best-first, annotated with score and in-use count. */
   proxiesForScope(key: string): ScoredProxyEntry[] {
     const store = this.load();
-    return scored(store, asProxyEntries(proxiesInScope(store, key)));
+    return scored(store, proxiesInScope(store, key));
   }
   /** One proxy by URL, annotated with score and in-use count; `null` if not found. */
   get(url: string): ScoredProxyEntry | null {
@@ -103,7 +96,7 @@ export class ProxyManager {
       for (const key of chain) if (stickyUsable(store, key, current)) return current;
     }
     for (const key of chain) {
-      const cands = asProxyEntries(candidatesForScope(store, key, accountId ?? null));
+      const cands = candidatesForScope(store, key, accountId ?? null);
       if (cands.length) {
         const chosen = cands[0].url;
         if (accountId) updateProxyStore((s) => { s.assignments[accountId] = chosen; });
@@ -118,7 +111,7 @@ export class ProxyManager {
     const store = this.load();
     const chain = resolveChain(store, null, providerId);   // no account scope yet
     for (const key of chain) {
-      const cands = asProxyEntries(candidatesForScope(store, key, null));
+      const cands = candidatesForScope(store, key, null);
       if (cands.length) return cands[0].url;
     }
     return null;

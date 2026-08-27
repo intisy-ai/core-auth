@@ -77,7 +77,6 @@ export { proxiedFetch, timeoutFetch } from "./net.js";
 export type { ProxyManagerLike, ProxiedFetchOpts, ProxiedFetchResult } from "./net.js";
 export { qualityLabel, isIpLimited, IP_LIMIT_COOLDOWN_MS, MAX_ACCOUNTS_PER_PROXY } from "./proxy/scoring.js";
 export { scopeKey, parseScopeKey, effectiveMode, resolveChain, proxiesInScope, candidatesForScope } from "./proxy/scopes.js";
-export type { ProxyStoreLike } from "./proxy/scopes.js";
 export type { ProxyProviderConfig } from "./proxy/providers.js";
 export { runProxyMenu, selectAccountProxies } from "./ui/proxy-menu.js";
 export { runProviderMenu } from "./menu.js";
