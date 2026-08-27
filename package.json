@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@intisy-ai/api": "^1.0.2",
-    "@intisy-ai/core": "^2.0.0",
+    "@intisy-ai/core": "^2.6.0",
     "@intisy-ai/core-ir": "^1.4.0"
   },
   "devDependencies": {
