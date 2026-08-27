@@ -31,8 +31,9 @@ function lockOpts(opts: AccountStoreLocation | null | undefined): StoreLockOpts 
 
 // LiveStoreLike.get() may report an absent key as undefined as well as null (it also serves the
 // npm core's own LiveStoreLike contract); CoreAuthJsStore only knows null, so normalize at the
-// crossing rather than widening the Java-facing type.
-function asJsStore(store: LiveStoreLike): CoreAuthJsStore {
+// crossing rather than widening the Java-facing type. Exported so manager.ts's own jsStore()
+// bridge, over the same createLiveStore, crosses at the exact same point rather than a second one.
+export function asJsStore(store: LiveStoreLike): CoreAuthJsStore {
   return {
     get: (key) => store.get(key) ?? null,
     put: (key, value) => store.put(key, value),
