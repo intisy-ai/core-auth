@@ -68,7 +68,7 @@ export async function proxiedFetch(
       return { transportFailed: true, proxyUsed: false };
     }
   }
-  if (proxyOk) opts.proxyManager?.reportResult(proxyUrl, true, Date.now() - started);
+  if (proxyOk && proxyUrl) opts.proxyManager?.reportResult(proxyUrl, true, Date.now() - started);
 
   return { response, proxyUsed: !!proxyUrl, transportFailed: false };
 }

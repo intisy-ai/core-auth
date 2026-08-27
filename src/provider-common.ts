@@ -27,13 +27,21 @@ export const COMMON_PROVIDER_CAPABILITIES = [
   },
 ];
 
+// Matches this file's own select options (COMMON_PROVIDER_CAPABILITIES above) and
+// the Java Strategy enum (ROUND_ROBIN, STICKY, HYBRID) one to one.
+export type AccountSelectionStrategy = "hybrid" | "sticky" | "round-robin";
+
+function isAccountSelectionStrategy(value: unknown): value is AccountSelectionStrategy {
+  return value === "hybrid" || value === "sticky" || value === "round-robin";
+}
+
 // AccountManager options derived from the common settings, so no provider hardcodes
 // the config key or the default strategy at its construction site. Providers merge
 // their own opts (oauth, backoff, isAvailable) on top.
-export function commonManagerOptions(config?: Record<string, unknown>): { selection: string } {
+export function commonManagerOptions(config?: Record<string, unknown>): { selection: AccountSelectionStrategy } {
   const cfg = config || {};
   const strategy = cfg.account_selection_strategy;
-  return { selection: typeof strategy === "string" ? strategy : "hybrid" };
+  return { selection: isAccountSelectionStrategy(strategy) ? strategy : "hybrid" };
 }
 
 // Retry/backoff: same "base cooldown, doubles per attempt, capped at a max"

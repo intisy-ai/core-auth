@@ -11,7 +11,16 @@ import { getCoreAuth } from "./core-auth-loader.js";
 //
 //   return chatError("All antigravity accounts are rate-limited, resets in ~5h.");
 //   return chatError("Not authenticated, run `cc auth`.", { type: "authentication_error", status: 401 });
-export function chatError(message, opts) {
+export interface ChatErrorOptions {
+  format?: string;
+  status?: number;
+  type?: string;
+  geminiStatus?: string;
+  rateLimited?: boolean;
+  retryAfterMs?: number;
+}
+
+export function chatError(message: string, opts?: ChatErrorOptions): Response {
   const { status, body, headers } = JSON.parse(getCoreAuth().chatError(message, JSON.stringify(opts || {})));
   return new Response(body, { status, headers });
 }

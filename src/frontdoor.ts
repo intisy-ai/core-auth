@@ -21,6 +21,11 @@ export interface AppFrontDoor {
 
 let CACHED: AppFrontDoor | null | undefined;
 
+function isAppFrontDoor(value: unknown): value is AppFrontDoor {
+  const candidate = value as { serve?: unknown; buildPluginHooks?: unknown } | null | undefined;
+  return !!candidate && typeof candidate.serve === "function" && typeof candidate.buildPluginHooks === "function";
+}
+
 function candidatePaths(configDir: string): string[] {
   const fromEnv = process.env.HUB_APP_FRONTDOOR;
   const paths: string[] = [];
@@ -42,8 +47,8 @@ export async function resolveAppFrontDoor(ctx: { configDir: string }): Promise<A
   for (const p of candidatePaths(ctx.configDir)) {
     try {
       const mod = await importModuleFromPath(p);
-      const fd = mod.appFrontDoor || mod.default;
-      if (fd && typeof fd.serve === "function" && typeof fd.buildPluginHooks === "function") {
+      const fd: unknown = mod.appFrontDoor || mod.default;
+      if (isAppFrontDoor(fd)) {
         CACHED = fd; return CACHED;
       }
     } catch { /* try next candidate */ }

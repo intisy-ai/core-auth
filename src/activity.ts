@@ -2,9 +2,13 @@
 // host that owns the event bus injects core's emitEvent here, mirroring setNotifier.
 // Unset (default) makes emitActivity a harmless no-op.
 
-let emitter = null;
-export function setActivityEmitter(fn) { emitter = typeof fn === "function" ? fn : null; }
-export function emitActivity(spec, source = "core-auth") {
+type ActivityEmitterFn = (spec: unknown, source: string) => void;
+
+let emitter: ActivityEmitterFn | null = null;
+export function setActivityEmitter(fn: unknown): void {
+  emitter = typeof fn === "function" ? (fn as ActivityEmitterFn) : null;
+}
+export function emitActivity(spec: unknown, source = "core-auth"): void {
   if (!emitter) return;
   try { emitter(spec, source); } catch {}
 }

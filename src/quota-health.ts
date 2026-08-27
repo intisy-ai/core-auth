@@ -10,7 +10,7 @@ export interface QuotaPool {
 }
 
 /** Does the account still have capacity in at least one pool? */
-export function hasCapacity(pools) {
+export function hasCapacity(pools: QuotaPool[]): boolean {
   return getCoreAuth().quotaHasCapacity(JSON.stringify(pools || []));
 }
 
@@ -19,6 +19,6 @@ export function hasCapacity(pools) {
  * own limit? Identical decision to hasCapacity, exposed under its own name since callers reach
  * for it by the proxy-signal concept (feeds proxyManager.reportRateLimit(url, { ipSuspected })).
  */
-export function ipSuspected(pools) {
+export function ipSuspected(pools: QuotaPool[]): boolean {
   return hasCapacity(pools);
 }

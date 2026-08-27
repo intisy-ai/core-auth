@@ -57,8 +57,7 @@ function formatValue(field: SettingsMenuField, value: unknown): string {
   return String(value);
 }
 
-function fieldItem(def: SettingsMenuDef, field: SettingsMenuField): MenuItem {
-  const settings = def.settings as SettingsAccessor;
+function fieldItem(settings: SettingsAccessor, field: SettingsMenuField): MenuItem {
   const value = settings.get(field.key);
   const label = field.label + "  " + "[" + formatValue(field, value) + "]";
   if (field.type === "bool") {
@@ -95,7 +94,8 @@ function fieldItem(def: SettingsMenuDef, field: SettingsMenuField): MenuItem {
 }
 
 export function buildSettingsMenu(def: SettingsMenuDef, groupIndex?: number): Menu {
-  const groups = (def.settings && def.settings.groups) || [];
+  const settings = def.settings;
+  const groups = settings?.groups || [];
   // more than one section: top level lists the sections
   if (groupIndex === undefined && groups.length > 1) {
     const items: MenuItem[] = [{ label: "Back", run: () => ({ pop: true }) }];
@@ -104,6 +104,8 @@ export function buildSettingsMenu(def: SettingsMenuDef, groupIndex?: number): Me
   }
   const group: SettingsMenuGroup = groups[groupIndex || 0] || { title: "Settings", fields: [] };
   const items: MenuItem[] = [{ label: "Back", run: () => ({ pop: true }) }];
-  for (const field of group.fields) items.push(fieldItem(def, field));
+  if (settings) {
+    for (const field of group.fields) items.push(fieldItem(settings, field));
+  }
   return { title: def.label + " - " + group.title, subtitle: "Enter to change · blank input resets to default · applies on restart", items };
 }

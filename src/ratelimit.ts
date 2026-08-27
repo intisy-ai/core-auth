@@ -4,6 +4,8 @@
 // reimplementing this math in TS. isCoolingDown stays here as a thin, stateless host shim: it's a
 // pure sync read over an already-loaded account object, used by controller.ts's list-view status
 // label (no store I/O, no Java call needed for a single boolean check).
-export function isCoolingDown(account, now) {
+import type { CoreAccount } from "./types.js";
+
+export function isCoolingDown(account: CoreAccount, now: number): boolean {
   return typeof account.coolingDownUntil === "number" && account.coolingDownUntil > now;
 }

@@ -34,6 +34,10 @@ describe("common provider settings", () => {
     expect(commonManagerOptions({}).selection).toBe("hybrid");
     expect(commonManagerOptions(undefined).selection).toBe("hybrid");
   });
+
+  it("falls back to hybrid when the strategy is an empty string", () => {
+    expect(commonManagerOptions({ account_selection_strategy: "" }).selection).toBe("hybrid");
+  });
 });
 
 describe("retry/backoff shared schema", () => {

@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 
-export async function prompt(message) {
+export async function prompt(message: string): Promise<string | null> {
   const rl = createInterface({ input: stdin, output: stdout });
   try {
     const answer = await rl.question(message + " ");
