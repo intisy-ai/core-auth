@@ -9,8 +9,10 @@
 import { toCapabilitiesFields, toSettingsGroups, type ProviderSettingsSchema, type CapabilitiesField } from "./settings-schema.js";
 
 /** Default value for the account-selection config key every provider spreads into its own defineConfig. */
-export const COMMON_PROVIDER_DEFAULTS = {
+export const COMMON_PROVIDER_DEFAULTS: {
   /** Default selection strategy. */
+  account_selection_strategy: AccountSelectionStrategy;
+} = {
   account_selection_strategy: "hybrid",
 };
 
