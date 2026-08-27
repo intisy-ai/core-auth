@@ -2,7 +2,7 @@ package io.github.intisy.ai.shared.oauth;
 
 /**
  * Java analog of the JS {@code { access, expires, refresh }} object returned by
- * {@code refreshAccessToken} (see {@code libs/core-auth/src/oauth.ts:99-103}).
+ * {@code refreshAccessToken} (see {@code libs/core-auth/src/oauth.ts}).
  */
 public class Refreshed {
     /** The new access token. */

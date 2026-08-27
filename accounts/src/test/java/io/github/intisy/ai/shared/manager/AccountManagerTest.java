@@ -28,10 +28,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Parity tests for the shared port of {@code libs/core-auth/src/oauth.ts} +
- * {@code libs/core-auth/src/manager.ts} (ported from {@code core}'s {@code AccountManagerTest}),
- * rewired onto the SPIs: a fake {@link HttpClient} (no network), an in-memory {@link Store}, a
- * fixed {@link Clock}, and a deterministic {@link Random} -- fully deterministic, no wall-clock
- * or real I/O.
+ * {@code libs/core-auth/src/manager.ts}, rewired onto the SPIs: a fake {@link HttpClient} (no
+ * network), an in-memory {@link Store}, a fixed {@link Clock}, and a deterministic
+ * {@link Random} -- fully deterministic, no wall-clock or real I/O.
  */
 class AccountManagerTest {
 

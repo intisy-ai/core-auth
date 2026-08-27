@@ -3,7 +3,7 @@ package io.github.intisy.ai.shared.model;
 import java.util.Map;
 
 /**
- * Java analog of the JS {@code CoreAccount} (see {@code libs/core-auth/src/types.ts:29-43}).
+ * Java analog of the JS {@code CoreAccount} (see {@code libs/core-auth/src/types.ts}).
  *
  * Field names and declaration order match the JS source EXACTLY for JSON byte-compatibility:
  * the on-disk {@code accounts.json} must be readable/writable by both this class (via the

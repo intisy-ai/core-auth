@@ -1,8 +1,8 @@
 package io.github.intisy.ai.shared.select;
 
 /**
- * Account selection strategy, ported from the string literals in
- * {@code libs/core-auth/src/selection.ts} ("round-robin" / "sticky" / "hybrid").
+ * Account selection strategy. The wire values are the string literals {@code "round-robin"},
+ * {@code "sticky"} and {@code "hybrid"}.
  */
 public enum Strategy {
     /** Advances the cursor on every call, cycling through every available account in turn. */

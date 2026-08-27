@@ -12,7 +12,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Parity tests for the shared port of {@code libs/core-auth/src/selection.ts} and
+ * Parity tests for account selection and the shared port of
  * {@code libs/core-auth/src/ratelimit.ts}. All times are passed in explicitly (no
  * wall-clock reads) so the tests are fully deterministic.
  */
@@ -163,7 +163,7 @@ class SelectionTest {
     void hybridWithCustomPredicateFloorsSoonestFreeToNow() {
         // JS ratelimit.ts: availableAt(account, lane, now) = Math.max(t, now) -- every candidate
         // is floored to `now` before comparison. When a custom predicate (e.g. antigravity's
-        // verificationRequired check, ported later) is the ONLY reason accounts are unavailable,
+        // verificationRequired check) is the ONLY reason accounts are unavailable,
         // and their raw coolingDownUntil timestamps already lie in the past, un-floored math would
         // rank accounts by "how far in the past" and pick whichever happens to be smallest (most
         // stale) -- the WRONG account. Flooring makes all three tie at `now`, and the tie is broken

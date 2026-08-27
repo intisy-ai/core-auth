@@ -4,7 +4,7 @@ import java.util.Map;
 
 /**
  * Java analog of the JS {@code opts} object accepted by {@code refreshAccessToken}
- * (see {@code libs/core-auth/src/oauth.ts:52-62}) - the driver-supplied OAuth endpoint config.
+ * (see {@code libs/core-auth/src/oauth.ts}) - the driver-supplied OAuth endpoint config.
  */
 public class OAuthConfig {
     /** The token endpoint a refresh or code exchange POSTs to. */
