@@ -26,27 +26,39 @@ function soonestAvailable(account: CoreAccount, now: number): number {
 
 /** The minimal AccountManager surface accountControllerFromManager needs, so this module never depends on manager.ts. */
 export interface AccountManagerLike {
+  /** Every stored account. */
   list(): CoreAccount[];
+  /** Atomic read-modify-write on one account. */
   mutate(id: string, fn: (account: CoreAccount) => void): void;
+  /** Removes an account by id. */
   remove(id: string): void;
+  /** Forces a token refresh; resolves `false` when the account cannot be refreshed. */
   refresh(id: string): Promise<boolean>;
 }
 
+/** Provider hooks {@link accountControllerFromManager} layers onto a generic AccountManager. */
 export interface AccountControllerOptions {
+  /** Computes an account's selection eligibility; defaults to the generic enabled/cooldown/rate-limit rules. */
   status?: (account: CoreAccount, now: number) => AccountStatus;
+  /** Computes a human-readable status note for an account. */
   detail?: (account: CoreAccount, now: number) => string | undefined;
+  /** Computes an account's quota readings. */
   quota?: (account: CoreAccount) => AccountQuota[] | undefined;
-  // availableAt lets a provider report usability from its own signal (e.g. quota pools) instead of
-  // the generic per-lane backoff, since a single transient lane limit shouldn't read as "the whole
-  // account is down" when other lanes still serve.
+  /** Reports usability from the provider's own signal (e.g. quota pools) instead of the generic per-lane backoff, since a single transient lane limit shouldn't read as "the whole account is down" when other lanes still serve. */
   availableAt?: (account: CoreAccount, now: number) => number;
+  /** Runs the provider's login flow. */
   login?: () => Promise<AccountView | null>;
+  /** Refreshes quota for every account. */
   refreshQuota?: () => Promise<void>;
+  /** Refreshes quota for one account. */
   refreshQuotaOne?: (id: string) => Promise<void>;
+  /** Extra top-level menu items. */
   actions?: () => MenuAction[];
+  /** Extra per-account menu items. */
   accountActions?: (view: AccountView) => MenuAction[];
 }
 
+/** Builds an {@link AccountController} from a generic AccountManager, so a provider need only supply its status/quota/detail/login hooks rather than re-implement list/enable/remove. */
 export function accountControllerFromManager(manager: AccountManagerLike, opts?: AccountControllerOptions): AccountController {
   const options = opts || {};
   return {
@@ -73,9 +85,11 @@ export function accountControllerFromManager(manager: AccountManagerLike, opts?:
   };
 }
 
-// Refresh one account's OAuth token via the manager and report success/failure.
-// Fully generic (manager.refresh() already encapsulates the OAuth refresh call),
-// so unlike verifyAllAccounts this needs no provider-specific hook.
+/**
+ * Refreshes one account's OAuth token via the manager and prints success/failure.
+ *
+ * @remarks Fully generic (`manager.refresh()` already encapsulates the OAuth refresh call), so unlike {@link verifyAllAccounts} this needs no provider-specific hook.
+ */
 export async function refreshAccountToken(manager: AccountManagerLike, view: Pick<CoreAccount, "id" | "email">): Promise<void> {
   const name = view.email || view.id;
   try {
@@ -85,9 +99,11 @@ export async function refreshAccountToken(manager: AccountManagerLike, view: Pic
   }
 }
 
-// Verify every enabled account, skipping disabled ones, then print a summary. The
-// actual ping is provider-specific (each provider hits its own upstream endpoint),
-// so it is injected as `verify`; this owns the shared loop/skip/summary shape.
+/**
+ * Verifies every enabled account, skipping disabled ones, then prints a summary.
+ *
+ * @param verify the provider-specific ping against its own upstream endpoint; this owns only the shared loop/skip/summary shape
+ */
 export async function verifyAllAccounts(
   manager: AccountManagerLike,
   verify: (manager: AccountManagerLike, account: Pick<CoreAccount, "id" | "email">) => Promise<void>,

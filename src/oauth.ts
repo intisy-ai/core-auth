@@ -6,24 +6,38 @@ import { getCoreAuth } from "./core-auth-loader.js";
 import { proxiedFetch, type ProxiedFetchOpts } from "./net.js";
 import type { CoreAccount } from "./types.js";
 
-export function isOAuthAuth(auth: unknown): auth is { type: "oauth" } {
+/** Whether `auth` is an OAuth-style credential, as opposed to an API key or other auth shape. */
+export function isOAuthAuth(auth: unknown): auth is {
+  /** Discriminates an OAuth-style credential from other auth shapes. */
+  type: "oauth";
+} {
   return !!auth && typeof auth === "object" && (auth as { type?: unknown }).type === "oauth";
 }
 
-// Delegates to CoreAuthJs.accessTokenExpired (TokenRefresh.accessTokenExpired, java/accounts),
-// the single-sourced expired-or-missing predicate with the 60s clock-skew buffer.
+/**
+ * Whether an account's access token is expired or missing.
+ *
+ * @remarks
+ * Delegates to the single-sourced predicate in Java (`TokenRefresh.accessTokenExpired`,
+ * `java/accounts`), which applies a 60s clock-skew buffer.
+ */
 export function accessTokenExpired(auth: Pick<CoreAccount, "access" | "expires"> | null | undefined): boolean {
   return getCoreAuth().accessTokenExpired(JSON.stringify(auth || {}), Date.now());
 }
 
-// Delegates to CoreAuthJs.calculateTokenExpiry (OAuthWire, java/accounts), which both OAuth grants
-// use. A non-number crosses as NaN, which the engine reads as "the endpoint reported no expires_in".
+/**
+ * Computes the absolute expiry time for a token issued at `requestTimeMs`.
+ *
+ * @param requestTimeMs when the token was issued, in epoch milliseconds
+ * @param expiresInSeconds the endpoint's `expires_in`; a non-number is read as "not reported"
+ * @remarks Delegates to the single-sourced `OAuthWire` calculation in Java (`java/accounts`), which both OAuth grants use.
+ */
 export function calculateTokenExpiry(requestTimeMs: number, expiresInSeconds: unknown): number {
   const seconds = typeof expiresInSeconds === "number" ? expiresInSeconds : NaN;
   return getCoreAuth().calculateTokenExpiry(requestTimeMs, seconds);
 }
 
-// Packs an OAuth `state` param as URL-safe base64 so it survives a redirect roundtrip.
+/** Packs an OAuth `state` param as URL-safe base64 so it survives a redirect roundtrip. */
 export function encodeState(payload: unknown): string {
   return getCoreAuth().encodeState(JSON.stringify(payload));
 }
@@ -33,24 +47,38 @@ interface DecodedState {
   payload: string;
 }
 
-// Unpacks a `state` param produced by encodeState and asserts the PKCE verifier is present.
+/**
+ * Unpacks a `state` param produced by {@link encodeState}.
+ *
+ * @throws if the state is malformed or its PKCE verifier is missing
+ */
 export function decodeState(state: unknown): unknown {
   const result: DecodedState = JSON.parse(getCoreAuth().decodeState(String(state)));
   if (result.error) throw new Error(result.error);
   return JSON.parse(result.payload);
 }
 
+/** Options for constructing a {@link TokenRefreshError}. */
 export interface TokenRefreshErrorOptions {
+  /** The error message. */
   message: string;
+  /** The token endpoint's own error code, e.g. `"invalid_grant"`. */
   code?: string;
+  /** The token endpoint's human-readable error description. */
   description?: string;
+  /** The HTTP status the token endpoint returned. */
   status?: number;
 }
 
+/** A failure from {@link refreshAccessToken}; `revoked` is true when the refresh token itself needs reauth. */
 export class TokenRefreshError extends Error {
+  /** The token endpoint's own error code, e.g. `"invalid_grant"`. */
   readonly code?: string;
+  /** The token endpoint's human-readable error description. */
   readonly description?: string;
+  /** The HTTP status the token endpoint returned. */
   readonly status?: number;
+  /** Whether the refresh token itself was revoked, so the account needs a fresh login rather than a retry. */
   readonly revoked: boolean;
   constructor(options: TokenRefreshErrorOptions) {
     super(options.message);
@@ -88,17 +116,27 @@ function httpSendVia(transport: ProxiedFetchOpts): (requestJson: string) => Prom
   };
 }
 
+/** Endpoint and client credentials {@link refreshAccessToken} needs to exchange a refresh token. */
 export interface RefreshAccessTokenOpts {
+  /** The token endpoint. */
   tokenUrl: string;
+  /** OAuth client id. */
   clientId: string;
+  /** OAuth client secret, when the client is confidential rather than public PKCE. */
   clientSecret?: string;
+  /** Extra params to include in the refresh request body. */
   extraParams?: Record<string, string>;
+  /** A proxy URL to route the refresh request through. */
   proxy?: string;
 }
 
+/** The token fields an endpoint returned; a member absent from the response is left `undefined`. */
 export interface RefreshedToken {
+  /** The new access token. */
   access?: string;
+  /** Epoch ms. */
   expires?: number;
+  /** A new refresh token, when the endpoint rotated it. */
   refresh?: string;
 }
 
@@ -109,9 +147,15 @@ interface RefreshTokenResult {
   refresh?: string;
 }
 
-// `transport` is net.ts's ProxiedFetchOpts: passing { proxyManager, accountId, providerId } binds
-// the refresh to the account's sticky proxy, so upstream sees one IP for a refresh and for the
-// requests it authorizes.
+/**
+ * Exchanges a refresh token for a new access token.
+ *
+ * @param transport `net.ts`'s `ProxiedFetchOpts`; passing `{ proxyManager, accountId, providerId }`
+ * binds the refresh to the account's sticky proxy, so upstream sees one IP for a refresh and for
+ * the requests it authorizes.
+ * @returns `undefined` if `refreshToken` is empty
+ * @throws {TokenRefreshError} if the endpoint refuses the refresh or cannot be reached
+ */
 export async function refreshAccessToken(
   refreshToken: string,
   opts: RefreshAccessTokenOpts,

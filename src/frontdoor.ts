@@ -3,19 +3,31 @@
 
 import { pathToFileURL } from "url";
 
+/** The core-auth primitives an injected {@link AppFrontDoor} is handed so it can build the app's plugin hooks without importing core-auth itself. */
 export interface FrontDoorToolkit {
+  /** Refreshes a provider's model catalog. */
   refreshModels: (def: any, force?: boolean) => Promise<void>;
+  /** Lists a provider's stored accounts as presentation views. */
   listAccounts: (id: string) => any[];
+  /** Runs the shared account-management menu for a provider. */
   runProviderMenu: (def: any) => Promise<void>;
+  /** Serves a provider's app-wire request. */
   dispatchFetch: (def: any, request: Request, env: any, ctx: any) => Promise<Response>;
+  /** Registers the app's plugin client for toast notifications. */
   setAppClient: (client: any) => void;
+  /** Whether stdin is an interactive terminal. */
   isTTY: () => boolean;
+  /** The active app's home directory. */
   configDir: string;
+  /** Writes to core-auth's own log. */
   log: (m: string) => void;
 }
 
+/** The app-owned adapter between the app's plugin hooks/wire format and canonical IR, resolved at runtime by {@link resolveAppFrontDoor}. */
 export interface AppFrontDoor {
+  /** Builds the app-specific plugin hooks for a provider. */
   buildPluginHooks(def: any, input: any, toolkit: FrontDoorToolkit): any;
+  /** Decodes an app-wire request into IR, calls `handleIr`, and encodes the result back to the app's wire format. */
   serve(request: Request, handleIr: any, ctx: any): Promise<Response>;
 }
 
@@ -35,13 +47,18 @@ function candidatePaths(configDir: string): string[] {
   return paths;
 }
 
-// Raw Node ESM import() rejects bare absolute-path specifiers (Windows reads the drive letter as a URL scheme); a real file: URL is required.
+/**
+ * Imports a module by absolute path or URL.
+ *
+ * @remarks Raw Node ESM `import()` rejects bare absolute-path specifiers (Windows reads the drive letter as a URL scheme), so a plain path is converted to a real `file:` URL first.
+ */
 export async function importModuleFromPath(p: string): Promise<any> {
   const isUrl = p.startsWith("file:") || p.startsWith("data:") || p.startsWith("node:") || /^[a-z][a-z0-9+.-]*:\/\//i.test(p);
   const specifier = isUrl ? p : pathToFileURL(p).href;
   return import(/* @vite-ignore */ specifier);
 }
 
+/** Resolves and caches the app layer's injected {@link AppFrontDoor}; `null` when none is found. */
 export async function resolveAppFrontDoor(ctx: { configDir: string }): Promise<AppFrontDoor | null> {
   if (CACHED !== undefined) return CACHED;
   for (const p of candidatePaths(ctx.configDir)) {
@@ -56,4 +73,5 @@ export async function resolveAppFrontDoor(ctx: { configDir: string }): Promise<A
   CACHED = null; return null;
 }
 
+/** Clears {@link resolveAppFrontDoor}'s cache; test-only. */
 export function __resetFrontDoorCacheForTests() { CACHED = undefined; }

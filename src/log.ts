@@ -37,6 +37,7 @@ function prefixColor(name: string): number {
   return PALETTE[h % PALETTE.length];
 }
 
+/** Writes a log line: to a per-day file under `logs/` unless `auth.json`'s `logging` is `false`, and mirrored to stderr when console logging is globally enabled. Never throws. */
 export function log(message: string): void {
   try {
     if (consoleEnabled()) {

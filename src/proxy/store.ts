@@ -7,32 +7,68 @@ import { randomBytes } from "crypto";
 import { configFolder } from "../env.js";
 import type { ProxyProviderConfig } from "./providers.js";
 
-export type ProxyScope = { type: "global" } | { type: "account"; id: string } | { type: "provider"; id: string };
+/** Which pool a proxy belongs to: every account/provider, one account, or one provider. */
+export type ProxyScope =
+  | {
+      /** Every account and provider. */
+      type: "global";
+    }
+  | {
+      /** Just one account. */
+      type: "account";
+      /** The account id. */
+      id: string;
+    }
+  | {
+      /** Just one provider. */
+      type: "provider";
+      /** The provider id. */
+      id: string;
+    };
 
+/** Health and usage counters for one {@link ProxyEntry}, absent members meaning "never recorded". */
 export interface ProxyStats {
+  /** Total health checks performed. */
   checks?: number;
+  /** Total failed checks. */
   failures?: number;
+  /** Rolling average latency, in milliseconds. */
   avgLatencyMs?: number;
+  /** Total IP-suspected rate limits. */
   ipRateLimitHits?: number;
+  /** Epoch ms of the last successful check. */
   lastOkAt?: number;
+  /** Epoch ms of the last IP-suspected rate limit. */
   lastRateLimitAt?: number;
 }
 
+/** One proxy in the shared pool. */
 export interface ProxyEntry {
+  /** The proxy's URL, e.g. `http://host:port`. */
   url: string;
+  /** The proxy-list source this entry came from, or `"manual"`. */
   provider: string;
+  /** Which pool this proxy belongs to. */
   scope: ProxyScope;
   /** Epoch ms the proxy was added. Absent on an entry migrated from a v1 store that never recorded it. */
   addedAt?: number;
+  /** Health and usage counters. */
   stats: ProxyStats;
 }
 
+/** The whole shared proxy pool, persisted to `<configDir>/config/core-auth-proxies.json`; one pool for all providers. */
 export interface ProxyStore {
+  /** The current store schema version. */
   version: 2;
+  /** Proxy mode per scope key (e.g. `"default"`, `"account:<id>"`); see `scopes.ts`. */
   modes: Record<string, string>;
+  /** Per-source config for every proxy-list source. */
   providers: Record<string, ProxyProviderConfig>;
+  /** Every proxy in the pool. */
   proxies: ProxyEntry[];
+  /** Which proxy URL is currently assigned per scope key. */
   assignments: Record<string, string>;
+  /** User-picked candidate proxy URLs per scope key, for scopes not left to automatic selection. */
   manualSelection: Record<string, string[]>;
 }
 
@@ -55,8 +91,13 @@ interface RawProxyStore {
   manualSelection?: Record<string, string[]>;
 }
 
-// v1 -> v2: owner -> scope{account}, untagged -> scope{global}; single `mode` ->
-// modes.default; manualSelection keyed by accountId -> "account:<id>". Idempotent.
+/**
+ * Normalizes whatever JSON.parse produced from the on-disk store, across every schema version
+ * this has ever shipped, into the current {@link ProxyStore} shape. Idempotent: a v2 store passes
+ * through unchanged, and v1 is migrated (`owner` to `scope.account`, untagged to `scope.global`,
+ * the single `mode` to `modes.default`, `manualSelection` rekeyed from an account id to
+ * `"account:<id>"`).
+ */
 export function migrateStore(raw: unknown): ProxyStore {
   if (!raw || typeof raw !== "object") return empty();
   const input = raw as RawProxyStore;
@@ -76,11 +117,13 @@ export function migrateStore(raw: unknown): ProxyStore {
   return out;
 }
 
+/** Reads the shared proxy store, migrating it to the current schema; an empty store if the file is absent or unreadable. */
 export function loadProxyStore(): ProxyStore {
   try { const f = storeFile(); if (existsSync(f)) return migrateStore(JSON.parse(readFileSync(f, "utf8")) || {}); } catch {}
   return empty();
 }
 
+/** Overwrites the shared proxy store, writing to a temp file and renaming it into place so a reader never sees a torn write; fails silently. */
 export function saveProxyStore(store: ProxyStore): void {
   try {
     if (!existsSync(configFolder())) mkdirSync(configFolder(), { recursive: true });
@@ -91,6 +134,7 @@ export function saveProxyStore(store: ProxyStore): void {
   } catch {}
 }
 
+/** Read-modify-write on the shared proxy store: `mutator` mutates the freshly-read store in place. */
 export function updateProxyStore(mutator: (store: ProxyStore) => void): ProxyStore {
   const store = loadProxyStore();
   mutator(store);

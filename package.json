@@ -34,7 +34,8 @@
     "test": "npm run build && vitest run",
     "prepublishOnly": "npm run build",
     "emit": "node node_modules/@intisy-ai/api/scripts/emit-dts.mjs --java-dir . --module :auth-contracts --module-dir auth-contracts --out src/generated",
-    "emit:teavm": "node node_modules/@intisy-ai/api/scripts/emit-dts.mjs --java-dir . --module :auth-teavm --out src/generated"
+    "emit:teavm": "node node_modules/@intisy-ai/api/scripts/emit-dts.mjs --java-dir . --module :auth-teavm --out src/generated",
+    "docs": "typedoc"
   },
   "dependencies": {
     "@intisy-ai/api": "^1.6.0",
@@ -44,6 +45,7 @@
   "devDependencies": {
     "@types/bun": "^1.3.14",
     "@types/node": "^25.9.1",
+    "typedoc": "^0.28.20",
     "typescript": "^6.0.3",
     "vitest": "^2.0.0"
   }

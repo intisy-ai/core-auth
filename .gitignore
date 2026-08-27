@@ -11,6 +11,7 @@ package-lock.json
 docs/
 .superpowers/
 graphify-out/
+site/
 
 # TeaVM-generated JS, staged by build:teavm -- the .d.ts alongside it is hand-authored and committed
 src/generated/*.js

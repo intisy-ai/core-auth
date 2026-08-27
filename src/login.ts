@@ -7,24 +7,37 @@ import { createInterface } from "node:readline";
 import { getCoreAuth } from "./core-auth-loader.js";
 import type { CoreAccount } from "./types.js";
 
+/** A code/state pair parsed from a pasted OAuth callback. */
 export interface PastedCallback {
+  /** The OAuth authorization code. */
   code: string;
+  /** `null` when the callback carried no `state` param. */
   state: string | null;
 }
 
-// Accepts a full redirect URL (?code=...&state=...), a bare `code#state` pair, or
-// a bare code pasted alone. Covers every pasted-callback shape used across drivers.
+/**
+ * Parses whatever a user pastes back after an OAuth redirect.
+ *
+ * @param input a full redirect URL (`?code=...&state=...`), a bare `code#state` pair, or a bare code alone
+ * @returns `null` if no code could be recovered
+ */
 export function parsePastedCallback(input: string): PastedCallback | null {
   return JSON.parse(getCoreAuth().parsePastedCallback(input || "")) as PastedCallback | null;
 }
 
+/** Injectable streams for {@link awaitPaste}, so a caller can test it without real stdin. */
 export interface AwaitPasteDeps {
+  /** Defaults to `process.stdin`. */
   input?: NodeJS.ReadableStream;
+  /** Defaults to `process.stdout`. */
   output?: NodeJS.WritableStream;
 }
 
-// Thin readline single-line prompt. Streams are injectable so it is testable
-// without real stdin; the caller decides whether to gate this on isTTY().
+/**
+ * Prompts on a single line and resolves with whatever the user pastes.
+ *
+ * @remarks The caller decides whether to gate this on `isTTY()`.
+ */
 export function awaitPaste(prompt: string, deps?: AwaitPasteDeps): Promise<string> {
   const input = deps?.input || process.stdin;
   const output = deps?.output || process.stdout;
@@ -36,16 +49,25 @@ export function awaitPaste(prompt: string, deps?: AwaitPasteDeps): Promise<strin
   });
 }
 
+/** A driver's raw OAuth token-exchange result, before it is normalized into a {@link CoreAccount}. */
 export interface OauthExchangeResult {
+  /** The account's email, when the endpoint reports one. */
   email?: string;
+  /** The OAuth refresh token. */
   refresh: string;
+  /** The access token. */
   access?: string;
+  /** Epoch ms. */
   expires?: number;
 }
 
-// The account shape shared by every driver's post-exchange result. Callers with
-// provider-specific extras (composite refresh tokens, meta fields) normalize
-// `refresh` and merge their own `meta` onto the returned object themselves.
+/**
+ * Builds the account shape shared by every driver's post-exchange result.
+ *
+ * @remarks
+ * A caller with provider-specific extras (composite refresh tokens, meta fields) normalizes
+ * `refresh` and merges its own `meta` onto the returned object itself.
+ */
 export function toCoreAccount(result: OauthExchangeResult): CoreAccount {
   return {
     id: result.email || result.refresh.slice(0, 16),
@@ -61,21 +83,33 @@ export function toCoreAccount(result: OauthExchangeResult): CoreAccount {
   };
 }
 
+/** Input to {@link oauthConfigFor}. */
 export interface OauthConfigInput {
+  /** The token endpoint. */
   tokenUrl: string;
+  /** OAuth client id. */
   clientId: string;
+  /** OAuth client secret, when the client is confidential rather than public PKCE. */
   clientSecret?: string;
 }
 
+/** The `{tokenUrl, clientId, clientSecret?}` shape {@link AccountManager}'s `oauth` option consumes. */
 export interface OauthConfig {
+  /** The token endpoint. */
   tokenUrl: string;
+  /** OAuth client id. */
   clientId: string;
+  /** OAuth client secret, omitted entirely for a public PKCE client. */
   clientSecret?: string;
 }
 
-// The {tokenUrl, clientId, clientSecret?} shape AccountManager's `oauth` option
-// consumes (see manager.ts). clientSecret is omitted entirely when absent, matching
-// public PKCE clients (e.g. Claude) that have no secret to send.
+/**
+ * Builds an {@link OauthConfig} for {@link AccountManager}.
+ *
+ * @remarks
+ * `clientSecret` is omitted entirely when absent, matching public PKCE clients (e.g. Claude) that
+ * have no secret to send.
+ */
 export function oauthConfigFor(opts: OauthConfigInput): OauthConfig {
   const config: OauthConfig = { tokenUrl: opts.tokenUrl, clientId: opts.clientId };
   if (opts.clientSecret) config.clientSecret = opts.clientSecret;

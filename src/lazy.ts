@@ -2,8 +2,11 @@
 // (loadOrchestrator/getLoadedOrchestrator) and scattered try/JSON.parse/catch
 // sites duplicated across provider plugins.
 
+/** A memoized dynamic import, built by {@link lazyModule}. */
 export interface LazyModule<T> {
+  /** Runs the import on first call; subsequent calls return the same in-flight or resolved promise. */
   load(): Promise<T>;
+  /** Synchronous escape hatch for callback contracts that cannot await; `null` until the first `load()` resolves. */
   getLoaded(): T | null;
 }
 

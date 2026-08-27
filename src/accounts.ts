@@ -29,10 +29,16 @@ function lockOpts(opts: AccountStoreLocation | null | undefined): StoreLockOpts 
   return { dir: opts?.dir, file: STORE_KEY };
 }
 
-// LiveStoreLike.get() may report an absent key as undefined as well as null (it also serves the
-// npm core's own LiveStoreLike contract); CoreAuthJsStore only knows null, so normalize at the
-// crossing rather than widening the Java-facing type. Exported so manager.ts's own jsStore()
-// bridge, over the same createLiveStore, crosses at the exact same point rather than a second one.
+/**
+ * Adapts a {@link LiveStoreLike} to the Java-facing `CoreAuthJsStore` contract.
+ *
+ * @remarks
+ * `LiveStoreLike.get()` may report an absent key as `undefined` as well as `null` (it also serves
+ * the npm core's own `LiveStoreLike` contract); `CoreAuthJsStore` only knows `null`, so this
+ * normalizes at the crossing rather than widening the Java-facing type. Exported so `manager.ts`'s
+ * own `jsStore()` bridge, over the same `createLiveStore`, crosses at the exact same point rather
+ * than a second one.
+ */
 export function asJsStore(store: LiveStoreLike): CoreAuthJsStore {
   return {
     get: (key) => store.get(key) ?? null,
@@ -55,15 +61,20 @@ function writing<T>(opts: AccountStoreLocation | null | undefined, fn: (store: C
   return withLock(lockOpts(opts), () => fn(asJsStore(createLiveStore(getConfigDir(), opts?.dir, { locked: false }))));
 }
 
+/** Reads a provider's stored account pool; an unlocked read, since every write lands by atomic rename. */
 export function loadAccounts(provider: string, opts?: AccountStoreLocation): AccountPool {
   return JSON.parse(getCoreAuth().poolLoad(provider, readingStore(opts)));
 }
 
+/** Overwrites a provider's whole account pool. */
 export function saveAccounts(provider: string, pool: AccountPool, opts?: AccountStoreLocation): void {
   writing(opts, (store) => getCoreAuth().poolSave(provider, JSON.stringify(pool), store));
 }
 
-// atomic read-modify-write: mutator mutates the freshly-read pool in place.
+/**
+ * Atomic read-modify-write on a provider's account pool: `mutator` mutates the freshly-read pool
+ * in place, and the whole cycle holds the cross-process lock.
+ */
 export function updateAccounts(provider: string, mutator: (pool: AccountPool) => void, opts?: AccountStoreLocation): AccountPool {
   return writing(opts, (store) => {
     const pool: AccountPool = JSON.parse(getCoreAuth().poolLoad(provider, store));
@@ -73,11 +84,18 @@ export function updateAccounts(provider: string, mutator: (pool: AccountPool) =>
   });
 }
 
+/** Just the accounts array from a provider's stored pool. */
 export function listAccounts(provider: string, opts?: AccountStoreLocation): CoreAccount[] { return loadAccounts(provider, opts).accounts; }
 
+/**
+ * Inserts or updates an account in a provider's pool, keyed by `id`.
+ *
+ * @remarks
+ * Emits an activity event on an actual add or update, but not on `"unchanged"`: a login refresh
+ * re-upserts the same account on every call, and reporting that would bury the real changes in
+ * the activity feed.
+ */
 export function addAccount(provider: string, account: CoreAccount, opts?: AccountStoreLocation): void {
-  // "unchanged" is a login refresh re-upserting the same account, which happens on every call:
-  // reporting it would bury the real changes in the activity feed.
   const outcome = writing(opts, (store) =>
     getCoreAuth().accountUpsert(provider, JSON.stringify(account), store),
   );
@@ -86,12 +104,14 @@ export function addAccount(provider: string, account: CoreAccount, opts?: Accoun
   emitActivity({ topic: "account", action: outcome === "added" ? "account_added" : "account_updated", impact: "notice", outcome: "ok", subject: { kind: "account", id: subjectId, label: subjectId }, details: { provider } }, provider);
 }
 
+/** Removes an account from a provider's pool by id; a no-op, with no activity event, if it was not present. */
 export function removeAccount(provider: string, id: string, opts?: AccountStoreLocation): void {
   const removed = writing(opts, (store) => getCoreAuth().accountRemove(provider, id, store));
   if (!removed) return;
   emitActivity({ topic: "account", action: "account_removed", impact: "notice", outcome: "ok", subject: { kind: "account", id, label: id }, details: { provider } }, provider);
 }
 
+/** Empties a provider's account pool back to its default (no accounts, index 0). */
 export function clearAccounts(provider: string, opts?: AccountStoreLocation): void {
   saveAccounts(provider, { accounts: [], activeIndex: 0, activeIndexByLane: {} }, opts);
 }

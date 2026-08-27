@@ -5,11 +5,15 @@
 import { createProviderPlugin, type ProviderPlugin } from "./provider-plugin-runtime.js";
 import type { ProviderDef } from "./types.js";
 
+/** A provider's raw definition alongside the app plugin built from it. */
 export interface DefinedProvider {
+  /** The provider's raw definition. */
   def: ProviderDef;
+  /** The app plugin built from `def`. */
   plugin: ProviderPlugin;
 }
 
+/** The single entry a provider plugin calls: from one {@link ProviderDef} it yields the generic app plugin hook. */
 export function defineProvider(def: ProviderDef): DefinedProvider {
   return {
     def,

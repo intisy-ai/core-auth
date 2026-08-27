@@ -12,15 +12,23 @@ import type { ProviderDef } from "./types.js";
 
 const BUILTIN_LABEL = { leaderboard: "Leaderboard (quality)" };
 
+/** A provider's non-manual Auto-sort sources, each with its precomputed order, cached so editors stay generic. */
 export interface ComputedSorts {
+  /** Available sources beyond `"manual"`. */
   sorts: Array<{ id: string; label: string }>;
+  /** Precomputed order, per source id. */
   sortOrders: Record<string, string[]>;
+  /** Live leaderboard quality scores, keyed by catalog id; empty when the provider does not opt into `"leaderboard"`. */
   scores: Record<string, number>;
+  /** Provenance of {@link scores}, e.g. `"Artificial Analysis via OpenRouter"`; `""` when there are none. */
   scoreSource: string;
 }
 
-// nameOf maps a catalog id -> its display name; the leaderboard ranks by NAME (the id
-// is an opaque API rawId). Defaults to identity when names aren't available.
+/**
+ * Computes every non-manual Auto-sort source a provider opts into, via `def.sorts`.
+ *
+ * @param nameOf maps a catalog id to its display name; the leaderboard ranks by NAME since the id is an opaque API rawId. Defaults to identity when names aren't available
+ */
 export async function computeSorts(
   def: ProviderDef,
   ranking: string[],

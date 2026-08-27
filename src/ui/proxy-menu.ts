@@ -50,6 +50,7 @@ type ProxyMenuAction =
   | { t: "toggle"; provider: string }
   | { t: "proxy"; url: string };
 
+/** Runs the standalone proxy management menu: mode, manual proxies, provider sources, and per-proxy stats. A no-op when stdout is not a TTY. */
 export async function runProxyMenu(): Promise<void> {
   if (!isTTY()) return;
   const expanded = new Set<string>();   // provider categories are collapsed by default
@@ -87,8 +88,11 @@ type AccountProxyAction =
   | { t: "add" }
   | { t: "toggle"; url: string; owned: boolean };
 
-// per-account proxy selection: toggle global proxies for this account, and add a
-// new proxy as global (all accounts) or account-only (auto-used here, hidden elsewhere)
+/**
+ * Runs the per-account proxy selection menu: toggle global proxies for this account, and add a
+ * new proxy as global (all accounts) or account-only (auto-used here, hidden elsewhere). A no-op
+ * when stdout is not a TTY.
+ */
 export async function selectAccountProxies(accountId: string): Promise<void> {
   if (!isTTY()) return;
   while (true) {

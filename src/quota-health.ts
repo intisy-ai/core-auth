@@ -4,8 +4,9 @@
 // capacity remaining" predicate itself.
 import { getCoreAuth } from "./core-auth-loader.js";
 
-// Provider maps its cachedQuota into this neutral shape; remainingFraction is [0, 1].
+/** A provider's own quota pool, mapped into this neutral shape for {@link hasCapacity} and {@link ipSuspected}. */
 export interface QuotaPool {
+  /** `0` to `1`. */
   remainingFraction: number;
 }
 

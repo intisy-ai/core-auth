@@ -2,25 +2,42 @@
 // separators, hints, colors. Returns the chosen value, or null on Esc/Ctrl-C.
 import { ANSI, parseKey, isTTY, truncateAnsi } from "./ansi.js";
 
+/** Renders an item as a plain selectable row (`undefined`), a heading, a note, or a usage bar. */
 export type SelectItemKind = "heading" | "note" | "bar";
+/** Foreground color for a {@link SelectItem}'s label. */
 export type SelectItemColor = "red" | "green" | "yellow" | "cyan";
 
+/** One row rendered by {@link select}. */
 export interface SelectItem<T = unknown> {
+  /** Row text. */
   label: string;
+  /** Resolved by `select()` when this item is chosen. */
   value?: T;
+  /** Secondary text shown alongside the label. */
   hint?: string;
+  /** Foreground color. */
   color?: SelectItemColor;
+  /** Renders as a heading, note, or usage bar instead of a plain selectable row. */
   kind?: SelectItemKind;
+  /** Draws a rule instead of a selectable row. */
   separator?: boolean;
+  /** Excludes this row from selection. */
   disabled?: boolean;
-  fraction?: number;   // "bar" items: fraction USED, 0..1
-  reset?: string;       // "bar" items: human-readable reset time
+  /** For a `"bar"` item: fraction USED, `0` to `1`. */
+  fraction?: number;
+  /** For a `"bar"` item: human-readable reset time. */
+  reset?: string;
 }
 
+/** Options to {@link select}. */
 export interface SelectOptions {
+  /** Screen heading. */
   message: string;
+  /** Secondary text shown under the heading. */
   subtitle?: string;
+  /** Clears the screen before drawing instead of redrawing in place. */
   clearScreen?: boolean;
+  /** Overrides the default footer hint text. */
   help?: string;
 }
 
@@ -41,6 +58,12 @@ function barText(item: SelectItem<unknown>): string {
   return `${ANSI.bold}${item.label}${ANSI.reset}  ${bar} ${Math.round(frac * 100)}% used`;
 }
 
+/**
+ * Raw-stdin arrow-key menu; no external deps.
+ *
+ * @returns the chosen item's value, or `null` on Esc/Ctrl-C
+ * @throws if stdout is not a TTY, or if every item is disabled
+ */
 export async function select<T>(items: SelectItem<T>[], options: SelectOptions): Promise<T | null> {
   if (!isTTY()) throw new Error("Interactive select requires a TTY terminal");
 

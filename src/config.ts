@@ -14,12 +14,14 @@ function paths() {
   };
 }
 
+/** Reads core-auth's config, preferring `config/auth.json` over the top-level fallback; `{}` if neither exists or parses. */
 export function readConfig(): Record<string, any> {
   const { preferred, fallback } = paths();
   const p = [preferred, fallback].find((c) => existsSync(c)) || null;
   try { return p ? JSON.parse(readFileSync(p, "utf8")) : {}; } catch { return {}; }
 }
 
+/** Writes core-auth's config to the preferred `config/auth.json` location; fails silently. */
 export function writeConfig(cfg: Record<string, any>): void {
   const { preferred } = paths();
   try {
@@ -28,10 +30,12 @@ export function writeConfig(cfg: Record<string, any>): void {
   } catch {}
 }
 
+/** The currently selected provider id, or `""` if none is set. */
 export function activeProvider(): string {
   return readConfig().provider || "";
 }
 
+/** Sets the currently selected provider id. */
 export function setActiveProvider(name: string): void {
   const cfg = readConfig();
   cfg.provider = name;
@@ -60,8 +64,7 @@ interface StoredAutoConfig {
   source?: string;
 }
 
-// Available sources for a provider: always manual, plus whatever the cache advertises
-// (minus any retired ids).
+/** Auto-sort sources available for a provider: always `"manual"`, plus whatever the model cache advertises, minus any retired ids. */
 export function getAutoSources(providerId: string): Array<{ id: string; label: string }> {
   const cache = readModelCache(providerId);
   const extra = (cache && Array.isArray(cache.sorts) ? cache.sorts : [])
@@ -69,8 +72,24 @@ export function getAutoSources(providerId: string): Array<{ id: string; label: s
   return [{ id: "manual", label: "Manual" }, ...extra];
 }
 
+/**
+ * A provider's Auto-model config, reconciled against the live catalog so new models append and
+ * removed ones drop rather than the stored config going stale.
+ */
 export function getAutoConfig(providerId: string): {
-  order: string[]; excluded: string[]; source: string; sources: Array<{ id: string; label: string }>;
+  /** Ranked raw model ids, reconciled against the live catalog. */
+  order: string[];
+  /** Raw model ids excluded from Auto. */
+  excluded: string[];
+  /** The active sort source id, `"manual"` or one of `sources`. */
+  source: string;
+  /** Every sort source available for this provider, from `getAutoSources`. */
+  sources: Array<{
+    /** The source id. */
+    id: string;
+    /** Display label. */
+    label: string;
+  }>;
 } {
   const stored: StoredAutoConfig = (readConfig().auto || {})[providerId] || {};
   const cache = readModelCache(providerId);
@@ -98,6 +117,7 @@ export function getAutoConfig(providerId: string): {
   return { order, excluded, source, sources };
 }
 
+/** Stores a provider's Auto-model config; an omitted field keeps its previously stored value. */
 export function setAutoConfig(
   providerId: string,
   auto: { order?: string[]; excluded?: string[]; source?: string },
@@ -113,7 +133,7 @@ export function setAutoConfig(
   writeConfig(cfg);
 }
 
-// The ranked, included raw model ids Auto should try (top preference first).
+/** The ranked, non-excluded raw model ids Auto should try, top preference first. */
 export function getAutoCandidates(providerId: string): string[] {
   const { order, excluded } = getAutoConfig(providerId);
   const ex = new Set(excluded);

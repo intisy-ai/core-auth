@@ -12,10 +12,13 @@ const LOCK_POLL_MS = 25;
 
 /** Where a locked store file lives, relative to the resolved config dir and its default filename. */
 export interface StoreLockOpts {
+  /** Overrides the resolved config directory. */
   dir?: string;
+  /** Overrides the default store filename. */
   file?: string;
 }
 
+/** The resolved directory a locked store file lives in: `opts.dir` when given, else the app's config folder. */
 export function storeDir(opts?: StoreLockOpts): string {
   return (opts && opts.dir) || configFolder();
 }
@@ -32,10 +35,13 @@ function errnoCode(error: unknown): string | undefined {
   return error instanceof Error ? (error as NodeJS.ErrnoException).code : undefined;
 }
 
-// Thrown by withLock when the lock couldn't be acquired within LOCK_WAIT_MS. Callers
-// must treat this as a hard failure (retry later / surface to the user) -- there is no
-// unlocked fallback.
+/**
+ * Thrown by `withLock` when the lock could not be acquired within its wait window.
+ *
+ * @remarks Callers must treat this as a hard failure (retry later / surface to the user); there is no unlocked fallback.
+ */
 export class LockTimeoutError extends Error {
+  /** Path to the lock file that could not be acquired. */
   readonly lockPath: string;
   constructor(lockPath: string) {
     super("withLock: timed out waiting for lock: " + lockPath);
@@ -62,16 +68,22 @@ function acquireLockSync(lockPath: string, deadline: number): number {
   }
 }
 
-// Cross-process exclusive lock via an atomic lock-file (open(...,"wx") fails if it
-// already exists). FAIL-CLOSED: if the lock can't be acquired before the deadline (or
-// on any other unexpected fs error), this THROWS -- it never runs `fn()` unlocked.
-// Running unlocked would let two writers both read-modify-write the store and have the
-// second `renameSync` silently clobber the first (a lost update: corrupted tokens /
-// rate-limit state).
-//
-// NOT re-entrant: the lock file is the whole mechanism, so taking the same {dir,file} twice in
-// one call stack spins to the deadline and throws. A helper called from inside a held lock must
-// take an already-unlocked store rather than locking again.
+/**
+ * Runs `fn()` under a cross-process exclusive lock, via an atomic lock file (`open(..., "wx")`
+ * fails if it already exists).
+ *
+ * @remarks
+ * FAIL-CLOSED: if the lock cannot be acquired before the deadline, or on any other unexpected fs
+ * error, this THROWS and never runs `fn()` unlocked. Running unlocked would let two writers both
+ * read-modify-write the store and have the second `renameSync` silently clobber the first (a lost
+ * update: corrupted tokens or rate-limit state).
+ *
+ * NOT re-entrant: the lock file is the whole mechanism, so taking the same `{dir, file}` twice in
+ * one call stack spins to the deadline and throws. A helper called from inside a held lock must
+ * take an already-unlocked store rather than locking again.
+ *
+ * @throws {LockTimeoutError} if the lock could not be acquired in time
+ */
 export function withLock<T>(opts: StoreLockOpts | undefined, fn: () => T): T {
   const dir = storeDir(opts);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });

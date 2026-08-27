@@ -5,8 +5,11 @@ import { buildAccountMenu } from "./ui/menu-model.js";
 import { isTTY } from "./ui/ansi.js";
 import type { ProviderDef } from "./types.js";
 
-// Standalone entry (oc auth login / handler.menu()): render the provider menu
-// MODEL with the select() renderer. The loader renders the same model natively.
+/**
+ * Runs the shared account-management menu for a provider, via the standalone `select()` renderer.
+ *
+ * @remarks Standalone entry (`oc auth login` / `handler.menu()`); the loader renders the same menu model natively. A no-op when the provider has no accounts or stdout is not a TTY.
+ */
 export async function runProviderMenu(def: ProviderDef): Promise<void> {
   if (!def || !def.accounts || !isTTY()) return;
   await runMenu(() => buildAccountMenu(def));

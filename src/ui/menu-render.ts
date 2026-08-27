@@ -9,9 +9,14 @@ import { select, type SelectItemColor, type SelectItemKind } from "./select.js";
 import { prompt } from "./prompt.js";
 import { isTTY } from "./ansi.js";
 
-// Navigation action an item's run() (or an input's complete()) returns, interpreted by apply()
-// below. { refresh } / { flash } are read by the loader's own (native-tab) renderer for this same
-// model, not by this standalone one, which always redraws and never shows a flash.
+/**
+ * Navigation an item's `run()` (or an input's `complete()`) returns, interpreted by this
+ * renderer's own apply loop.
+ *
+ * @remarks
+ * `refresh` and `flash` are read by the loader's own (native-tab) renderer for this same model,
+ * not by this standalone one, which always redraws and never shows a flash.
+ */
 export interface MenuNavAction {
   push?: MenuBuilder;
   pop?: true | number;
@@ -21,17 +26,18 @@ export interface MenuNavAction {
   input?: MenuInput;
 }
 
+/** A line of text this renderer collects before continuing, e.g. a pasted login code or a proxy URL. */
 export interface MenuInput {
   title?: string;
   message?: string;
   pendingLabel?: string;
-  // primary path: resolves when a loopback listener auto-captures the input (e.g. an OAuth
-  // redirect); the pasted-text path below is the fallback.
+  /** Primary path: resolves when a loopback listener auto-captures the input (e.g. an OAuth redirect); the pasted-text path is the fallback. */
   background?: Promise<MenuNavAction | null>;
   onClose?: () => void;
   complete: (value: string) => MenuNavAction | void | Promise<MenuNavAction | void>;
 }
 
+/** One row of a menu screen, as this renderer draws it. */
 export interface MenuItem {
   label: string;
   hint?: string;
@@ -43,6 +49,7 @@ export interface MenuItem {
   run?: () => MenuNavAction | void | Promise<MenuNavAction | void>;
 }
 
+/** One screen this renderer draws. */
 export interface MenuModel {
   title: string;
   subtitle?: string;
@@ -50,6 +57,7 @@ export interface MenuModel {
   onOpen?: () => Promise<void>;
 }
 
+/** Lazily builds a `MenuModel`; called fresh on every redraw so state changes show. */
 export type MenuBuilder = () => MenuModel;
 
 interface MenuInputResult {
@@ -57,6 +65,13 @@ interface MenuInputResult {
   bg?: MenuNavAction | null;
 }
 
+/**
+ * Drives a menu and its pushed submenus via a builder stack, redrawing on every loop so state
+ * changes show. The `select()`-based standalone renderer; the loader has its own renderer for
+ * the same model.
+ *
+ * @remarks A no-op when stdout is not a TTY, since this renderer needs an interactive terminal.
+ */
 export async function runMenu(rootBuilder: MenuBuilder): Promise<void> {
   if (!isTTY()) return;
   const stack: MenuBuilder[] = [rootBuilder];

@@ -44,6 +44,12 @@ function stripJsonc(text: string): string {
     .replace(/,(\s*[}\]])/g, "$1");
 }
 
+/**
+ * Merges a provider's models into the active app's own config file, keyed under its declared
+ * provider key.
+ *
+ * @remarks A no-op when the active app declares no `modelCatalog`. REPLACES (not merges) the provider's whole model list on every call, so a renamed or removed model id can never linger as a stale entry.
+ */
 export function mergeModels(providerId: string, models: Record<string, unknown>, npm?: string): void {
   const declared = activeDescriptor()?.modelCatalog;
   const path = catalogPath();
@@ -74,14 +80,13 @@ export function mergeModels(providerId: string, models: Record<string, unknown>,
   } catch (e) { log("model catalog merge failed: " + (e instanceof Error ? e.message : String(e))); }
 }
 
-// Resolve the provider's catalog and persist it: always refresh the model cache, and merge the
-// models into the app's own config when the active app declares one. Run at plugin startup and
-// right after a login so a newly-authed account populates models without waiting for a restart.
-//
-// The declaration alone decides whether a merge happens, for every caller: without a descriptor
-// there is no target file and no provider key to write under, so there is nothing a caller could
-// force. A startup call inside the app's own process, where HUB_CONFIG_DIR may be unset, still
-// resolves its home from the descriptor's own declared candidates.
+/**
+ * Resolves a provider's model catalog and persists it: always refreshes the model cache, and
+ * merges the models into the app's own config when the active app declares one.
+ *
+ * @remarks Run at plugin startup and right after a login, so a newly-authed account populates models without waiting for a restart. Fails silently, logging the error.
+ * @returns the resolved models, or `{}` on failure
+ */
 export async function refreshModels(def: ProviderDef): Promise<Record<string, unknown>> {
   let models: Record<string, unknown> = {};
   const startedAt = Date.now();

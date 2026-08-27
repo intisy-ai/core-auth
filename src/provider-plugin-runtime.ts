@@ -22,6 +22,12 @@ function proxyTarget(env: ProxyEnv | undefined): { mode: "proxy"; port: number }
   return { mode: "direct" };
 }
 
+/**
+ * Serves a provider's app-wire request, either forwarding it to the `:34567` HTTP proxy when the
+ * app runs behind it, or handing it straight to the resolved app front-door.
+ *
+ * @returns a 503 with an explanatory body when no front-door is available and no proxy is configured
+ */
 export async function dispatchFetch(def: ProviderDef, request: Request, env: ProxyEnv | undefined, ctx: ProviderCtx): Promise<Response> {
   const target = proxyTarget(env);
   if (target.mode === "proxy") {
@@ -52,8 +58,15 @@ function toolkit(configDir: string): FrontDoorToolkit {
   };
 }
 
+/** The app plugin entry point {@link createProviderPlugin} returns: takes the app's own plugin input, returns its plugin hooks. */
 export type ProviderPlugin = (input: any) => Promise<any>;
 
+/**
+ * Wraps a provider definition as an in-process app plugin. The app-specific hook shape and the
+ * app to IR codec come from the app-layer front-door resolved at runtime; core-auth names no app.
+ *
+ * @returns a plugin that builds no hooks (an empty object) when no app front-door is found
+ */
 export function createProviderPlugin(def: ProviderDef): ProviderPlugin {
   return async function (input: any) {
     await refreshModels(def);

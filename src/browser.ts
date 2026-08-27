@@ -4,6 +4,7 @@
 
 import { spawn, type SpawnOptions } from "node:child_process";
 
+/** Opens a URL in the user's default browser; a silent no-op when none is available (headless / container). */
 export function openBrowser(url: string): void {
   if (!url) return;
   try {

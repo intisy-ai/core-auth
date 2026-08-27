@@ -6,6 +6,7 @@
 // label (no store I/O, no Java call needed for a single boolean check).
 import type { CoreAccount } from "./types.js";
 
+/** Whether an account is within a transient backoff window across all lanes. */
 export function isCoolingDown(account: CoreAccount, now: number): boolean {
   return typeof account.coolingDownUntil === "number" && account.coolingDownUntil > now;
 }

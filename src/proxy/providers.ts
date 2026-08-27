@@ -1,6 +1,7 @@
 // Proxy-list fetchers. Free sources fetch live; keyed providers are gated on a
 // config key and return [] until one is set. Each returns [{ url, provider }].
 
+/** One proxy fetched from a proxy-list source. */
 export interface FetchedProxy {
   url: string;
   provider: string;
@@ -43,8 +44,11 @@ async function iplocate() {
   return linesToProxies(text, "iplocate");
 }
 
+/** Per-source config: whether a proxy-list source is enabled, and its API key for a keyed source. */
 export interface ProxyProviderConfig {
+  /** Whether this source auto-fetches. */
   enabled?: boolean;
+  /** API key for a keyed (premium) source. */
   key?: string;
 }
 
@@ -57,7 +61,7 @@ async function keyed(provider: string, config: ProxyProviderConfig | undefined):
 const FREE = { proxyscrape, proxifly, pubproxy, geonix, iplocate };
 const KEYED = ["webshare", "brightdata", "oxylabs", "litport"];
 
-// providersConfig: { <name>: { enabled, key? } }; "manual" is never fetched
+/** Fetches from every source enabled in `providersConfig`; `"manual"` is never fetched, since it holds hand-added proxies only. */
 export async function fetchEnabledProxies(providersConfig: Record<string, ProxyProviderConfig> | undefined): Promise<FetchedProxy[]> {
   const config = providersConfig || {};
   const out: FetchedProxy[] = [];
@@ -70,4 +74,5 @@ export async function fetchEnabledProxies(providersConfig: Record<string, ProxyP
   return out;
 }
 
+/** Every proxy-list source id, `"manual"` plus every free and keyed source, for a settings dropdown. */
 export const PROXY_PROVIDERS = ["manual", ...Object.keys(FREE), ...KEYED];

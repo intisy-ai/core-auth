@@ -18,17 +18,36 @@ import type { AccountQuota, AccountView, ProviderDef } from "../types.js";
 
 /** What a menu item's `run` tells the renderer to do next. */
 export type MenuNavigation =
-  | { push: () => Menu }
-  | { pop: true | number }
-  | { refresh: true; flash?: string }
-  | { input: MenuInput }
+  | {
+      /** Builds and pushes a new screen. */
+      push: () => Menu;
+    }
+  | {
+      /** Pops one screen (`true`) or `n` screens. */
+      pop: true | number;
+    }
+  | {
+      /** Always `true`; the discriminant for a rebuild of the current screen. */
+      refresh: true;
+      /** A message to flash alongside the rebuild. */
+      flash?: string;
+    }
+  | {
+      /** Opens a text prompt before continuing. */
+      input: MenuInput;
+    }
+  /** Stays on the current screen with no visible effect. */
   | void;
 
 /** A prompt the renderer collects a value with before continuing. */
 export interface MenuInput {
+  /** Prompt heading. */
   title: string;
+  /** Prompt body text. */
   message: string;
+  /** Shown while `complete` is running, replacing the input row. */
   pendingLabel?: string;
+  /** Runs when the user submits a value. */
   complete: (value: string) => MenuNavigation | Promise<MenuNavigation>;
   /**
    * Primary path: resolves when a loopback listener auto-captures the input (e.g. an OAuth
@@ -37,15 +56,23 @@ export interface MenuInput {
    * this mutually-recursive shape against menu-render.ts's own MenuNavAction (verified: widening it
    * back to `Promise<MenuNavigation | null>` reproduces the "not assignable" error at menu.ts).
    */
-  background?: Promise<{ refresh: true } | null>;
+  background?: Promise<{
+    /** Always `true`; the discriminant that lets a background result stand in for a `refresh` navigation. */
+    refresh: true;
+  } | null>;
+  /** Releases the listener when the input is dismissed or superseded. */
   onClose?: () => void;
 }
 
 /** One row of a menu: what it reads as, and what choosing it does. */
 export interface MenuItem {
+  /** Row text. */
   label: string;
+  /** Absent for a heading, note, or bar row, which is never selectable. */
   run?: () => MenuNavigation | Promise<MenuNavigation>;
+  /** Foreground color. */
   color?: SelectItemColor;
+  /** Secondary text shown alongside the label. */
   hint?: string;
   /** Groups items the renderer styles together (a heading, a note, or a quota bar). */
   kind?: SelectItemKind;
@@ -53,16 +80,23 @@ export interface MenuItem {
   separator?: boolean;
   /** Needs a clean terminal, so the renderer runs it blocking (login, proxy pickers). */
   suspend?: boolean;
+  /** For a `"bar"` item: fraction used, `0` to `1`. */
   fraction?: number;
+  /** For a `"bar"` item: human-readable reset time. */
   reset?: string;
 }
 
 /** One screen of the menu model: a title and the rows under it. */
 export interface Menu {
+  /** Screen heading. */
   title: string;
+  /** Secondary text shown under the title. */
   subtitle?: string;
+  /** The screen's rows. */
   items: MenuItem[];
+  /** The provider this screen belongs to, shown by a host renderer that tabs across providers. */
   providerLabel?: string;
+  /** Runs once when the screen first opens, e.g. to kick off a background quota fetch. */
   onOpen?: () => Promise<void>;
 }
 
@@ -224,6 +258,7 @@ function buildAutoModelEdit(def: ProviderDef, id: string): Menu {
   return { title: modelName(providerId, id), items };
 }
 
+/** Builds the Auto model-ranking editor: sort source, per-model include/exclude and reorder. */
 export function buildAutoMenu(def: ProviderDef): Menu {
   const providerId = def.id;
   const { order, excluded, source, sources } = getAutoConfig(providerId);
@@ -492,6 +527,7 @@ function quotaBars(views: AccountView[]): MenuItem[] {
   })));
 }
 
+/** Builds a provider's top-level menu: its accounts, quota, models and management actions. */
 export function buildAccountMenu(def: ProviderDef): Menu {
   const controller = def.accounts!;
   const views = controller.list();

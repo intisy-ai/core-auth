@@ -130,22 +130,26 @@ async function getScores(): Promise<ScoreSet> {
   return cached ? { scores: cached.scores, source: cached.source || "" } : { scores: [], source: "" };
 }
 
-// Full name of the source backing the current scores ("" when no data yet).
+/** Full name of the source backing the current scores; `""` when no data has been fetched yet. */
 export async function leaderboardSource(): Promise<string> {
   return (await getScores()).source;
 }
 
-// Compact tag for row hints ("score 50 · AA"); full name goes in a subtitle.
+/** Compact tag for row hints (e.g. `"score 50 - AA"`); the full name goes in a subtitle. */
 export function leaderboardSourceShort(source: string): string {
   return getCoreAuth().leaderboardSourceShort(source);
 }
 
 // ---- public order -----------------------------------------------------------
 
-// Per-model live quality scores { id: number } for the given catalog ids (only ids
-// with a live score are included). Used to DISPLAY the score next to models; the
-// caller persists it in the model cache so both the provider browser and the loader's
-// mapping picker can show it without re-fetching.
+/**
+ * Per-model live quality scores (`{ id: number }`) for the given catalog ids; only ids with a
+ * live score are included.
+ *
+ * @remarks
+ * Used to DISPLAY the score next to models; the caller persists it in the model cache so both
+ * the provider browser and the loader's mapping picker can show it without re-fetching.
+ */
 export async function computeLeaderboardScores(
   candidateIds: string[],
   nameOf: (id: string) => string = (id) => id,

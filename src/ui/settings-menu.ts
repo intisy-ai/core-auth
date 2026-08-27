@@ -15,12 +15,14 @@
 
 import type { SettingsMenuField, SettingsMenuGroup } from "../settings-schema.js";
 
+/** A text prompt this settings menu opens for a number/string field. */
 export interface MenuInputRequest {
   title: string;
   message: string;
   complete: (text: string | undefined) => MenuNavResult | Promise<MenuNavResult>;
 }
 
+/** What choosing a settings-menu item tells the renderer to do next. */
 export type MenuNavResult =
   | { push: () => Menu }
   | { pop: true | number }
@@ -28,26 +30,34 @@ export type MenuNavResult =
   | { input: MenuInputRequest }
   | void;
 
+/** One row of the settings menu. */
 export interface MenuItem {
   label: string;
   hint?: string;
   run: () => MenuNavResult | Promise<MenuNavResult>;
 }
 
+/** One screen of the settings menu built by {@link buildSettingsMenu}. */
 export interface Menu {
   title: string;
   subtitle?: string;
   items: MenuItem[];
 }
 
+/** A provider's `settings` object: the schema plus how to read and persist a value by key. */
 export interface SettingsAccessor {
   groups: SettingsMenuGroup[];
+  /** Reads a field's effective (default-resolved) value; dotted keys like `"health_score.initial"` are allowed. */
   get(key: string): unknown;
+  /** Persists a field's value; `value === undefined` resets it to its default. */
   set(key: string, value: unknown): void;
 }
 
+/** What {@link buildSettingsMenu} needs from a provider: its label and optional settings accessor. */
 export interface SettingsMenuDef {
+  /** Display name, shown in the screen title. */
   label: string;
+  /** The schema and value accessors; the menu shows nothing when absent. */
   settings?: SettingsAccessor;
 }
 
@@ -93,6 +103,10 @@ function fieldItem(settings: SettingsAccessor, field: SettingsMenuField): MenuIt
   };
 }
 
+/**
+ * Builds the generic, schema-driven settings editor screen for a provider: the section list
+ * when it has more than one group, or the fields of one group when `groupIndex` is given.
+ */
 export function buildSettingsMenu(def: SettingsMenuDef, groupIndex?: number): Menu {
   const settings = def.settings;
   const groups = settings?.groups || [];

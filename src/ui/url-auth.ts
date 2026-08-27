@@ -34,7 +34,10 @@ function loginSucceededSpec(provider: string, account: CoreAccount, durationMs: 
  * Callers must confirm `def.loginFlow` exists first (e.g. `typeof def.loginFlow === "function"`,
  * as menu-model.ts's addAccount item does); called otherwise, this throws immediately below.
  */
-export async function buildLoginInput(def: ProviderDef): Promise<{ input: MenuInput }> {
+export async function buildLoginInput(def: ProviderDef): Promise<{
+  /** The menu navigation a renderer applies to open this login prompt. */
+  input: MenuInput;
+}> {
   const flow = await def.loginFlow!({ configDir: getConfigDir(), log });
   openBrowser(flow.url);
   const provider = def.id;

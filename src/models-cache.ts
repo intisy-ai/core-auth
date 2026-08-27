@@ -16,15 +16,30 @@ export type ModelFetchCtx = Parameters<NonNullable<ProviderDef["fetchModels"]>>[
 /** What {@link ProviderDef.fetchModels} resolves, derived from its own declaration. */
 export type ModelFetchResult = Awaited<ReturnType<NonNullable<ProviderDef["fetchModels"]>>>;
 
+/** A provider's cached model catalog, plus the Auto-sort metadata derived from it. */
 export interface ModelCacheEntry {
+  /** The provider's cached model catalog. */
   models: Record<string, ProviderModel>;
+  /** Preferred order, top preference first. */
   ranking?: string[];
+  /** The model to select by default, when the provider has one. */
   defaultModelId?: string;
+  /** Epoch ms this entry was written. */
   fetchedAt?: number;
+  /** Where the catalog came from: `"live"` fetch or `"static"` fallback. */
   source?: string;
-  sorts?: Array<{ id: string; label: string }>;
+  /** Non-manual Auto-sort sources available for this provider. */
+  sorts?: Array<{
+    /** The source id. */
+    id: string;
+    /** Display label. */
+    label: string;
+  }>;
+  /** Precomputed order per non-manual sort source id. */
   sortOrders?: Record<string, string[]>;
+  /** Live leaderboard quality scores, keyed by catalog id. */
   scores?: Record<string, number>;
+  /** Provenance of {@link scores}. */
   scoreSource?: string;
 }
 
@@ -39,14 +54,20 @@ function readAll(): Record<string, ModelCacheEntry> {
   return {};
 }
 
-// NOTE: derived fields (sorts/sortOrders) are returned AS CACHED; we do NOT wipe them
-// on read. Wiping would hide still-valid sources (e.g. leaderboard) until the next
-// refresh. Stale RETIRED sources are filtered surgically in config.getAutoSources by id.
+/**
+ * Reads a provider's cached model catalog; `null` if nothing has been cached yet.
+ *
+ * @remarks
+ * Derived fields (`sorts`/`sortOrders`) are returned AS CACHED, never wiped on read: wiping
+ * would hide still-valid sources (e.g. leaderboard) until the next refresh. Stale retired sources
+ * are filtered surgically in `config.getAutoSources` by id instead.
+ */
 export function readModelCache(providerId: string): ModelCacheEntry | null {
   const entry = readAll()[providerId];
   return entry && entry.models ? entry : null;
 }
 
+/** Overwrites a provider's cached model catalog; fails silently, logging the error. */
 export function writeModelCache(providerId: string, entry: ModelCacheEntry): void {
   try {
     const all = readAll();
@@ -59,10 +80,13 @@ export function writeModelCache(providerId: string, entry: ModelCacheEntry): voi
   }
 }
 
-// Resolve a provider's catalog: live fetch when supported + an account exists,
-// caching the result; otherwise the last cached catalog; otherwise empty
-// (models stay empty until the first `oc auth login`). `nowMs` is injected so
-// callers can stamp fetchedAt without this module touching Date.now directly.
+/**
+ * Resolves a provider's model catalog: a live fetch when supported and an account exists,
+ * caching the result; otherwise the last cached catalog; otherwise empty (models stay empty
+ * until the first `oc auth login`).
+ *
+ * @param nowMs injected so callers can stamp `fetchedAt` without this module touching `Date.now` directly
+ */
 export async function resolveProviderModels(
   def: ProviderDef,
   ctx: ModelFetchCtx,

@@ -3,12 +3,17 @@
 import { createServer } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 
+/** Options to {@link startOAuthListener}. */
 export interface StartOAuthListenerOptions {
+  /** How long to wait for the callback before rejecting; 5 minutes by default. */
   timeoutMs?: number;
 }
 
+/** A running local OAuth-redirect listener. */
 export interface OAuthListener {
+  /** Resolves with the redirect's full URL once the callback lands. */
   waitForCallback: () => Promise<URL>;
+  /** Stops the listener; rejects the pending {@link waitForCallback} promise if it never landed. */
   close: () => Promise<void>;
 }
 
@@ -60,6 +65,12 @@ function successPage() {
     "<p>Authentication succeeded. You can close this tab and return to your terminal.</p></div></body></html>";
 }
 
+/**
+ * Starts a local HTTP listener for an OAuth redirect callback, on the port and path the driver's
+ * own redirect URI names.
+ *
+ * @throws if the port is already in use, or the callback does not arrive within `timeoutMs`
+ */
 export async function startOAuthListener(redirectUriString: string, opts?: StartOAuthListenerOptions): Promise<OAuthListener> {
   const options = opts || {};
   const timeoutMs = options.timeoutMs || 5 * 60 * 1000;
