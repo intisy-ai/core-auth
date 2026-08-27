@@ -28,6 +28,7 @@ public interface Provider extends IrHandler {
     @TsProperty(readOnly = true)
     String id();
 
+    /** Serves one canonical IR request against this provider's upstream; a non-2xx outcome is thrown, never returned as data. */
     @Override
     @TsUnion(value = {"IrResponse", "IrEventStream"}, async = true)
     IrResponse handleIr(IrRequest request, HandlerCtx ctx) throws Exception;

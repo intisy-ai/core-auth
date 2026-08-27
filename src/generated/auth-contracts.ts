@@ -37,6 +37,7 @@ export interface ProviderDescriptor {
  * would be absent from the emitted declaration.
  */
 export interface Provider {
+  /** Serves one canonical IR request against this provider's upstream; a non-2xx outcome is thrown, never returned as data. */
   handleIr(request: IrRequest, ctx: HandlerCtx): Promise<IrResponse | IrEventStream>;
   /** The provider id a routing chain names. */
   readonly id: string;
