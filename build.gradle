@@ -3,7 +3,7 @@ plugins {
 }
 
 // core-auth's Java module -- self-contained Gradle build living alongside core-auth's TS (../src,
-// ../package.json). Mirrors core-proxy/java/build.gradle's subprojects{} shape exactly (plain
+// ../package.json). Mirrors core-proxy/build.gradle's subprojects{} shape exactly (plain
 // java-library + JUnit, Java 8 baseline) -- deliberately not ai-java's root build.gradle (its
 // io.github.intisy.online-gradle plugin is ai-java-repo-specific, out of
 // scope here).
@@ -55,6 +55,25 @@ subprojects {
     test {
         useJUnitPlatform()
     }
+
+    tasks.withType(Javadoc).configureEach {
+        options.addBooleanOption("Xdoclint:all", true)
+        // javadoc stops listing after 100 of each kind by default, which silently under-reports the gap.
+        options.addStringOption("Xmaxwarns", "10000")
+        options.addStringOption("Xmaxerrs", "10000")
+        // doclint reports a missing comment as a WARNING, and failOnError only fails on errors, so
+        // without this the task passes over an entirely undocumented module.
+        options.addBooleanOption("Werror", true)
+        options.tags = [
+            "apiNote:a:API Note:",
+            "implSpec:a:Implementation Requirements:",
+            "implNote:a:Implementation Note:",
+        ]
+        failOnError = true
+    }
+
+    // check does not run javadoc by default, so without this a doclint finding fails no build.
+    tasks.named("check") { dependsOn tasks.named("javadoc") }
 }
 
 // The modules a downstream java repo resolves, mapped to the classifier its coordinate names.

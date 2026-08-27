@@ -13,20 +13,26 @@ import { randomBytes } from "crypto";
 import { withLock } from "./store-lock.js";
 import { CONFIG_SUBDIR } from "./env.js";
 
-// Matches the npm core's `LiveStoreLike` (js/npm/index.d.ts) exactly so a
-// `createLiveStore(configDir)` instance is a drop-in `opts.store` for its fine-grained
-// exports (acquireAccount, reportRateLimit, reportError, reportSuccess,
-// nextAvailableAt, resolveTiers, resolveModelMap).
+/**
+ * A synchronous key/value store, matching the npm core's `LiveStoreLike` (`js/npm/index.d.ts`)
+ * exactly so a {@link createLiveStore} instance is a drop-in `opts.store` for its fine-grained
+ * exports (`acquireAccount`, `reportRateLimit`, `reportError`, `reportSuccess`,
+ * `nextAvailableAt`, `resolveTiers`, `resolveModelMap`).
+ */
 export interface LiveStoreLike {
   /** Returns the stored JSON string for `key`, or `null`/`undefined` when absent. */
   get(key: string): string | null | undefined;
+  /** Overwrites `key`'s stored value. */
   put(key: string, value: string): void;
+  /** Whether `key` is stored. */
   exists(key: string): boolean;
+  /** Removes `key`; a no-op if it was not stored. */
   delete(key: string): void;
   /** Every stored key starting with `prefix`. */
   listKeys(prefix: string): string[];
 }
 
+/** Options to {@link createLiveStore}. */
 export interface LiveStoreOpts {
   /**
    * Set false when the CALLER already holds the lock for the keys this store will touch, which is
@@ -36,12 +42,15 @@ export interface LiveStoreOpts {
   locked?: boolean;
 }
 
-// `configDir` is the app home (e.g. ~/.claude), matching core-auth's own
-// `getConfigDir()` convention: every key lives at `<configDir>/config/<key>`
-// (accounts.json, models.json, a routing profile's configFile, ...) -- the same
-// location core-auth's own default store (accounts.ts) already uses.
-// `dirOverride`, when given, replaces `<configDir>/config` outright -- matching
-// accounts.ts's `opts.dir` store-location override (AccountManager's `options.store.dir`).
+/**
+ * Adapts core-auth's own file-backed config store into a {@link LiveStoreLike}, so the npm core's
+ * fine-grained ops can run against the SAME on-disk files core-auth already reads and writes
+ * (`accounts.json`, `models.json`, a routing profile's `configFile`, etc.) without losing the
+ * existing cross-process file lock.
+ *
+ * @param configDir the app home (e.g. `~/.claude`), matching `getConfigDir()`'s convention: every key lives at `<configDir>/config/<key>`, the same location core-auth's own default store (`accounts.ts`) already uses
+ * @param dirOverride when given, replaces `<configDir>/config` outright, matching `accounts.ts`'s `opts.dir` store-location override (AccountManager's `options.store.dir`)
+ */
 export function createLiveStore(configDir: string, dirOverride?: string, opts?: LiveStoreOpts): LiveStoreLike {
   const dir = dirOverride || join(configDir, CONFIG_SUBDIR);
   const filePath = (key: string): string => join(dir, key);

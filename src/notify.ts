@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Cross-app user notifications for auth providers: a small message the USER sees that never
 // enters the model's context.
 //
@@ -12,28 +11,50 @@ import { join, dirname } from "path";
 import { log } from "./log.js";
 import { getConfigDir } from "./env.js";
 
-let appClient = null;   // set by the provider's app-front-door hooks
-let notifier = null;    // injected by a host that owns the core event bus
+/** Severity of a {@link notify} message, which selects the toast variant when a client is registered. */
+export type NotifyLevel = "info" | "success" | "warning" | "error";
+type NotifierFn = (message: string, level: NotifyLevel) => void;
+type ToastFn = (payload: { body: { message: string; variant: NotifyLevel } }) => unknown;
 
-// Providers call this from their app-front-door hooks with the plugin `client`: a registered
-// client with a toast API is what turns a notification into a real toast rather than a queue
-// entry. No-op / harmless when never called.
-export function setAppClient(client) { appClient = client || null; }
+let appClient: unknown = null;   // set by the provider's app-front-door hooks
+let notifier: NotifierFn | null = null;    // injected by a host that owns the core event bus
 
-// A host that bundles core wires its event-bus publish here, so notifications flow
-// onto the one shared bus instead of the local toast/queue. Unset (the default)
-// keeps the standalone toast/queue delivery below.
-export function setNotifier(fn) { notifier = typeof fn === "function" ? fn : null; }
+function toastFn(client: unknown): ToastFn | null {
+  const candidate = client as { tui?: { showToast?: unknown } } | null | undefined;
+  const fn = candidate?.tui?.showToast;
+  return typeof fn === "function" ? (fn as ToastFn) : null;
+}
 
-// Shared queue for an app whose front door registered no toast-capable client: that app's own
-// drain hook reads it. It's TRANSIENT runtime state (appended
-// then read-and-cleared), so it lives under cache/, not config/ (config is for
-// config files only). Sibling of config/ and logs/ under the app dir.
-export function notifyQueuePath(dir) { return join(dir || getConfigDir(), "cache", "auth-notifications.jsonl"); }
+/**
+ * Registers the app's plugin `client`, called by a provider from its app-front-door hooks.
+ *
+ * @remarks A registered client with a toast API is what turns a notification into a real toast rather than a queue entry. Harmless when never called.
+ */
+export function setAppClient(client: unknown): void { appClient = client || null; }
 
-// notify(message, level?): level is "info" | "success" | "warning" | "error".
-// Never throws: a failed notification must not break the request path.
-export function notify(message, level) {
+/**
+ * Registers a host's event-bus publish function, so notifications flow onto the one shared bus
+ * instead of the local toast/queue.
+ *
+ * @remarks Unset (the default) keeps the standalone toast/queue delivery.
+ */
+export function setNotifier(fn: unknown): void { notifier = typeof fn === "function" ? (fn as NotifierFn) : null; }
+
+/**
+ * Path to the notification queue an app with no toast-capable client drains, its own drain hook
+ * reading and clearing it.
+ *
+ * @remarks Transient runtime state (appended then read-and-cleared), so it lives under `cache/`, not `config/`; a sibling of `config/` and `logs/` under the app dir.
+ */
+export function notifyQueuePath(dir?: string): string { return join(dir || getConfigDir(), "cache", "auth-notifications.jsonl"); }
+
+/**
+ * Shows the user a small message that never enters the model's context: a real toast when the
+ * app registered a toast-capable client, a queued entry the app's drain hook re-emits otherwise.
+ *
+ * @remarks Never throws: a failed notification must not break the request path.
+ */
+export function notify(message: string, level?: NotifyLevel): void {
   const lvl = level || "info";
   // Persistent record in the normal log (both apps). The toast/queue below is
   // transient delivery only; the queue is read-and-cleared by the drain hook, so
@@ -44,10 +65,11 @@ export function notify(message, level) {
     return;
   }
   try {
-    if (appClient && appClient.tui && typeof appClient.tui.showToast === "function") {
+    const showToast = toastFn(appClient);
+    if (showToast) {
       const variant = lvl === "success" || lvl === "warning" || lvl === "error" ? lvl : "info";
       // opencode's SDK expects the payload nested under `body`; a flat {message,variant} silently no-ops.
-      Promise.resolve(appClient.tui.showToast({ body: { message, variant } })).catch(() => {});
+      Promise.resolve(showToast({ body: { message, variant } })).catch(() => {});
       return;
     }
     const p = notifyQueuePath();

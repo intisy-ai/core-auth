@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Settings that belong to EVERY core-auth provider, declared once here instead of
 // hand-duplicated in each provider. Right now that is the account-selection
 // strategy: the AccountManager consumes it identically for every provider, so a
@@ -7,56 +6,99 @@
 // commonManagerOptions() to AccountManager, so the key name, default, and choice
 // list live in one place.
 
-import { toCapabilitiesFields, toSettingsGroups } from "./settings-schema.js";
+import { toCapabilitiesFields, toSettingsGroups, type ProviderSettingsSchema, type CapabilitiesField } from "./settings-schema.js";
 
-export const COMMON_PROVIDER_DEFAULTS = {
+/** Default value for the account-selection config key every provider spreads into its own defineConfig. */
+export const COMMON_PROVIDER_DEFAULTS: {
+  /** Default selection strategy. */
+  account_selection_strategy: AccountSelectionStrategy;
+} = {
   account_selection_strategy: "hybrid",
 };
 
-export const COMMON_PROVIDER_CAPABILITIES = [
+/** Capabilities-fields entry for the account-selection setting, spread into a provider's own defineCapabilities. */
+export const COMMON_PROVIDER_CAPABILITIES: CapabilitiesField[] = [
   {
+    /** The config key this field reads and writes. */
     key: "account_selection_strategy",
+    /** The edit widget. */
     type: "select",
+    /** Display label. */
     label: "Account selection",
+    /** Help text shown alongside the field. */
     description: "How accounts are picked: sticky keeps the prompt cache warm, round-robin spreads load, hybrid balances by availability.",
+    /** Group heading. */
     group: "Account selection",
+    /** The selectable strategies. */
     options: [
-      { value: "hybrid", label: "Hybrid (health + freshness)" },
+      {
+        /** The stored value. */
+        value: "hybrid",
+        /** Display text. */
+        label: "Hybrid (health + freshness)",
+      },
       { value: "sticky", label: "Sticky (until rate-limited)" },
       { value: "round-robin", label: "Round-robin" },
     ],
   },
 ];
 
-// AccountManager options derived from the common settings, so no provider hardcodes
-// the config key or the default strategy at its construction site. Providers merge
-// their own opts (oauth, backoff, isAvailable) on top.
-export function commonManagerOptions(config) {
-  const cfg = config || {};
-  return { selection: cfg.account_selection_strategy || "hybrid" };
+/**
+ * How the AccountManager picks which account serves the next request.
+ *
+ * @remarks
+ * Matches this file's own select options ({@link COMMON_PROVIDER_CAPABILITIES}) and the Java
+ * Strategy enum (ROUND_ROBIN, STICKY, HYBRID) one to one.
+ */
+export type AccountSelectionStrategy = "hybrid" | "sticky" | "round-robin";
+
+function isAccountSelectionStrategy(value: unknown): value is AccountSelectionStrategy {
+  return value === "hybrid" || value === "sticky" || value === "round-robin";
 }
 
-// Retry/backoff: same "base cooldown, doubles per attempt, capped at a max"
-// semantics across providers (antigravity's default_retry_after_seconds/
-// max_backoff_seconds, claude-code's default_cooldown_seconds/max_cooldown_seconds),
-// but the KEY NAMES differ per provider and renaming them would silently drop a
-// live user's existing config value. So provider-common owns the field shape,
-// the coercion, and the AccountManager-ready backoff object; each provider
-// supplies its OWN key names (RetryBackoffKeys) and its OWN default values
-// (RetryBackoffDefaults) - antigravity's 60/60 and claude-code's 60/900 are
-// legitimate per-provider config values, not duplication.
+/**
+ * Derives the AccountManager's selection option from a provider's config, so no provider
+ * hardcodes the config key or the default strategy at its own construction site.
+ *
+ * @param config the provider's raw config; an unrecognized or missing strategy falls back to `"hybrid"`
+ * @returns the option to merge into the provider's own AccountManager options (oauth, backoff, isAvailable)
+ */
+export function commonManagerOptions(config?: Record<string, unknown>): {
+  /** The resolved selection strategy. */
+  selection: AccountSelectionStrategy;
+} {
+  const cfg = config || {};
+  const strategy = cfg.account_selection_strategy;
+  return { selection: isAccountSelectionStrategy(strategy) ? strategy : "hybrid" };
+}
 
+/**
+ * A provider's own config key names for its base and max retry-backoff settings.
+ *
+ * @remarks
+ * Every provider shares the same "base cooldown, doubles per attempt, capped at a max"
+ * semantics, but the key names differ per provider (antigravity's
+ * `default_retry_after_seconds`/`max_backoff_seconds`, claude-code's
+ * `default_cooldown_seconds`/`max_cooldown_seconds`), and renaming them would silently drop a
+ * live user's existing config value. This lets provider-common own the field shape, the
+ * coercion, and the AccountManager-ready backoff object while each provider keeps its own names.
+ */
 export interface RetryBackoffKeys {
+  /** The provider's own config key for the base retry delay. */
   baseKey: string;
+  /** The provider's own config key for the max backoff. */
   maxKey: string;
 }
 
+/** A provider's own default base and max retry-backoff values, in seconds. */
 export interface RetryBackoffDefaults {
+  /** Base cooldown, in seconds. */
   baseSeconds: number;
+  /** Cap on the exponential backoff, in seconds. */
   maxSeconds: number;
 }
 
-function retryBackoffSchema(keys) {
+function retryBackoffSchema(keys: RetryBackoffKeys): ProviderSettingsSchema {
   return [
     {
       title: "Retry",
@@ -68,33 +110,37 @@ function retryBackoffSchema(keys) {
   ];
 }
 
-// Ready-to-spread capabilities fields (Cairn dashboard) for a provider's retry/backoff
-// pair, generated from the one schema above via the settings-schema adapter.
+/** Capabilities fields (Cairn dashboard) for a provider's retry/backoff pair, keyed by its own field names. */
 export function retryBackoffCapabilities(keys: RetryBackoffKeys) {
   return toCapabilitiesFields(retryBackoffSchema(keys));
 }
 
-// Ready-to-use settings.groups (loader TUI) for a provider's retry/backoff pair,
-// generated from the same schema.
+/** Settings groups (loader TUI) for a provider's retry/backoff pair, keyed by its own field names. */
 export function retryBackoffSettingsGroups(keys: RetryBackoffKeys) {
   return toSettingsGroups(retryBackoffSchema(keys));
 }
 
-// Default config values keyed by the provider's own key names.
+/** Default config values for a provider's retry/backoff pair, keyed by the provider's own field names. */
 export function retryBackoffConfigDefaults(keys: RetryBackoffKeys, defaults: RetryBackoffDefaults) {
   return { [keys.baseKey]: defaults.baseSeconds, [keys.maxKey]: defaults.maxSeconds };
 }
 
-// Validates a raw config value into a positive integer, falling back to the
-// default on anything non-finite or below the minimum (matches the existing
-// per-provider "isFinite && >= 1 ? floor : default" coercion, not a clamp).
+/**
+ * Coerces a raw config value into a positive integer.
+ *
+ * @param value the raw config value
+ * @param defaultValue used when `value` is non-finite or below `min`
+ * @param min the smallest accepted value, 1 by default
+ */
 export function coercePositiveInt(value: unknown, defaultValue: number, min = 1): number {
   const n = Number(value);
   return Number.isFinite(n) && n >= min ? Math.floor(n) : defaultValue;
 }
 
-// Coerces a provider's raw retry/backoff config into validated seconds, reading
-// the provider's own key names and falling back to the provider's own defaults.
+/**
+ * Coerces a provider's raw retry/backoff config into validated seconds, reading the provider's
+ * own key names and falling back to the provider's own defaults.
+ */
 export function coerceRetryBackoff(config: Record<string, unknown> | undefined, keys: RetryBackoffKeys, defaults: RetryBackoffDefaults): RetryBackoffDefaults {
   const cfg = config || {};
   return {
@@ -103,9 +149,15 @@ export function coerceRetryBackoff(config: Record<string, unknown> | undefined, 
   };
 }
 
-// AccountManager-ready backoff object ({baseMs, maxMs}), matching the shape
-// antigravity's driver constructs by hand today.
-export function retryBackoffMs(config: Record<string, unknown> | undefined, keys: RetryBackoffKeys, defaults: RetryBackoffDefaults) {
+/**
+ * AccountManager-ready backoff object (`{baseMs, maxMs}`), coerced from a provider's raw config.
+ */
+export function retryBackoffMs(config: Record<string, unknown> | undefined, keys: RetryBackoffKeys, defaults: RetryBackoffDefaults): {
+  /** Base cooldown, in milliseconds. */
+  baseMs: number;
+  /** Cap on the exponential backoff, in milliseconds. */
+  maxMs: number;
+} {
   const coerced = coerceRetryBackoff(config, keys, defaults);
   return { baseMs: coerced.baseSeconds * 1000, maxMs: coerced.maxSeconds * 1000 };
 }

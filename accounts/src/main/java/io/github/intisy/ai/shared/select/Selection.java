@@ -10,13 +10,17 @@ import java.util.function.BiPredicate;
  * Picks an account index given availability. Strategies: STICKY (keep the cursor until it
  * becomes unavailable), ROUND_ROBIN (advance the cursor on every call), HYBRID (sticky, but
  * fall back to whoever frees up soonest when nobody is currently available). The cursor is
- * per-lane when a lane is given. Ported from {@code libs/core-auth/src/selection.ts}.
+ * per-lane when a lane is given.
  */
 public final class Selection {
     private Selection() {
     }
 
     /**
+     * @param pool the pool to select from
+     * @param lane the lane to select within, or {@code null}/empty for the pool-wide cursor
+     * @param now the current epoch ms
+     * @param strat the selection strategy, defaulted to {@link Strategy#HYBRID} when {@code null}
      * @param available availability predicate {@code (account, lane) -> boolean}; pass
      *                   {@code null} to use {@link RateLimitMath#isAvailable} with {@code now}.
      * @return the selected index, or -1 when none are available (round-robin/sticky) or the

@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/@intisy-ai/api/schema/plugin.schema.json",
+  "id": "core-auth",
+  "api": 1,
+  "publish": {
+    "scopedOnly": true,
+    "jarModule": [
+      "accounts",
+      "auth-contracts"
+    ]
+  },
+  "repo": {
+    "role": "Provider account, OAuth, and quota library",
+    "category": "core-library",
+    "tech": [
+      "typescript"
+    ]
+  }
+}

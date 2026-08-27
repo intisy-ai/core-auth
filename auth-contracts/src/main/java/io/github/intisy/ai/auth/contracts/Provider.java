@@ -28,6 +28,7 @@ public interface Provider extends IrHandler {
     @TsProperty(readOnly = true)
     String id();
 
+    /** Serves one canonical IR request against this provider's upstream; a non-2xx outcome is thrown, never returned as data. */
     @Override
     @TsUnion(value = {"IrResponse", "IrEventStream"}, async = true)
     IrResponse handleIr(IrRequest request, HandlerCtx ctx) throws Exception;
@@ -36,6 +37,7 @@ public interface Provider extends IrHandler {
      * Every lane this plugin serves, when it serves more than the one {@code id} names, or
      * {@code null} when it serves only that one.
      *
+     * @return the lanes this plugin serves, or {@code null} for a single-lane provider
      * @implNote Defaulted rather than abstract so the optionality the emitted declaration carries
      * also holds in Java: a one-lane provider does not write this method at all, and a host reads
      * {@code null} as the lane list being absent rather than as serving no lanes.

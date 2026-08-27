@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Shared model-catalog cache. core-auth fetches a provider's live models (via
 // def.fetchModels) and writes them here; both the app-config merge and the
 // loader's Providers tab read this file instead of a hardcoded list.
@@ -7,30 +6,69 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { configFolder } from "./env.js";
 import { log } from "./log.js";
+import type { ProviderDef, ProviderModel } from "./types.js";
 
 const MODELS_FILE = "models.json";
 
-function cachePath() {
+/** The context {@link ProviderDef.fetchModels} is called with, derived from its own declaration. */
+export type ModelFetchCtx = Parameters<NonNullable<ProviderDef["fetchModels"]>>[0];
+
+/** What {@link ProviderDef.fetchModels} resolves, derived from its own declaration. */
+export type ModelFetchResult = Awaited<ReturnType<NonNullable<ProviderDef["fetchModels"]>>>;
+
+/** A provider's cached model catalog, plus the Auto-sort metadata derived from it. */
+export interface ModelCacheEntry {
+  /** The provider's cached model catalog. */
+  models: Record<string, ProviderModel>;
+  /** Preferred order, top preference first. */
+  ranking?: string[];
+  /** The model to select by default, when the provider has one. */
+  defaultModelId?: string;
+  /** Epoch ms this entry was written. */
+  fetchedAt?: number;
+  /** Where the catalog came from: `"live"` fetch or `"static"` fallback. */
+  source?: string;
+  /** Non-manual Auto-sort sources available for this provider. */
+  sorts?: Array<{
+    /** The source id. */
+    id: string;
+    /** Display label. */
+    label: string;
+  }>;
+  /** Precomputed order per non-manual sort source id. */
+  sortOrders?: Record<string, string[]>;
+  /** Live leaderboard quality scores, keyed by catalog id. */
+  scores?: Record<string, number>;
+  /** Provenance of {@link scores}. */
+  scoreSource?: string;
+}
+
+function cachePath(): string {
   return join(configFolder(), MODELS_FILE);
 }
 
-function readAll() {
+function readAll(): Record<string, ModelCacheEntry> {
   try {
     if (existsSync(cachePath())) return JSON.parse(readFileSync(cachePath(), "utf8")) || {};
   } catch {}
   return {};
 }
 
-// returns { models, ranking, defaultModelId, fetchedAt, sorts, sortOrders, scores } | null
-// NOTE: derived fields (sorts/sortOrders) are returned AS CACHED; we do NOT wipe them
-// on read. Wiping would hide still-valid sources (e.g. leaderboard) until the next
-// refresh. Stale RETIRED sources are filtered surgically in config.getAutoSources by id.
-export function readModelCache(providerId) {
+/**
+ * Reads a provider's cached model catalog; `null` if nothing has been cached yet.
+ *
+ * @remarks
+ * Derived fields (`sorts`/`sortOrders`) are returned AS CACHED, never wiped on read: wiping
+ * would hide still-valid sources (e.g. leaderboard) until the next refresh. Stale retired sources
+ * are filtered surgically in `config.getAutoSources` by id instead.
+ */
+export function readModelCache(providerId: string): ModelCacheEntry | null {
   const entry = readAll()[providerId];
   return entry && entry.models ? entry : null;
 }
 
-export function writeModelCache(providerId, entry) {
+/** Overwrites a provider's cached model catalog; fails silently, logging the error. */
+export function writeModelCache(providerId: string, entry: ModelCacheEntry): void {
   try {
     const all = readAll();
     all[providerId] = { ...entry, fetchedAt: entry.fetchedAt || 0 };
@@ -38,18 +76,25 @@ export function writeModelCache(providerId, entry) {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(cachePath(), JSON.stringify(all, null, 2), "utf8");
   } catch (e) {
-    log("model cache write failed: " + (e && e.message));
+    log("model cache write failed: " + (e instanceof Error ? e.message : String(e)));
   }
 }
 
-// Resolve a provider's catalog: live fetch when supported + an account exists,
-// caching the result; otherwise the last cached catalog; otherwise empty
-// (models stay empty until the first `oc auth login`). `nowMs` is injected so
-// callers can stamp fetchedAt without this module touching Date.now directly.
-export async function resolveProviderModels(def, ctx, nowMs) {
+/**
+ * Resolves a provider's model catalog: a live fetch when supported and an account exists,
+ * caching the result; otherwise the last cached catalog; otherwise empty (models stay empty
+ * until the first `oc auth login`).
+ *
+ * @param nowMs injected so callers can stamp `fetchedAt` without this module touching `Date.now` directly
+ */
+export async function resolveProviderModels(
+  def: ProviderDef,
+  ctx: ModelFetchCtx,
+  nowMs: number,
+): Promise<Record<string, ProviderModel>> {
   const providerId = def.id;
-  let catalog = null;   // { models, ranking, defaultModelId }
-  let source = null;    // "live" (fetched now) | "static" (shipped fallback list)
+  let catalog: ModelFetchResult | null = null;
+  let source: string | null = null;
 
   // 1. live fetch: providers that implement fetchModels and have an account
   if (typeof def.fetchModels === "function" && ctx && ctx.hasAccounts) {
@@ -87,16 +132,16 @@ export async function resolveProviderModels(def, ctx, nowMs) {
   }
 
   // preserve any previously computed sort metadata; refreshModels updates it.
-  const prev = readModelCache(providerId) || {};
+  const prev = readModelCache(providerId);
   writeModelCache(providerId, {
     models: catalog.models,
     ranking: catalog.ranking,
     defaultModelId: catalog.defaultModelId,
-    source: source || prev.source || "static",   // live vs static-fallback, for the UI badge
-    sorts: prev.sorts || [],
-    sortOrders: prev.sortOrders || {},
-    scores: prev.scores || {},
-    scoreSource: prev.scoreSource || "",
+    source: source || prev?.source || "static",   // live vs static-fallback, for the UI badge
+    sorts: prev?.sorts || [],
+    sortOrders: prev?.sortOrders || {},
+    scores: prev?.scores || {},
+    scoreSource: prev?.scoreSource || "",
     fetchedAt: nowMs || 0,
   });
   return catalog.models;

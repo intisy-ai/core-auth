@@ -17,16 +17,26 @@ import type { ReadmeSpec } from "@intisy-ai/core";
 // contract cannot narrow behind its back. The copies these replace had already drifted, missing an
 // action's `args` and a schema's `sections` and `data`.
 export type { CommandDef, FieldType, FieldSpec, ActionSpec, CapabilitySchema, ReadmeSpec } from "@intisy-ai/core";
+/** Options to {@link defineProviderPlugin}. */
 export interface ProviderPluginOpts {
-  name: string;                                     // the readme registration name
+  /** The readme registration name. */
+  name: string;
+  /** The provider's definition. */
   driver: ProviderDef;
-  cliGuard?: () => boolean | Promise<boolean>;       // the provider's own maybeRunCli(), for actions like `accounts`
+  /** The provider's own `maybeRunCli()`, for actions like `accounts`. */
+  cliGuard?: () => boolean | Promise<boolean>;
+  /** The provider's readme spec, registered before the plugin activates. */
   readme?: ReadmeSpec;
-  exit?: (code: number) => void;                     // defaults to process.exit; overridable for tests
+  /** Defaults to `process.exit`; overridable for tests. */
+  exit?: (code: number) => void;
 }
 
-// Slash-command / config invocations shell back in as `node <bundle> <action>`; both guards
-// below must exit before the provider registers, so a CLI invocation never boots the provider.
+/**
+ * Runs the provider prologue every core-auth provider needs before it can serve as an app plugin.
+ *
+ * @remarks Slash-command / config invocations shell back in as `node <bundle> <action>`; both the readme and cliGuard checks must exit before the provider registers, so a CLI invocation never boots the provider.
+ * @returns `undefined` when a CLI guard exited instead of the plugin
+ */
 export async function defineProviderPlugin(opts: ProviderPluginOpts): Promise<ProviderPlugin | undefined> {
   const exit = opts.exit ?? ((code: number) => process.exit(code));
 

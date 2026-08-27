@@ -10,16 +10,25 @@ import java.util.Map;
  * the serialized key order, which a JS reader of the same file depends on.
  */
 public class AccountPool {
+    /** The provider's accounts, in catalog order. */
     public List<Account> accounts;
-    public int activeIndex;                          // sticky selection when no lane is given
+    /** Sticky selection into {@link #accounts} used when no lane is given. */
+    public int activeIndex;
+    /** Sticky selection into {@link #accounts} per lane, for callers that select by lane. */
     public Map<String, Integer> activeIndexByLane;
 
+    /** Constructs an empty pool. */
     public AccountPool() {
         this.accounts = new ArrayList<>();
         this.activeIndex = 0;
         this.activeIndexByLane = new LinkedHashMap<>();
     }
 
+    /**
+     * @param accounts the provider's accounts, defaulted to empty when {@code null}
+     * @param activeIndex the sticky selection used when no lane is given
+     * @param activeIndexByLane the sticky selection per lane, defaulted to empty when {@code null}
+     */
     public AccountPool(List<Account> accounts, int activeIndex, Map<String, Integer> activeIndexByLane) {
         this.accounts = accounts != null ? accounts : new ArrayList<>();
         this.activeIndex = activeIndex;

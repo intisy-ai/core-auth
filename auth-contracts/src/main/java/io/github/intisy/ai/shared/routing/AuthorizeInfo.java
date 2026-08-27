@@ -9,15 +9,28 @@ package io.github.intisy.ai.shared.routing;
  * them yet.
  */
 public final class AuthorizeInfo {
+    /** The URL the operator opens in a browser to start the login. */
     public String authorizeUrl;
-    public String completion; // paste|loopback
+    /** How the flow completes: {@code paste} (operator pastes a code back) or {@code loopback}. */
+    public String completion;
+    /** Opaque value the exchange step must echo back, to correlate the callback with this attempt. */
     public String state;
+    /** Local port the loopback listener binds, for a {@code completion == "loopback"} flow. */
     public Integer loopbackPort;
+    /** Local path the loopback listener answers on, for a {@code completion == "loopback"} flow. */
     public String loopbackPath;
 
+    /** Empty constructor for JSON deserialization. */
     public AuthorizeInfo() {
     }
 
+    /**
+     * @param authorizeUrl the URL the operator opens to start the login
+     * @param completion how the flow completes, {@code paste} or {@code loopback}
+     * @param state opaque value the exchange step must echo back
+     * @param loopbackPort local port the loopback listener binds, or {@code null} for a paste flow
+     * @param loopbackPath local path the loopback listener answers on, or {@code null} for a paste flow
+     */
     public AuthorizeInfo(String authorizeUrl, String completion, String state,
                           Integer loopbackPort, String loopbackPath) {
         this.authorizeUrl = authorizeUrl;

@@ -1,16 +1,15 @@
-// @ts-nocheck
-import { select } from "./select.js";
+import { select, type SelectItem } from "./select.js";
 import { confirm } from "./confirm.js";
 import { prompt } from "./prompt.js";
 import { isTTY } from "./ansi.js";
-import { proxyManager } from "../proxy/manager.js";
+import { proxyManager, type ScoredProxyEntry } from "../proxy/manager.js";
 import { PROXY_PROVIDERS } from "../proxy/providers.js";
 
-function fmtScore(n) { return (Math.round(n * 10) / 10).toString(); }
+function fmtScore(n: number): string { return (Math.round(n * 10) / 10).toString(); }
 
-async function proxyStats(proxy) {
+async function proxyStats(proxy: ScoredProxyEntry): Promise<void> {
   const s = proxy.stats || {};
-  const items = [
+  const items: SelectItem<string | number>[] = [
     { label: "provider: " + proxy.provider, kind: "heading", value: 0 },
     { label: "score: " + fmtScore(proxy.score) + " (lower = better)", kind: "heading", value: 0 },
     { label: "in use by: " + proxy.inUse + " / 3 accounts", kind: "heading", value: 0 },
@@ -26,10 +25,10 @@ async function proxyStats(proxy) {
   if (result === "remove" && await confirm("Remove " + proxy.url + "?")) proxyManager.remove(proxy.url);
 }
 
-async function providerMenu() {
+async function providerMenu(): Promise<void> {
   while (true) {
     const config = proxyManager.providersConfig();
-    const items = [{ label: "Back", value: "back" }];
+    const items: SelectItem<string>[] = [{ label: "Back", value: "back" }];
     for (const name of PROXY_PROVIDERS) {
       if (name === "manual") continue;
       const on = config[name] && config[name].enabled;
@@ -41,13 +40,24 @@ async function providerMenu() {
   }
 }
 
-export async function runProxyMenu() {
+type ProxyMenuAction =
+  | { t: "mode" }
+  | { t: "add" }
+  | { t: "refresh" }
+  | { t: "providers" }
+  | { t: "noop" }
+  | { t: "back" }
+  | { t: "toggle"; provider: string }
+  | { t: "proxy"; url: string };
+
+/** Runs the standalone proxy management menu: mode, manual proxies, provider sources, and per-proxy stats. A no-op when stdout is not a TTY. */
+export async function runProxyMenu(): Promise<void> {
   if (!isTTY()) return;
-  const expanded = new Set();   // provider categories are collapsed by default
+  const expanded = new Set<string>();   // provider categories are collapsed by default
   while (true) {
     const mode = proxyManager.getMode("default");
-    const grouped = { Global: proxyManager.proxiesForScope("global") };
-    const items = [
+    const grouped: Record<string, ScoredProxyEntry[]> = { Global: proxyManager.proxiesForScope("global") };
+    const items: SelectItem<ProxyMenuAction>[] = [
       { label: "Mode: " + mode, value: { t: "mode" }, color: "cyan" },
       { label: "Add manual proxy", value: { t: "add" }, color: "cyan" },
       { label: "Refresh from providers", value: { t: "refresh" }, color: "cyan" },
@@ -73,14 +83,22 @@ export async function runProxyMenu() {
   }
 }
 
-// per-account proxy selection: toggle global proxies for this account, and add a
-// new proxy as global (all accounts) or account-only (auto-used here, hidden elsewhere)
-export async function selectAccountProxies(accountId) {
+type AccountProxyAction =
+  | { t: "done" }
+  | { t: "add" }
+  | { t: "toggle"; url: string; owned: boolean };
+
+/**
+ * Runs the per-account proxy selection menu: toggle global proxies for this account, and add a
+ * new proxy as global (all accounts) or account-only (auto-used here, hidden elsewhere). A no-op
+ * when stdout is not a TTY.
+ */
+export async function selectAccountProxies(accountId: string): Promise<void> {
   if (!isTTY()) return;
   while (true) {
     const selected = new Set(proxyManager.getScopeSelection("account:" + accountId));
     const all = [...proxyManager.proxiesForScope("global"), ...proxyManager.proxiesForScope("account:" + accountId)];
-    const items = [
+    const items: SelectItem<AccountProxyAction>[] = [
       { label: "Done", value: { t: "done" } },
       { label: "Add proxy", value: { t: "add" }, color: "cyan" },
     ];

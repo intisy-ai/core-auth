@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Live quality ranking for the Auto "leaderboard" source. Pulls per-model quality
 // scores from a public, keyless source: OpenRouter's model list
 // (https://openrouter.ai/api/v1/models), whose `benchmarks.artificial_analysis
@@ -44,20 +43,30 @@ const SOURCE_OPENROUTER = "Artificial Analysis via OpenRouter";
 
 // ---- score sources ----------------------------------------------------------
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
 // OpenRouter's public /models endpoint, keyless. Each model may carry
 // benchmarks.artificial_analysis.intelligence_index; index by both name and id.
 async function fetchOpenRouter(): Promise<Score[]> {
   const response = await fetch(OPENROUTER_URL, { headers: { Accept: "application/json" } });
   if (!response.ok) { log("leaderboard: openrouter " + response.status); return []; }
-  const payload = await response.json();
-  const rows = Array.isArray(payload) ? payload : (payload && payload.data) || [];
+  const payload: unknown = await response.json();
+  const body = asRecord(payload);
+  const dataField = body ? body.data : undefined;
+  const rows: unknown[] = Array.isArray(payload) ? payload : (Array.isArray(dataField) ? dataField : []);
   const out: Score[] = [];
-  for (const r of rows) {
-    const score = r && r.benchmarks && r.benchmarks.artificial_analysis
-      && r.benchmarks.artificial_analysis.intelligence_index;
+  for (const item of rows) {
+    const row = asRecord(item);
+    const benchmarks = row ? asRecord(row.benchmarks) : null;
+    const aa = benchmarks ? asRecord(benchmarks.artificial_analysis) : null;
+    const score = aa ? aa.intelligence_index : undefined;
     if (typeof score !== "number") continue;
-    if (r.name) out.push({ norm: getCoreAuth().leaderboardNormalize(r.name), score });
-    if (r.id) out.push({ norm: getCoreAuth().leaderboardNormalize(r.id), score });
+    const name = row?.name;
+    const id = row?.id;
+    if (typeof name === "string" && name) out.push({ norm: getCoreAuth().leaderboardNormalize(name), score });
+    if (typeof id === "string" && id) out.push({ norm: getCoreAuth().leaderboardNormalize(id), score });
   }
   return out;
 }
@@ -66,17 +75,22 @@ async function fetchOpenRouter(): Promise<Score[]> {
 async function fetchAA(key: string): Promise<Score[]> {
   const response = await fetch(AA_URL, { headers: { "x-api-key": key, Accept: "application/json" } });
   if (!response.ok) { log("leaderboard: AA " + response.status); return []; }
-  const payload = await response.json();
-  const rows = Array.isArray(payload) ? payload : payload && (payload.data || payload.models || payload.results);
+  const payload: unknown = await response.json();
+  const body = asRecord(payload);
+  const rowsField = body ? (body.data || body.models || body.results) : undefined;
+  const rows = Array.isArray(payload) ? payload : rowsField;
   if (!Array.isArray(rows)) return [];
   const out: Score[] = [];
-  for (const r of rows) {
+  for (const item of rows) {
+    const r = asRecord(item);
     if (!r) continue;
     const name = r.name || r.model_name || r.slug || r.id || r.model;
-    const score =
+    const evaluations = asRecord(r.evaluations);
+    const scoreRaw =
       r.intelligenceIndex ?? r.intelligence_index ?? r.intelligence ??
-      (r.evaluations && (r.evaluations.artificial_analysis_intelligence_index ?? r.evaluations.intelligence_index)) ??
+      (evaluations ? (evaluations.artificial_analysis_intelligence_index ?? evaluations.intelligence_index) : undefined) ??
       r.quality ?? r.elo ?? r.score;
+    const score = typeof scoreRaw === "number" ? scoreRaw : undefined;
     if (name && typeof score === "number") out.push({ norm: getCoreAuth().leaderboardNormalize(String(name)), score });
   }
   return out;
@@ -116,22 +130,26 @@ async function getScores(): Promise<ScoreSet> {
   return cached ? { scores: cached.scores, source: cached.source || "" } : { scores: [], source: "" };
 }
 
-// Full name of the source backing the current scores ("" when no data yet).
+/** Full name of the source backing the current scores; `""` when no data has been fetched yet. */
 export async function leaderboardSource(): Promise<string> {
   return (await getScores()).source;
 }
 
-// Compact tag for row hints ("score 50 · AA"); full name goes in a subtitle.
+/** Compact tag for row hints (e.g. `"score 50 - AA"`); the full name goes in a subtitle. */
 export function leaderboardSourceShort(source: string): string {
   return getCoreAuth().leaderboardSourceShort(source);
 }
 
 // ---- public order -----------------------------------------------------------
 
-// Per-model live quality scores { id: number } for the given catalog ids (only ids
-// with a live score are included). Used to DISPLAY the score next to models; the
-// caller persists it in the model cache so both the provider browser and the loader's
-// mapping picker can show it without re-fetching.
+/**
+ * Per-model live quality scores (`{ id: number }`) for the given catalog ids; only ids with a
+ * live score are included.
+ *
+ * @remarks
+ * Used to DISPLAY the score next to models; the caller persists it in the model cache so both
+ * the provider browser and the loader's mapping picker can show it without re-fetching.
+ */
 export async function computeLeaderboardScores(
   candidateIds: string[],
   nameOf: (id: string) => string = (id) => id,

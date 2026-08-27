@@ -9,8 +9,20 @@ import java.util.Map;
  * handle()}.
  */
 public interface OAuthProvider {
+    /**
+     * Starts a login and returns what the operator needs to complete it.
+     *
+     * @param ctx the request context
+     * @return the parameters to start the OAuth login
+     */
     AuthorizeInfo authorize(HandlerCtx ctx);
 
-    /** {@code body} is the raw exchange request payload (e.g. {@code {code,state}} JSON); returns {@code {account:...}}. */
+    /**
+     * Completes a login started by {@link #authorize}.
+     *
+     * @param ctx the request context
+     * @param body the raw exchange request payload (e.g. {@code {code,state}} JSON)
+     * @return the resulting account, as {@code {account:...}}
+     */
     Map<String, Object> exchange(HandlerCtx ctx, String body);
 }

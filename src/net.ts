@@ -1,29 +1,39 @@
-// @ts-nocheck
 // Single-source proxy-aware transport, lifted out of the per-provider jsExec copies
 // (antigravity-auth's and claude-code-auth's driver/javaHandle.ts). Owns ONLY the
 // fetch + proxy-retry mechanics; rate-limit status classification stays with the
 // caller (it differs per upstream wire format).
 
+/** The minimal proxy-manager shape {@link proxiedFetch} needs: pick a proxy, report how it went. */
 export interface ProxyManagerLike {
+  /** Picks a proxy URL for an account, or `null` for a direct connection. */
   selectForAccount(accountId?: string, providerId?: string): string | null;
+  /** Reports whether a proxy's use succeeded, feeding its quality score. */
   reportResult(url: string, ok: boolean, elapsedMs?: number): void;
 }
 
+/** Options to {@link proxiedFetch}. */
 export interface ProxiedFetchOpts {
+  /** The account this fetch is on behalf of, used to select a sticky proxy. */
   accountId?: string;
+  /** The provider this fetch is on behalf of, used to select a proxy when there is no account yet. */
   providerId?: string;
+  /** Selects and reports on the proxy; omit for a direct fetch. */
   proxyManager?: ProxyManagerLike;
-  // An already-chosen proxy, used instead of asking the manager for one. A caller that was
-  // handed a proxy URL rather than the account it belongs to has nothing to select with.
+  /** An already-chosen proxy, used instead of asking the manager for one; needed when the caller has a proxy URL but not the account it belongs to. */
   proxy?: string;
+  /** Where diagnostic messages (e.g. a proxy-then-direct retry) go. */
   log?: (message: string) => void;
-  // Test seam only; production callers never set this (defaults to the global fetch).
+  /** Test seam only; production callers never set this (defaults to the global fetch). */
   fetchImpl?: typeof fetch;
 }
 
+/** Outcome of {@link proxiedFetch}. */
 export interface ProxiedFetchResult {
-  response?: Response;   // retained live Response; body is never read here
-  proxyUsed: boolean;    // whether a proxy was applied to the (first) attempt
+  /** The retained live Response; its body is never read here. */
+  response?: Response;
+  /** Whether a proxy was applied to the (first) attempt. */
+  proxyUsed: boolean;
+  /** Whether both the proxied and direct attempts failed to reach the endpoint at all. */
   transportFailed: boolean;
 }
 
@@ -34,6 +44,12 @@ function freshInput(request: Request | string): Request | string {
   return request instanceof Request ? request.clone() : request;
 }
 
+/**
+ * Fetches through a proxy when one is available, retrying directly if the proxy is unreachable
+ * (a dead proxy gives no isolation anyway).
+ *
+ * @remarks Owns only the fetch + proxy-retry mechanics; rate-limit status classification stays with the caller, since it differs per upstream wire format.
+ */
 export async function proxiedFetch(
   request: Request | string,
   init: RequestInit & { proxy?: string },
@@ -69,15 +85,16 @@ export async function proxiedFetch(
       return { transportFailed: true, proxyUsed: false };
     }
   }
-  if (proxyOk) opts.proxyManager?.reportResult(proxyUrl, true, Date.now() - started);
+  if (proxyOk && proxyUrl) opts.proxyManager?.reportResult(proxyUrl, true, Date.now() - started);
 
   return { response, proxyUsed: !!proxyUrl, transportFailed: false };
 }
 
-// AbortController-based fetch with a hard deadline, lifted out of the ~5 hand-rolled
-// AbortController+setTimeout copies across antigravity-auth and claude-code-auth (ping
-// checks and quota/model-list calls). fetchImpl is a test seam only; production callers
-// never pass it (defaults to the global fetch).
+/**
+ * Fetches with a hard deadline, aborting the request if `timeoutMs` elapses first.
+ *
+ * @param fetchImpl test seam only; production callers never pass it (defaults to the global fetch)
+ */
 export async function timeoutFetch(
   url: string | Request,
   init: RequestInit = {},

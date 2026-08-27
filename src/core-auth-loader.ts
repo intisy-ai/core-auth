@@ -6,6 +6,7 @@
 // per process, measured at 15.5 ms.
 import * as coreAuth from "./generated/core-auth.teavm.js";
 
+/** The TeaVM-generated Java account-store engine, statically imported so this never fails and callers need no init step. */
 export function getCoreAuth(): typeof coreAuth {
   return coreAuth;
 }

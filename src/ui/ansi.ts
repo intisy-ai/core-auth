@@ -1,11 +1,11 @@
-// @ts-nocheck
+/** Raw ANSI escape codes and helpers the terminal menu renderers draw with. */
 export const ANSI = {
   hide: "\x1b[?25l",
   show: "\x1b[?25h",
   up: (n = 1) => `\x1b[${n}A`,
   clearLine: "\x1b[2K",
   clearScreen: "\x1b[2J",
-  moveTo: (row, col) => `\x1b[${row};${col}H`,
+  moveTo: (row: number, col: number) => `\x1b[${row};${col}H`,
   cyan: "\x1b[36m",
   green: "\x1b[32m",
   red: "\x1b[31m",
@@ -15,7 +15,8 @@ export const ANSI = {
   reset: "\x1b[0m",
 };
 
-export function parseKey(data) {
+/** Decodes a raw-stdin keypress into a named navigation action; `null` for a key this UI does not handle. */
+export function parseKey(data: Buffer | string): string | null {
   const s = data.toString();
   if (s === "\x1b[A" || s === "\x1bOA") return "up";
   if (s === "\x1b[B" || s === "\x1bOB") return "down";
@@ -28,15 +29,17 @@ export function parseKey(data) {
   return null;
 }
 
+/** Whether stdin is an interactive terminal, which every raw-stdin menu requires. */
 export function isTTY() {
   return Boolean(process.stdin.isTTY);
 }
 
-function stripAnsi(s) {
+function stripAnsi(s: string): string {
   return s.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
-export function truncateAnsi(s, max) {
+/** Truncates a string to `max` visible characters, preserving its ANSI color codes rather than cutting mid-escape. */
+export function truncateAnsi(s: string, max: number): string {
   if (stripAnsi(s).length <= max) return s;
   let out = "", visible = 0, i = 0;
   while (i < s.length && visible < max) {

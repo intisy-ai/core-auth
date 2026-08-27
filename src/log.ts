@@ -1,4 +1,3 @@
-// @ts-nocheck
 // File logger, toggleable via auth.json `logging`. Console mirroring is GLOBAL,
 // off by default, toggled for every plugin via the shared config/settings.json `logConsole`
 // (or CORE_LOG_CONSOLE). Console lines go to stderr, prefixed [core-auth] + colored,
@@ -38,6 +37,7 @@ function prefixColor(name: string): number {
   return PALETTE[h % PALETTE.length];
 }
 
+/** Writes a log line: to a per-day file under `logs/` unless `auth.json`'s `logging` is `false`, and mirrored to stderr when console logging is globally enabled. Never throws. */
 export function log(message: string): void {
   try {
     if (consoleEnabled()) {

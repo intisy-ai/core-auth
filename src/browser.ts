@@ -1,16 +1,17 @@
-// @ts-nocheck
 // Open a URL in the user's default browser. Silent no-op when none is available
 // (headless / container): the async "error" event from a missing opener is
 // swallowed so callers can rely on the in-tab paste fallback instead.
 
-import { spawn } from "node:child_process";
+import { spawn, type SpawnOptions } from "node:child_process";
 
-export function openBrowser(url) {
+/** Opens a URL in the user's default browser; a silent no-op when none is available (headless / container). */
+export function openBrowser(url: string): void {
   if (!url) return;
   try {
     const platform = process.platform;
-    let command, args;
-    const spawnOpts = { detached: true, stdio: "ignore" };
+    let command: string;
+    let args: string[];
+    const spawnOpts: SpawnOptions = { detached: true, stdio: "ignore" };
     if (platform === "win32") {
       // `cmd /c start "" "<url>"`: an unquoted url lets cmd treat & as a command separator
       // (and %xx as env expansion), truncating the OAuth url. Passing the whole command

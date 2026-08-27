@@ -31,6 +31,11 @@ public final class ChatError {
      * The response to send, as {@code {status, body, headers}}. {@code opts} carries the optional
      * {@code format}, {@code status}, {@code type}, {@code geminiStatus}, {@code rateLimited} and
      * {@code retryAfterMs}.
+     *
+     * @param message the user-facing error message
+     * @param opts the shaping options, or {@code null} to use every default
+     * @param json the codec used to serialize the response body
+     * @return the response to send, as {@code {status, body, headers}}
      */
     public static Map<String, Object> build(String message, Map<String, Object> opts, JsonCodec json) {
         Map<String, Object> options = opts == null ? new LinkedHashMap<String, Object>() : opts;

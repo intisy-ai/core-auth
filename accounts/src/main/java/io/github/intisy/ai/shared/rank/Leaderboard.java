@@ -31,9 +31,15 @@ public final class Leaderboard {
 
     /** One live quality score, against the normalized name or id it was published under. */
     public static final class Score {
+        /** The name or id this score was published under, already run through {@link #normalize}. */
         public final String norm;
+        /** The live quality score for {@link #norm}. */
         public final double score;
 
+        /**
+         * @param norm the name or id this score was published under
+         * @param score the live quality score for it
+         */
         public Score(String norm, double score) {
             this.norm = norm == null ? "" : norm;
             this.score = score;
@@ -61,6 +67,9 @@ public final class Leaderboard {
     /**
      * Collapses a name or id to a matching key: lowercase, effort and variant tokens dropped, then
      * everything but letters and digits removed, so every variant of one model shares a key.
+     *
+     * @param name the display name or catalog id to collapse
+     * @return the matching key, or the empty string for {@code null}
      */
     public static String normalize(String name) {
         if (name == null) return "";
@@ -71,13 +80,21 @@ public final class Leaderboard {
     /**
      * The matching key for a display name, dropping every parenthetical tag first, so the effort
      * "(High)" and the provider label "(Antigravity)" cannot separate a model from its own variants.
+     *
+     * @param text the display name to collapse
+     * @return the matching key, or the empty string for {@code null}
      */
     public static String baseKeyFromName(String text) {
         if (text == null) return "";
         return normalize(PARENTHESISED.matcher(text).replaceAll(" "));
     }
 
-    /** Effort weight, higher first. A name with no effort marker sits mid-range at 3. */
+    /**
+     * Effort weight, higher first. A name with no effort marker sits mid-range at 3.
+     *
+     * @param text the display name to read an effort marker from
+     * @return the effort weight, from 1 (lowest) to 6 (thinking)
+     */
     public static int effortRank(String text) {
         String s = text == null ? "" : text.toLowerCase(Locale.ROOT);
         if (THINKING.matcher(s).find()) return 6;
@@ -94,6 +111,10 @@ public final class Leaderboard {
      * substring match wins; failing that a digit-stripped FAMILY match, so a catalog entry still
      * ranks by its family when the score source lists only a different version of it. The family
      * pass is skipped for a very short key, where it would match almost anything.
+     *
+     * @param key the normalized base key to find a score for
+     * @param scores the available live scores
+     * @return the best matching score, or {@link #NO_SCORE} when none matches
      */
     public static double scoreForKey(String key, List<Score> scores) {
         if (key == null || scores == null || scores.isEmpty()) return NO_SCORE;
@@ -123,6 +144,11 @@ public final class Leaderboard {
      * position. Variants of one model group together at their shared score and are ordered by effort
      * among themselves; effort never decides the order between different models, and an unscored
      * model keeps its catalog position behind every scored one.
+     *
+     * @param ids the catalog ids to order
+     * @param names each id's display name at the same position, or {@code null} to fall back to the id
+     * @param scores the available live scores
+     * @return {@code ids}, reordered best-first
      */
     public static List<String> order(List<String> ids, List<String> names, List<Score> scores) {
         List<Entry> entries = entriesOf(ids, names, scores);
@@ -155,7 +181,14 @@ public final class Leaderboard {
         return ordered;
     }
 
-    /** The live score per id, carrying only the ids that matched a score. */
+    /**
+     * The live score per id, carrying only the ids that matched a score.
+     *
+     * @param ids the catalog ids to look up
+     * @param names each id's display name at the same position, or {@code null} to fall back to the id
+     * @param scores the available live scores
+     * @return a map from id to score, for the ids that matched
+     */
     public static Map<String, Double> scoresFor(List<String> ids, List<String> names, List<Score> scores) {
         Map<String, Double> out = new LinkedHashMap<String, Double>();
         for (Entry entry : entriesOf(ids, names, scores)) {
@@ -164,7 +197,12 @@ public final class Leaderboard {
         return out;
     }
 
-    /** Compact tag for a row hint; the full provenance goes in a subtitle. */
+    /**
+     * Compact tag for a row hint; the full provenance goes in a subtitle.
+     *
+     * @param source the full source provenance string, or {@code null}/empty for none
+     * @return {@code "AA"} when a source is present, else the empty string
+     */
     public static String sourceShort(String source) {
         return source != null && !source.isEmpty() ? "AA" : "";
     }
