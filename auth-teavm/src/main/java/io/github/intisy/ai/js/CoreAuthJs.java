@@ -262,9 +262,10 @@ public final class CoreAuthJs {
     }
 
     /**
-     * {@code RateLimitMath.calculateBackoffMs} over the {@code jitter == false} exact-value path
-     * (the deterministic one; {@code jitter == true} consults a random source, so it is
-     * deliberately excluded from a deterministic-output check). {@code argsJson} is
+     * {@code RateLimitMath.calculateBackoffMs} over the {@code Random}-consulting overload: exact
+     * when {@code jitter} is {@code false} (the deterministic path, safe for a byte-for-byte
+     * output check), randomized via {@code Math::random} when {@code jitter} is {@code true} (not
+     * deterministic, so excluded from one). {@code argsJson} is
      * {@code {"attempt":int,"baseMs":long,"maxMs":long,"jitter":boolean}}; returns the bare JSON
      * number result (a {@code Long}, so a whole value never gets a spurious {@code .0}).
      *
@@ -279,7 +280,8 @@ public final class CoreAuthJs {
         long baseMs = toLong(args.get("baseMs"));
         long maxMs = toLong(args.get("maxMs"));
         boolean jitter = Boolean.TRUE.equals(args.get("jitter"));
-        long result = RateLimitMath.calculateBackoffMs(attempt, baseMs, maxMs, jitter);
+        Random random = Math::random;
+        long result = RateLimitMath.calculateBackoffMs(attempt, baseMs, maxMs, jitter, random);
         return json.stringify(result);
     }
 

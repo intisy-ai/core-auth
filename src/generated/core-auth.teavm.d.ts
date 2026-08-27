@@ -88,7 +88,8 @@ export declare function accountUpsert(providerId: string, accountJson: string, j
  */
 export declare function acquireAccount(providerId: string, lane: string, strategy: string, available: ((a: string, b: string) => boolean) | null, jsStore: CoreAuthJsStore): string;
 /**
- * The exact backoff delay, with jitter off.
+ * The backoff delay: exact when `jitter` is `false`, randomized (halved, then
+ * scaled back up by a random fraction of that half) when `jitter` is `true`.
  *
  * @param argsJson - JSON with `attempt`, `baseMs`, `maxMs` and `jitter`
  * @returns the bare JSON number

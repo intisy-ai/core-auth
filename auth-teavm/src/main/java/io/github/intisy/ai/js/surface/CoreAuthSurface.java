@@ -151,7 +151,8 @@ public interface CoreAuthSurface {
     double calculateTokenExpiry(double requestTimeMs, double expiresInSeconds);
 
     /**
-     * The exact backoff delay, with jitter off.
+     * The backoff delay: exact when {@code jitter} is {@code false}, randomized (halved, then
+     * scaled back up by a random fraction of that half) when {@code jitter} is {@code true}.
      *
      * @param argsJson JSON with {@code attempt}, {@code baseMs}, {@code maxMs} and {@code jitter}
      * @return the bare JSON number
