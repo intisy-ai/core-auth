@@ -26,7 +26,10 @@ public class Account {
     public Long addedAt;
     /** Epoch ms this account was last claimed by selection. */
     public Long lastUsed;
-    /** Whether the user has explicitly disabled the account; {@code null} means enabled. */
+    /**
+     * Whether the account is disabled, by the user or by the system (e.g. a revoked refresh
+     * token); a disabled account is skipped by selection. {@code null} means enabled.
+     */
     public Boolean enabled;
     /** Per-lane epoch ms until which that lane is rate-limited on this account. */
     public Map<String, Long> rateLimitResetTimes;
@@ -34,7 +37,7 @@ public class Account {
     public Long coolingDownUntil;
     /** Raw error text behind the current cooldown; transient, never shown in a UI row. */
     public String cooldownReason;
-    /** Why the SYSTEM (not the user) disabled the account. */
+    /** Why the SYSTEM disabled the account, when {@link #enabled} was set to false by the system rather than by the user. */
     public String disabledReason;
     /** Provider-specific extras, opaque to this harness. */
     public Map<String, Object> meta;

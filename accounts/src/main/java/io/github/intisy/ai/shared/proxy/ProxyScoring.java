@@ -49,7 +49,8 @@ public final class ProxyScoring {
      *
      * @param store the proxy store to read assignments from
      * @param proxy the proxy to score
-     * @return the ranking score, combining base quality, current load and a manual-entry penalty
+     * @return the ranking score, combining base quality, current load, and a preference for
+     * manually entered proxies (their score is reduced, which makes them rank better)
      */
     public static double scoreOf(Map<String, Object> store, Map<String, Object> proxy) {
         int inUse = countAssignments(store, JsonUtil.asString(proxy.get("url")));
