@@ -83,6 +83,12 @@ export interface AccountView {
   lastUsed?: number;
   detail?: string;                    // human-readable status note ("rate-limited 12m")
   quota?: AccountQuota[];
+  /**
+   * Epoch ms this account becomes usable again, or `Infinity` when disabled. Optional: a
+   * hand-built AccountView from a provider not going through the shared account-controller helper
+   * may not compute it.
+   */
+  availableAt?: number;
 }
 
 // Implemented by the provider; consumed by the shared core TUI.
@@ -98,6 +104,8 @@ export interface AccountController {
   remove(id: string): void;
   login(): Promise<AccountView | null>;
   refreshQuota?(): Promise<void>;
+  /** Per-account quota refresh; renders as a core account-detail action. */
+  refreshQuotaOne?(id: string): Promise<void>;
   actions?(): MenuAction[];                       // extra top-level menu items
   accountActions?(view: AccountView): MenuAction[];   // extra per-account menu items
 }

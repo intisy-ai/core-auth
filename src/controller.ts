@@ -32,21 +32,6 @@ export interface AccountManagerLike {
   refresh(id: string): Promise<boolean>;
 }
 
-/** An AccountView plus the availableAt signal the shared menu model reads for "free in Xm" hints. */
-export interface AccountControllerView extends AccountView {
-  availableAt: number;
-}
-
-/**
- * @remarks
- * `refreshQuotaOne` renders as a per-account "Refresh quota" action; `AccountController` (types.ts)
- * does not declare it, so it is added here rather than force-fit into that interface.
- */
-export interface AccountControllerImpl extends AccountController {
-  list(): AccountControllerView[];
-  refreshQuotaOne?(id: string): Promise<void>;
-}
-
 export interface AccountControllerOptions {
   status?: (account: CoreAccount, now: number) => AccountStatus;
   detail?: (account: CoreAccount, now: number) => string | undefined;
@@ -62,10 +47,10 @@ export interface AccountControllerOptions {
   accountActions?: (view: AccountView) => MenuAction[];
 }
 
-export function accountControllerFromManager(manager: AccountManagerLike, opts?: AccountControllerOptions): AccountControllerImpl {
+export function accountControllerFromManager(manager: AccountManagerLike, opts?: AccountControllerOptions): AccountController {
   const options = opts || {};
   return {
-    list(): AccountControllerView[] {
+    list(): AccountView[] {
       const now = Date.now();
       return manager.list().map((account) => ({
         id: account.id,

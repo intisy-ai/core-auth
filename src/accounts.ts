@@ -4,7 +4,7 @@
 
 import { getCoreAuth } from "./core-auth-loader.js";
 import { createLiveStore, type LiveStoreLike } from "./live-store.js";
-import { withLock } from "./store-lock.js";
+import { withLock, type StoreLockOpts } from "./store-lock.js";
 import { getConfigDir } from "./env.js";
 import { emitActivity } from "./activity.js";
 import type { AccountPool, CoreAccount } from "./types.js";
@@ -14,13 +14,18 @@ export { LockTimeoutError, withLock } from "./store-lock.js";
 
 const STORE_KEY = "accounts.json";
 
-/** Where a provider's account pool is stored, when it is not the default location. */
-export interface AccountStoreLocation {
-  dir?: string;
-  file?: string;
-}
+/**
+ * Where a provider's account pool is stored, when it is not the default location.
+ *
+ * @remarks
+ * Re-exports store-lock.ts's `StoreLockOpts` under the public name this store's callers use.
+ * `file` is real, not speculative: `withLock`'s other caller (live-store.ts) sets it per-key for
+ * per-key locking. accounts.ts's own writers never forward a caller's `file`, though -- `lockOpts`
+ * below always pins it to `STORE_KEY`, since this store keeps exactly one file per provider.
+ */
+export type AccountStoreLocation = StoreLockOpts;
 
-function lockOpts(opts: AccountStoreLocation | null | undefined): { dir?: string; file: string } {
+function lockOpts(opts: AccountStoreLocation | null | undefined): StoreLockOpts {
   return { dir: opts?.dir, file: STORE_KEY };
 }
 
