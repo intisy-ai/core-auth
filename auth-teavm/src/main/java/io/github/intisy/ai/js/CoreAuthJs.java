@@ -263,8 +263,8 @@ public final class CoreAuthJs {
 
     /**
      * {@code RateLimitMath.calculateBackoffMs} over the {@code jitter == false} exact-value path
-     * (the deterministic one; {@code jitter == true} consults an RNG and is intentionally out of
-     * scope for a byte-identical parity check). {@code argsJson} is
+     * (the deterministic one; {@code jitter == true} consults a random source, so it is
+     * deliberately excluded from a deterministic-output check). {@code argsJson} is
      * {@code {"attempt":int,"baseMs":long,"maxMs":long,"jitter":boolean}}; returns the bare JSON
      * number result (a {@code Long}, so a whole value never gets a spurious {@code .0}).
      *

@@ -161,14 +161,14 @@ class SelectionTest {
 
     @Test
     void hybridWithCustomPredicateFloorsSoonestFreeToNow() {
-        // JS ratelimit.ts: availableAt(account, lane, now) = Math.max(t, now) -- every candidate
-        // is floored to `now` before comparison. When a custom predicate (e.g. antigravity's
-        // verificationRequired check) is the ONLY reason accounts are unavailable,
-        // and their raw coolingDownUntil timestamps already lie in the past, un-floored math would
-        // rank accounts by "how far in the past" and pick whichever happens to be smallest (most
-        // stale) -- the WRONG account. Flooring makes all three tie at `now`, and the tie is broken
-        // by the first index in scan order (strict `<` in soonestFree). This pins the JS-parity
-        // behavior: index 0 wins even though a2 has the smallest raw (unfloored) timestamp.
+        // RateLimitMath.availableAt(account, lane, now) floors every candidate to `now` before
+        // comparison. When a custom predicate (e.g. antigravity's verificationRequired check) is
+        // the ONLY reason accounts are unavailable, and their raw coolingDownUntil timestamps
+        // already lie in the past, un-floored math would rank accounts by "how far in the past"
+        // and pick whichever happens to be smallest (most stale) -- the WRONG account. Flooring
+        // makes all three tie at `now`, and the tie is broken by the first index in scan order
+        // (strict `<` in soonestFree). This pins that tie-break: index 0 wins even though a2 has
+        // the smallest raw (unfloored) timestamp.
         long now = 1_000_000L;
         Account a0 = account("a0");
         Account a1 = account("a1");
