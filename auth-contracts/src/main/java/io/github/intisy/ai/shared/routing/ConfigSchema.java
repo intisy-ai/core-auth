@@ -8,11 +8,16 @@ import java.util.List;
  * separately by {@link ConfigurableProvider#getConfigValues}).
  */
 public final class ConfigSchema {
+    /** The provider's settings, organized into titled groups. */
     public List<ConfigGroup> groups;
 
+    /** Empty constructor for JSON deserialization. */
     public ConfigSchema() {
     }
 
+    /**
+     * @param groups the provider's settings, organized into titled groups
+     */
     public ConfigSchema(List<ConfigGroup> groups) {
         this.groups = groups;
     }

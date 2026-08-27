@@ -17,6 +17,7 @@ export interface ProviderDescriptor {
   hasOAuth?: boolean;
   /** The provider id a routing chain names. */
   id: string;
+  /** The lane's display label, shown wherever a host lists it for a person to pick. */
   label: string;
   /** Models this lane serves, keyed by model id. */
   models?: Record<string, unknown>;
@@ -43,6 +44,7 @@ export interface Provider {
    * Every lane this plugin serves, when it serves more than the one `id` names, or
    * `null` when it serves only that one.
    *
+   * @returns the lanes this plugin serves, or `null` for a single-lane provider
    * @remarks
    * Defaulted rather than abstract so the optionality the emitted declaration carries
    * also holds in Java: a one-lane provider does not write this method at all, and a host reads

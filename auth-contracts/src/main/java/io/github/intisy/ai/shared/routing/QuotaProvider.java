@@ -9,5 +9,11 @@ import java.util.List;
  * carrying its own pool bars), matching the {@code accounts[]} wire shape.
  */
 public interface QuotaProvider {
+    /**
+     * This provider's per-account usage.
+     *
+     * @param ctx the request context
+     * @return one entry per account
+     */
     List<AccountQuota> quota(HandlerCtx ctx);
 }
