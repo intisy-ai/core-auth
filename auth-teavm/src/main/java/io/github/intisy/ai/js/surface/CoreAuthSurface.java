@@ -163,7 +163,7 @@ public interface CoreAuthSurface {
      *
      * @implNote One decision answers both whether the account has quota left and whether a 429 is an
      * IP or proxy limit. A missing or non-numeric remaining fraction counts as zero.
-     * @param poolsJson the pools as {@code [{remainingFraction}]}
+     * @param poolsJson the pools as a JSON array of objects, each with a {@code remainingFraction}
      * @return true when any pool still has capacity
      */
     boolean quotaHasCapacity(String poolsJson);

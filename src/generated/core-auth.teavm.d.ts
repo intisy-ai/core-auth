@@ -298,7 +298,7 @@ export declare function proxyStickyUsable(storeJson: string, key: string, url: s
  * @remarks
  * One decision answers both whether the account has quota left and whether a 429 is an
  * IP or proxy limit. A missing or non-numeric remaining fraction counts as zero.
- * @param poolsJson - the pools as `[{remainingFraction`]}
+ * @param poolsJson - the pools as a JSON array of objects, each with a `remainingFraction`
  * @returns true when any pool still has capacity
  */
 export declare function quotaHasCapacity(poolsJson: string): boolean;
