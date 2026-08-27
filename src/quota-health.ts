@@ -1,5 +1,5 @@
 // Neutral quota/health SPI (single-sourced in Java, CoreAuthJs.quotaHasCapacity over
-// QuotaHealth.hasCapacity, java/accounts). A provider maps its own cachedQuota shape into
+// QuotaHealth.hasCapacity, accounts). A provider maps its own cachedQuota shape into
 // { remainingFraction }[] and delegates here instead of reimplementing the "any pool with
 // capacity remaining" predicate itself.
 import { getCoreAuth } from "./core-auth-loader.js";

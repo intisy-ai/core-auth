@@ -3,7 +3,7 @@ plugins {
 }
 
 // core-auth's Java module -- self-contained Gradle build living alongside core-auth's TS (../src,
-// ../package.json). Mirrors core-proxy/java/build.gradle's subprojects{} shape exactly (plain
+// ../package.json). Mirrors core-proxy/build.gradle's subprojects{} shape exactly (plain
 // java-library + JUnit, Java 8 baseline) -- deliberately not ai-java's root build.gradle (its
 // io.github.intisy.online-gradle plugin is ai-java-repo-specific, out of
 // scope here).

@@ -26,7 +26,7 @@ dependencies {
 // extension-spi artifacts publish a minimum JVM-version metadata of 11-17, so :teavm needs a
 // newer compile target than :accounts -- override both the extension's compatibility (fixes
 // Gradle's dependency-resolution JVM-version attribute matching) and the compileJava task's
-// --release option. Mirrors core-proxy/java/teavm/build.gradle exactly (which itself mirrors
+// --release option. Mirrors core-proxy/teavm/build.gradle exactly (which itself mirrors
 // ai-java's js/build.gradle).
 java {
     sourceCompatibility = JavaVersion.VERSION_17

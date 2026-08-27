@@ -42,7 +42,7 @@ import java.util.function.BiPredicate;
  * {@code SimpleJsonCodec}/{@code JsStoreBridge}/{@code JsHttpClientBridge} are NOT duplicated
  * here; this class lives in the same package ({@code io.github.intisy.ai.js}) as core-proxy's
  * {@code :teavm} module (a Gradle project dependency, see
- * {@code core-auth/java/teavm/build.gradle}), so it references those classes unqualified.
+ * {@code core-auth/auth-teavm/build.gradle}), so it references those classes unqualified.
  */
 public final class CoreAuthJs {
     private CoreAuthJs() {

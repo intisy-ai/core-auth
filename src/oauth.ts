@@ -1,5 +1,5 @@
 // Generic OAuth helpers + token refresh; the driver supplies its own tokenUrl/clientId/clientSecret.
-// The refresh call itself is single-sourced in Java (TokenRefresh, java/accounts) behind
+// The refresh call itself is single-sourced in Java (TokenRefresh, accounts) behind
 // CoreAuthJs.refreshToken; what stays here is the transport it runs over and the error shape
 // callers branch on.
 import { getCoreAuth } from "./core-auth-loader.js";
@@ -19,7 +19,7 @@ export function isOAuthAuth(auth: unknown): auth is {
  *
  * @remarks
  * Delegates to the single-sourced predicate in Java (`TokenRefresh.accessTokenExpired`,
- * `java/accounts`), which applies a 60s clock-skew buffer.
+ * `accounts`), which applies a 60s clock-skew buffer.
  */
 export function accessTokenExpired(auth: Pick<CoreAccount, "access" | "expires"> | null | undefined): boolean {
   return getCoreAuth().accessTokenExpired(JSON.stringify(auth || {}), Date.now());
@@ -30,7 +30,7 @@ export function accessTokenExpired(auth: Pick<CoreAccount, "access" | "expires">
  *
  * @param requestTimeMs when the token was issued, in epoch milliseconds
  * @param expiresInSeconds the endpoint's `expires_in`; a non-number is read as "not reported"
- * @remarks Delegates to the single-sourced `OAuthWire` calculation in Java (`java/accounts`), which both OAuth grants use.
+ * @remarks Delegates to the single-sourced `OAuthWire` calculation in Java (`accounts`), which both OAuth grants use.
  */
 export function calculateTokenExpiry(requestTimeMs: number, expiresInSeconds: unknown): number {
   const seconds = typeof expiresInSeconds === "number" ? expiresInSeconds : NaN;

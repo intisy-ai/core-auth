@@ -499,7 +499,7 @@ function accountBars(view: AccountView): MenuItem[] {
 }
 
 interface QuotaBarAccumulator {
-  label: string;
+  label?: string;
   fracs: number[];
   reset: number | null;
 }
@@ -513,10 +513,10 @@ function quotaBars(views: AccountView[]): MenuItem[] {
     if (v.enabled === false || !Array.isArray(v.quota)) continue;
     for (const q of v.quota) {
       if (!q || typeof q.remainingFraction !== "number") continue;
-      // A pool with no label collides under the coerced key "undefined" here (JS's own
-      // property-key coercion, reproduced rather than changed -- see the task report).
+      // A pool with no label collides under the coerced key "undefined" here, matching
+      // JS's own property-key coercion when an object key is written with a non-string value.
       const key = String(q.label);
-      const p = pools[key] || (pools[key] = { label: q.label ?? key, fracs: [], reset: null });
+      const p = pools[key] || (pools[key] = { label: q.label, fracs: [], reset: null });
       p.fracs.push(q.remainingFraction);
       const ms = resetToMs(q.resetTime);
       if (Number.isFinite(ms) && (p.reset == null || ms < p.reset)) p.reset = ms;

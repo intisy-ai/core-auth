@@ -1,5 +1,5 @@
 // Generic per-provider account store, keyed by provider id. The store ENGINE is Java
-// (AccountStore, java/accounts) reached through CoreAuthJs; what lives here is the transport it
+// (AccountStore, accounts) reached through CoreAuthJs; what lives here is the transport it
 // runs over: the cross-process lock, and the activity events a host sees.
 
 import { getCoreAuth } from "./core-auth-loader.js";

@@ -125,7 +125,7 @@ export interface CoreAccount {
   addedAt?: number;
   /** Epoch ms this account was last selected. */
   lastUsed?: number;
-  /** `false` means the user disabled this account; selection skips it. */
+  /** `false` means the account is disabled, by the user or by the system; selection skips it. */
   enabled?: boolean;
   /** Per-lane rate-limit expiry: lane name to epoch ms the lane is rate-limited until. */
   rateLimitResetTimes?: Record<string, number>;
@@ -172,7 +172,7 @@ export interface AccountView {
   email?: string;
   /** Selection eligibility, as shown in the row. */
   status: AccountStatus;
-  /** Whether the user has this account enabled. */
+  /** Whether the account is enabled; `false` when disabled by the user or by the system. */
   enabled: boolean;
   /** Epoch ms this account was last selected. */
   lastUsed?: number;
