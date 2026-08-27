@@ -14,19 +14,43 @@ import io.github.intisy.ai.tsemit.TsNullable;
 @TsInterface
 public interface CoreAuthJsStore {
 
-    /** The stored value, or null when the key is absent or unreadable. */
+    /**
+     * The stored value, or null when the key is absent or unreadable.
+     *
+     * @param key the key to read
+     * @return the stored value, or null when the key is absent or unreadable
+     */
     @TsNullable(asNull = true)
     String get(String key);
 
-    /** Stores a value. */
+    /**
+     * Stores a value.
+     *
+     * @param key the key to write
+     * @param value the value to store
+     */
     void put(String key, String value);
 
-    /** Whether the key is present. */
+    /**
+     * Whether the key is present.
+     *
+     * @param key the key to check
+     * @return true when the key is present
+     */
     boolean exists(String key);
 
-    /** Removes the key. */
+    /**
+     * Removes the key.
+     *
+     * @param key the key to remove
+     */
     void delete(String key);
 
-    /** Every key under the prefix. */
+    /**
+     * Every key under the prefix.
+     *
+     * @param prefix the prefix to list keys under
+     * @return every key under the prefix
+     */
     String[] listKeys(String prefix);
 }

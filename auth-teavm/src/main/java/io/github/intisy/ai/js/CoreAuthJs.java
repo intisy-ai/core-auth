@@ -103,6 +103,13 @@ public final class CoreAuthJs {
      * Google verification" gate) -- pass {@code null}/{@code undefined} when the provider
      * supplied none, matching {@link ManagerOptions#extraAvailable}'s own null-means-"built-in
      * check only" contract.
+     *
+     * @param providerId the provider whose pool to select from
+     * @param lane which upstream lane the request is for
+     * @param strategy the selection strategy name, see {@link #parseStrategy}
+     * @param available the caller's isAvailable predicate, or null for the built-in check only
+     * @param jsStore the live account store to select against and claim into
+     * @return {@code {accountId, access?}} JSON, or {@code {none:true}} when the pool has none available
      */
     @JSExport
     public static String acquireAccount(String providerId, String lane, String strategy,
@@ -140,6 +147,12 @@ public final class CoreAuthJs {
      * value (confirmed via a {@code BigInt.asUintN} crash on an epoch-ms-sized value). A {@code
      * double} parameter needs no such remarshalling (JS numbers ARE doubles), so the explicit
      * {@code (long)} cast below constructs a well-formed Java {@code long} from it.
+     *
+     * @param providerId the provider whose account is being reported on
+     * @param id the account id
+     * @param lane which upstream lane hit the rate limit
+     * @param resetMs the epoch-ms this lane becomes usable again
+     * @param jsStore the live account store to persist the reset into
      */
     @JSExport
     public static void reportRateLimit(String providerId, String id, String lane, double resetMs, JsStoreBridge.JsStore jsStore) {
@@ -161,6 +174,15 @@ public final class CoreAuthJs {
      * defaults, so a provider that configures a non-default backoff (e.g. antigravity's 60s/60s)
      * keeps that value across this delegation instead of silently reverting to {@link
      * ManagerOptions}'s 1s/5min built-in default.
+     *
+     * @param providerId the provider whose account is being reported on
+     * @param id the account id
+     * @param lane the failing request's lane, or {@code ""} when unknown
+     * @param attempt the retry attempt number this cooldown is for
+     * @param reason a short machine string recorded as the cooldown reason
+     * @param baseMs the caller's own backoff base, in milliseconds
+     * @param maxMs the caller's own backoff cap, in milliseconds
+     * @param jsStore the live account store to persist the cooldown into
      */
     @JSExport
     public static void reportError(String providerId, String id, String lane, int attempt, String reason,
@@ -173,7 +195,13 @@ public final class CoreAuthJs {
         accountManagerFor(providerId, store, json, opts).reportError(id, lane, attempt, reason);
     }
 
-    /** {@code AccountManager.reportSuccess} -- clears cooldown, bumps {@code lastUsed}. */
+    /**
+     * {@code AccountManager.reportSuccess} -- clears cooldown, bumps {@code lastUsed}.
+     *
+     * @param providerId the provider whose account succeeded
+     * @param id the account id
+     * @param jsStore the live account store to persist the update into
+     */
     @JSExport
     public static void reportSuccess(String providerId, String id, JsStoreBridge.JsStore jsStore) {
         JsonCodec json = new SimpleJsonCodec();
@@ -185,6 +213,11 @@ public final class CoreAuthJs {
      * {@code AccountManager.nextAvailableAt} -- the soonest epoch-ms any account in the pool
      * becomes available for {@code lane}. Returns the bare JSON number, or the literal JSON
      * {@code "null"} when no account will ever become available.
+     *
+     * @param providerId the provider whose pool to check
+     * @param lane which upstream lane to check
+     * @param jsStore the live account store to read
+     * @return the bare JSON epoch-ms number, or the literal JSON {@code "null"}
      */
     @JSExport
     public static String nextAvailableAt(String providerId, String lane, JsStoreBridge.JsStore jsStore) {
@@ -199,6 +232,10 @@ public final class CoreAuthJs {
      * {@code accountJson} supplies {@code {access, expires}} (only fields this predicate reads).
      * {@code now} is a {@code double}, not {@code long} -- see {@link #reportRateLimit}'s javadoc
      * for why a raw exported {@code long} parameter is unsafe.
+     *
+     * @param accountJson the account, as {@code {access, expires}} JSON
+     * @param now the current epoch-ms
+     * @return true when the stored access token is expired as of {@code now}
      */
     @JSExport
     public static boolean accessTokenExpired(String accountJson, double now) {
@@ -213,6 +250,10 @@ public final class CoreAuthJs {
      * default lives on the Java side rather than being restated by each caller. Both parameters are
      * {@code double} because a raw JS number handed to a declared Java {@code long} is not
      * remarshalled at this boundary (see {@link #reportRateLimit}).
+     *
+     * @param requestTimeMs the epoch-ms the token request was sent
+     * @param expiresInSeconds the token endpoint's reported lifetime, or non-finite when it reported none
+     * @return the computed expiry as epoch-ms
      */
     @JSExport
     public static double calculateTokenExpiry(double requestTimeMs, double expiresInSeconds) {
@@ -228,6 +269,9 @@ public final class CoreAuthJs {
      * scope for a byte-identical parity check). {@code argsJson} is
      * {@code {"attempt":int,"baseMs":long,"maxMs":long,"jitter":boolean}}; returns the bare JSON
      * number result (a {@code Long}, so a whole value never gets a spurious {@code .0}).
+     *
+     * @param argsJson {@code {"attempt":int,"baseMs":long,"maxMs":long,"jitter":boolean}}
+     * @return the bare JSON backoff-ms number
      */
     @JSExport
     public static String calculateBackoffMsJson(String argsJson) {
@@ -249,6 +293,9 @@ public final class CoreAuthJs {
      * capacity); returns the bare JSON boolean. The same value answers both "does the account
      * still have quota" and "is a 429 an IP/proxy limit" (ipSuspected), see {@link
      * QuotaHealth#ipSuspected} javadoc.
+     *
+     * @param poolsJson a JSON array of {@code {"remainingFraction":number}} objects
+     * @return true when any pool still has capacity
      */
     @JSExport
     public static boolean quotaHasCapacity(String poolsJson) {
@@ -288,6 +335,11 @@ public final class CoreAuthJs {
      * @implNote a reported failure resolves as data rather than rejecting because a JS rejection
      * can carry only a string: {@code revoked} decides whether the caller re-auths or retries, so
      * it has to survive the crossing as a field instead of being parsed back out of a message.
+     *
+     * @param refreshToken the stored refresh token to exchange
+     * @param oauthConfigJson {@code {tokenUrl, clientId, clientSecret?, extraParams?}}
+     * @param httpSend the JS-side transport this refresh call is bridged through
+     * @return a promise resolving to {@code {access, expires, refresh}} or {@code {failed:{...}}} JSON
      */
     @JSExport
     public static JSPromise<JSString> refreshToken(String refreshToken, String oauthConfigJson,
@@ -322,13 +374,23 @@ public final class CoreAuthJs {
     /**
      * {@code AccountStore.loadRaw} -- the provider's pool as stored, with {@code accounts},
      * {@code activeIndex} and {@code activeIndexByLane} always present.
+     *
+     * @param providerId the provider whose pool to load
+     * @param jsStore the live account store to read
+     * @return the provider's pool, as stored JSON
      */
     @JSExport
     public static String poolLoad(String providerId, JsStoreBridge.JsStore jsStore) {
         return accountStoreFor(jsStore).loadRaw(providerId);
     }
 
-    /** {@code AccountStore.saveRaw} -- replaces this provider's pool, leaving every other one be. */
+    /**
+     * {@code AccountStore.saveRaw} -- replaces this provider's pool, leaving every other one be.
+     *
+     * @param providerId the provider whose pool to replace
+     * @param poolJson the full pool to store, replacing whatever was there
+     * @param jsStore the live account store to write into
+     */
     @JSExport
     public static void poolSave(String providerId, String poolJson, JsStoreBridge.JsStore jsStore) {
         accountStoreFor(jsStore).saveRaw(providerId, poolJson);
@@ -338,6 +400,11 @@ public final class CoreAuthJs {
      * {@code AccountStore.upsertRaw} -- upsert by {@code id}, else by {@code refresh}, merging the
      * incoming fields over the stored record. Returns {@code "added"}, {@code "updated"} or
      * {@code "unchanged"}; a caller reports an activity event for the first two only.
+     *
+     * @param providerId the provider whose pool to upsert into
+     * @param accountJson the incoming account fields to merge over the stored record
+     * @param jsStore the live account store to write into
+     * @return {@code "added"}, {@code "updated"} or {@code "unchanged"}
      */
     @JSExport
     public static String accountUpsert(String providerId, String accountJson, JsStoreBridge.JsStore jsStore) {
@@ -348,7 +415,14 @@ public final class CoreAuthJs {
         return outcome.name().toLowerCase();
     }
 
-    /** {@code AccountStore.removeRaw} -- true when an account with this id was there to remove. */
+    /**
+     * {@code AccountStore.removeRaw} -- true when an account with this id was there to remove.
+     *
+     * @param providerId the provider whose pool to remove from
+     * @param id the account id to remove
+     * @param jsStore the live account store to write into
+     * @return true when an account with this id was removed
+     */
     @JSExport
     public static boolean accountRemove(String providerId, String id, JsStoreBridge.JsStore jsStore) {
         return accountStoreFor(jsStore).removeRaw(providerId, id);
@@ -440,6 +514,10 @@ public final class CoreAuthJs {
      * {@code ChatError.build} -- the response to send for a TERMINAL provider failure, as
      * {@code {status, body, headers}} JSON. The caller constructs the actual Response, which is a
      * web-platform type with no Java equivalent.
+     *
+     * @param message the terminal failure message
+     * @param optsJson the response-shaping options {@link ChatError#build} accepts
+     * @return {@code {status, body, headers}} JSON
      */
     @JSExport
     public static String chatError(String message, String optsJson) {
@@ -452,6 +530,9 @@ public final class CoreAuthJs {
     /**
      * {@code OAuthWire.parsePastedCallback} -- returns {@code {code, state}} as JSON, or the literal
      * JSON {@code "null"} when nothing was pasted.
+     *
+     * @param input the text the user pasted back from the OAuth redirect
+     * @return {@code {code, state}} JSON, or the literal JSON {@code "null"}
      */
     @JSExport
     public static String parsePastedCallback(String input) {
@@ -462,6 +543,9 @@ public final class CoreAuthJs {
     /**
      * {@code OAuthWire.encodeState} -- packs an already-serialised state payload as unpadded
      * URL-safe base64. The caller serialises, so the encoded bytes are exactly its own JSON.
+     *
+     * @param payloadJson the already-serialised state payload
+     * @return the payload as unpadded URL-safe base64
      */
     @JSExport
     public static String encodeState(String payloadJson) {
@@ -475,6 +559,9 @@ public final class CoreAuthJs {
      * @implNote the refusal crosses as DATA rather than as a thrown Java exception, because only the
      * caller can raise an error the surrounding JS will recognise, and the message decides whether a
      * driver re-runs the login or reports a tampered callback.
+     *
+     * @param state the base64 state string round-tripped from the OAuth redirect
+     * @return {@code {payload}} JSON, or {@code {error}} when the state carries no PKCE verifier
      */
     @JSExport
     public static String decodeState(String state) {
@@ -493,13 +580,21 @@ public final class CoreAuthJs {
     /**
      * {@code Leaderboard.normalize} -- the matching key a caller stores each fetched score under.
      * Returns the bare key, not a JSON string.
+     *
+     * @param name the raw display name to normalize
+     * @return the bare matching key
      */
     @JSExport
     public static String leaderboardNormalize(String name) {
         return Leaderboard.normalize(name);
     }
 
-    /** {@code Leaderboard.sourceShort} -- the compact provenance tag for a row hint. */
+    /**
+     * {@code Leaderboard.sourceShort} -- the compact provenance tag for a row hint.
+     *
+     * @param source the raw source string
+     * @return the compact provenance tag
+     */
     @JSExport
     public static String leaderboardSourceShort(String source) {
         return Leaderboard.sourceShort(source);
@@ -510,6 +605,9 @@ public final class CoreAuthJs {
      * {@code {"ids":[..],"names":[..],"scores":[{"norm":..,"score":..}]}}, where {@code names}
      * holds each id's display name at the same position. Returns the ids as a JSON array,
      * best-first.
+     *
+     * @param argsJson {@code {"ids":[..],"names":[..],"scores":[{"norm":..,"score":..}]}}
+     * @return the ids as a JSON array, best-first
      */
     @JSExport
     public static String leaderboardOrder(String argsJson) {
@@ -522,6 +620,9 @@ public final class CoreAuthJs {
     /**
      * {@code Leaderboard.scoresFor} -- the same {@code argsJson} as {@link #leaderboardOrder}.
      * Returns a JSON object of id to score, carrying only the ids that matched a live score.
+     *
+     * @param argsJson {@code {"ids":[..],"names":[..],"scores":[{"norm":..,"score":..}]}}
+     * @return a JSON object of id to score, omitting ids with no live score
      */
     @JSExport
     public static String leaderboardScores(String argsJson) {
@@ -558,6 +659,8 @@ public final class CoreAuthJs {
     /**
      * The caps the scoring engine enforces, as {@code {maxAccountsPerProxy, ipLimitCooldownMs}}, so
      * a caller states them once from here instead of restating the numbers on its own side.
+     *
+     * @return {@code {maxAccountsPerProxy, ipLimitCooldownMs}} JSON
      */
     @JSExport
     public static String proxyLimits() {
@@ -568,26 +671,49 @@ public final class CoreAuthJs {
         return json.stringify(out);
     }
 
-    /** {@code ProxyScopes.scopeKey} -- returns the bare key, not a JSON string. */
+    /**
+     * {@code ProxyScopes.scopeKey} -- returns the bare key, not a JSON string.
+     *
+     * @param scopeJson the scope object to key
+     * @return the bare scope key
+     */
     @JSExport
     public static String proxyScopeKey(String scopeJson) {
         return ProxyScopes.scopeKey(parseObject(scopeJson));
     }
 
-    /** {@code ProxyScopes.parseScopeKey} -- returns the scope as a JSON object. */
+    /**
+     * {@code ProxyScopes.parseScopeKey} -- returns the scope as a JSON object.
+     *
+     * @param key the scope key to parse
+     * @return the scope, as a JSON object
+     */
     @JSExport
     public static String proxyParseScopeKey(String key) {
         JsonCodec json = new SimpleJsonCodec();
         return json.stringify(ProxyScopes.parseScopeKey(key));
     }
 
-    /** {@code ProxyScopes.effectiveMode} -- returns the bare mode, not a JSON string. */
+    /**
+     * {@code ProxyScopes.effectiveMode} -- returns the bare mode, not a JSON string.
+     *
+     * @param storeJson the account/proxy store to read
+     * @param key the scope key to resolve the mode for
+     * @return the bare effective mode
+     */
     @JSExport
     public static String proxyEffectiveMode(String storeJson, String key) {
         return ProxyScopes.effectiveMode(parseObject(storeJson), key);
     }
 
-    /** {@code ProxyScopes.resolveChain} -- returns a JSON array of scope keys. */
+    /**
+     * {@code ProxyScopes.resolveChain} -- returns a JSON array of scope keys.
+     *
+     * @param storeJson the account/proxy store to read
+     * @param accountId the account to resolve the scope chain for
+     * @param providerId the provider the account belongs to
+     * @return a JSON array of scope keys, most-specific first, disabled scopes dropped
+     */
     @JSExport
     public static String proxyResolveChain(String storeJson, String accountId, String providerId) {
         JsonCodec json = new SimpleJsonCodec();
@@ -597,6 +723,10 @@ public final class CoreAuthJs {
     /**
      * {@code ProxyScopes.proxiesInScope} -- a JSON array of INDICES into {@code store.proxies}, so
      * the caller maps them back onto its own proxy objects and identity survives the crossing.
+     *
+     * @param storeJson the account/proxy store to read
+     * @param key the scope key to resolve proxies for
+     * @return a JSON array of indices into {@code store.proxies}
      */
     @JSExport
     public static String proxyProxiesInScope(String storeJson, String key) {
@@ -607,6 +737,11 @@ public final class CoreAuthJs {
     /**
      * {@code ProxyScopes.candidatesForScope} -- a JSON array of indices into {@code store.proxies},
      * best-first. {@code now} is a {@code double}, not {@code long}: see {@link #reportRateLimit}.
+     *
+     * @param storeJson the account/proxy store to read
+     * @param key the scope key to resolve candidates for
+     * @param now the current epoch-ms, for cooldown filtering
+     * @return a JSON array of indices into {@code store.proxies}, best-first
      */
     @JSExport
     public static String proxyCandidatesForScope(String storeJson, String key, double now) {
@@ -614,31 +749,62 @@ public final class CoreAuthJs {
         return json.stringify(ProxyScopes.candidatesForScope(parseObject(storeJson), key, (long) now));
     }
 
-    /** {@code ProxyScopes.stickyUsable} -- whether a proxy the account already holds may be re-used. */
+    /**
+     * {@code ProxyScopes.stickyUsable} -- whether a proxy the account already holds may be re-used.
+     *
+     * @param storeJson the account/proxy store to read
+     * @param key the scope key the account is sticky within
+     * @param url the proxy url the account already holds
+     * @param now the current epoch-ms, for cooldown filtering
+     * @return true when the held proxy may still be reused
+     */
     @JSExport
     public static boolean proxyStickyUsable(String storeJson, String key, String url, double now) {
         return ProxyScopes.stickyUsable(parseObject(storeJson), key, url, (long) now);
     }
 
-    /** {@code ProxyScoring.scoreOf} -- lower is better. */
+    /**
+     * {@code ProxyScoring.scoreOf} -- lower is better.
+     *
+     * @param storeJson the account/proxy store to read
+     * @param proxyJson the proxy to score
+     * @return the proxy's score, lower is better
+     */
     @JSExport
     public static double proxyScoreOf(String storeJson, String proxyJson) {
         return ProxyScoring.scoreOf(parseObject(storeJson), parseObject(proxyJson));
     }
 
-    /** {@code ProxyScoring.qualityLabel} -- returns the bare label, not a JSON string. */
+    /**
+     * {@code ProxyScoring.qualityLabel} -- returns the bare label, not a JSON string.
+     *
+     * @param proxyJson the proxy to label
+     * @return the bare quality label
+     */
     @JSExport
     public static String proxyQualityLabel(String proxyJson) {
         return ProxyScoring.qualityLabel(parseObject(proxyJson));
     }
 
-    /** {@code ProxyScoring.isIpLimited} -- whether the proxy's exit IP is still cooling down. */
+    /**
+     * {@code ProxyScoring.isIpLimited} -- whether the proxy's exit IP is still cooling down.
+     *
+     * @param proxyJson the proxy to check
+     * @param now the current epoch-ms
+     * @return true when the proxy's exit IP is still cooling down
+     */
     @JSExport
     public static boolean proxyIsIpLimited(String proxyJson, double now) {
         return ProxyScoring.isIpLimited(parseObject(proxyJson), (long) now);
     }
 
-    /** {@code ProxyScoring.countAssignments} -- how many accounts currently hold {@code url}. */
+    /**
+     * {@code ProxyScoring.countAssignments} -- how many accounts currently hold {@code url}.
+     *
+     * @param storeJson the account/proxy store to read
+     * @param url the proxy url to count assignments for
+     * @return how many accounts currently hold this proxy
+     */
     @JSExport
     public static int proxyCountAssignments(String storeJson, String url) {
         return ProxyScoring.countAssignments(parseObject(storeJson), url);

@@ -22,8 +22,16 @@ public final class JsAvailabilityBridge {
     private JsAvailabilityBridge() {
     }
 
+    /** A provider's isAvailable predicate, callable from Java across the TeaVM boundary. */
     @JSFunctor
     public interface JsAvailable extends JSObject {
+        /**
+         * Whether an account is available for a lane.
+         *
+         * @param accountJson the account, as JSON, in the shape {@code AccountStore.accountToMap} produces
+         * @param lane the lane the caller is selecting an account for
+         * @return true when the account is available
+         */
         boolean test(JSString accountJson, JSString lane);
     }
 }
