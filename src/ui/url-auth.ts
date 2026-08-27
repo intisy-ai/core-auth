@@ -18,7 +18,7 @@ import { log } from "../log.js";
 import { refreshModels } from "../refresh.js";
 import { emitActivity } from "../activity.js";
 import type { CoreAccount, ProviderDef } from "../types.js";
-import type { MenuInput, MenuNavigation } from "./menu-model.js";
+import type { AccountMenuInput, AccountMenuNavigation } from "./menu-model.js";
 
 function loginFailedSpec(provider: string, message: string) {
   return { topic: "account", action: "login_failed", impact: "error", outcome: "failed", subject: { kind: "account", id: "?" }, details: { provider, message } };
@@ -36,7 +36,7 @@ function loginSucceededSpec(provider: string, account: CoreAccount, durationMs: 
  */
 export async function buildLoginInput(def: ProviderDef): Promise<{
   /** The menu navigation a renderer applies to open this login prompt. */
-  input: MenuInput;
+  input: AccountMenuInput;
 }> {
   const flow = await def.loginFlow!({ configDir: getConfigDir(), log });
   openBrowser(flow.url);
@@ -54,7 +54,7 @@ export async function buildLoginInput(def: ProviderDef): Promise<{
       pendingLabel: "Adding account… (exchanging the code, this can take a few seconds)",
       // paste fallback: trade the pasted code/redirect URL for an account, then pull
       // the now-authed account's models so they appear without an app restart
-      complete: async (text: string): Promise<MenuNavigation> => {
+      complete: async (text: string): Promise<AccountMenuNavigation> => {
         let account: CoreAccount | null;
         try {
           account = await flow.complete(text);

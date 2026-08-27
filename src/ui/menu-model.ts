@@ -17,10 +17,10 @@ import type { ProxyScope } from "../proxy/store.js";
 import type { AccountQuota, AccountView, ProviderDef } from "../types.js";
 
 /** What a menu item's `run` tells the renderer to do next. */
-export type MenuNavigation =
+export type AccountMenuNavigation =
   | {
       /** Builds and pushes a new screen. */
-      push: () => Menu;
+      push: () => AccountMenu;
     }
   | {
       /** Pops one screen (`true`) or `n` screens. */
@@ -34,13 +34,13 @@ export type MenuNavigation =
     }
   | {
       /** Opens a text prompt before continuing. */
-      input: MenuInput;
+      input: AccountMenuInput;
     }
   /** Stays on the current screen with no visible effect. */
   | void;
 
 /** A prompt the renderer collects a value with before continuing. */
-export interface MenuInput {
+export interface AccountMenuInput {
   /** Prompt heading. */
   title: string;
   /** Prompt body text. */
@@ -48,13 +48,13 @@ export interface MenuInput {
   /** Shown while `complete` is running, replacing the input row. */
   pendingLabel?: string;
   /** Runs when the user submits a value. */
-  complete: (value: string) => MenuNavigation | Promise<MenuNavigation>;
+  complete: (value: string) => AccountMenuNavigation | Promise<AccountMenuNavigation>;
   /**
    * Primary path: resolves when a loopback listener auto-captures the input (e.g. an OAuth
-   * redirect). Narrower than {@link MenuNavigation} on purpose: a background result only ever
+   * redirect). Narrower than {@link AccountMenuNavigation} on purpose: a background result only ever
    * refreshes (no provider drives push/pop/input from it), and TypeScript cannot otherwise resolve
    * this mutually-recursive shape against menu-render.ts's own MenuNavAction (verified: widening it
-   * back to `Promise<MenuNavigation | null>` reproduces the "not assignable" error at menu.ts).
+   * back to `Promise<AccountMenuNavigation | null>` reproduces the "not assignable" error at menu.ts).
    */
   background?: Promise<{
     /** Always `true`; the discriminant that lets a background result stand in for a `refresh` navigation. */
@@ -65,11 +65,11 @@ export interface MenuInput {
 }
 
 /** One row of a menu: what it reads as, and what choosing it does. */
-export interface MenuItem {
+export interface AccountMenuItem {
   /** Row text. */
   label: string;
   /** Absent for a heading, note, or bar row, which is never selectable. */
-  run?: () => MenuNavigation | Promise<MenuNavigation>;
+  run?: () => AccountMenuNavigation | Promise<AccountMenuNavigation>;
   /** Foreground color. */
   color?: SelectItemColor;
   /** Secondary text shown alongside the label. */
@@ -87,13 +87,13 @@ export interface MenuItem {
 }
 
 /** One screen of the menu model: a title and the rows under it. */
-export interface Menu {
+export interface AccountMenu {
   /** Screen heading. */
   title: string;
   /** Secondary text shown under the title. */
   subtitle?: string;
   /** The screen's rows. */
-  items: MenuItem[];
+  items: AccountMenuItem[];
   /** The provider this screen belongs to, shown by a host renderer that tabs across providers. */
   providerLabel?: string;
   /** Runs once when the screen first opens, e.g. to kick off a background quota fetch. */
@@ -110,7 +110,7 @@ function errorMessage(e: unknown): string {
 // actions: a raw-stdin prompt can't run while the loader TUI owns the terminal
 // (it froze), and a submenu keeps the flash/spinner feedback. popAfter = levels
 // to unwind on Yes (2 = this confirm + the menu whose subject was just deleted).
-function buildConfirmMenu(question: string, onYes: () => void | Promise<void>, popAfter = 2): Menu {
+function buildConfirmMenu(question: string, onYes: () => void | Promise<void>, popAfter = 2): AccountMenu {
   return { title: question, items: [
     { label: "Cancel", run: () => ({ pop: true }) },
     { label: "Yes", color: "red", run: async () => { await onYes(); return { pop: popAfter }; } },
@@ -139,11 +139,11 @@ function proxyScopeKeys(def: ProviderDef): string[] {
   return keys;
 }
 
-function buildProxyMenu(def: ProviderDef): Menu {
+function buildProxyMenu(def: ProviderDef): AccountMenu {
   const keys = proxyScopeKeys(def);
   if (!keys.includes(proxyScopeKey)) proxyScopeKey = "global";
   const mode = proxyManager.getMode(proxyScopeKey);
-  const items: MenuItem[] = [
+  const items: AccountMenuItem[] = [
     { label: "Back", run: () => ({ pop: true }) },
     { label: "Scope: " + proxyScopeLabel(proxyScopeKey), color: "cyan", run: () => { const i = keys.indexOf(proxyScopeKey); proxyScopeKey = keys[(i + 1) % keys.length]; return { refresh: true }; } },
     { label: "Mode: " + mode, color: "cyan", run: () => { const order = ["automatic", "manual", "disabled"]; const i = order.indexOf(mode); proxyManager.setMode(proxyScopeKey, order[(i + 1) % order.length]); return { refresh: true }; } },
@@ -182,10 +182,10 @@ function buildProxyMenu(def: ProviderDef): Menu {
   return { title: "Proxies", subtitle: "Scope: " + proxyScopeLabel(proxyScopeKey) + " · mode " + mode, items };
 }
 
-function buildProxyDetail(url: string, scopeKey: string): Menu {
+function buildProxyDetail(url: string, scopeKey: string): AccountMenu {
   const sel = new Set(proxyManager.getScopeSelection(scopeKey));
   const mode = proxyManager.getMode(scopeKey);
-  const items: MenuItem[] = [
+  const items: AccountMenuItem[] = [
     { label: "Back", run: () => ({ pop: true }) },
   ];
   if (mode === "manual") items.push({ label: sel.has(url) ? "Deselect (manual)" : "Select (manual)", color: "cyan", run: () => { if (sel.has(url)) sel.delete(url); else sel.add(url); proxyManager.setScopeSelection(scopeKey, [...sel]); return { refresh: true }; } });
@@ -196,7 +196,7 @@ function buildProxyDetail(url: string, scopeKey: string): Menu {
 // Per-account "Select proxies" routes into the unified scope-tabbed proxy view
 // (buildProxyMenu), pre-focused on this account's scope. `def` supplies the
 // provider id + account list for the scope selector.
-function buildAccountProxyMenu(accountId: string, def: ProviderDef): Menu {
+function buildAccountProxyMenu(accountId: string, def: ProviderDef): AccountMenu {
   proxyScopeKey = "account:" + accountId;
   return buildProxyMenu(def);
 }
@@ -239,12 +239,12 @@ function catalogSourceLabel(providerId: string): string {
 
 // ---- Auto editor (model ranking) -------------------------------------------
 
-function buildAutoModelEdit(def: ProviderDef, id: string): Menu {
+function buildAutoModelEdit(def: ProviderDef, id: string): AccountMenu {
   const providerId = def.id;
   const { order, excluded, source } = getAutoConfig(providerId);
   const included = !excluded.includes(id);
   const pos = order.indexOf(id);
-  const items: MenuItem[] = [
+  const items: AccountMenuItem[] = [
     { label: "Back", run: () => ({ pop: true }) },
     {
       label: included ? "Exclude" : "Include", color: included ? "yellow" : "green",
@@ -259,11 +259,11 @@ function buildAutoModelEdit(def: ProviderDef, id: string): Menu {
 }
 
 /** Builds the Auto model-ranking editor: sort source, per-model include/exclude and reorder. */
-export function buildAutoMenu(def: ProviderDef): Menu {
+export function buildAutoMenu(def: ProviderDef): AccountMenu {
   const providerId = def.id;
   const { order, excluded, source, sources } = getAutoConfig(providerId);
   const current = sources.find((s) => s.id === source) || sources[0] || { id: "manual", label: "Manual" };
-  const items: MenuItem[] = [];
+  const items: AccountMenuItem[] = [];
   // Re-fetch the catalog and RECOMPUTE the sort orders (leaderboard etc.) in place: the
   // displayed order is the cached sortOrders, so without this the list only updates on an
   // app restart / login. Rebuilds the menu (refresh) so the new order shows immediately.
@@ -301,7 +301,7 @@ export function buildAutoMenu(def: ProviderDef): Menu {
 // module scope because only one menu is active at a time; the input prompt + refresh
 // re-filters in place (no menu stacking).
 let browseQuery = "";
-function buildModelsBrowse(def: ProviderDef): Menu {
+function buildModelsBrowse(def: ProviderDef): AccountMenu {
   const providerId = def.id;
   const cat = catalogFor(def);
   const models = cat?.models || {};
@@ -310,7 +310,7 @@ function buildModelsBrowse(def: ProviderDef): Menu {
   const matches = order.filter((id) => models[id] && !/-auto$/.test(id)
     && (!q || (id + " " + (models[id]?.name || "")).toLowerCase().indexOf(q) >= 0));
 
-  const items: MenuItem[] = [{ label: "Back", run: () => { browseQuery = ""; return { pop: true }; } }];
+  const items: AccountMenuItem[] = [{ label: "Back", run: () => { browseQuery = ""; return { pop: true }; } }];
   items.push({ label: browseQuery ? "Search: " + browseQuery : "Search…", color: "cyan",
     run: () => ({ input: { title: "Search models", message: "Filter by name or id (empty to clear)", complete: (v: string) => { browseQuery = v || ""; return { refresh: true }; } } }) });
   if (browseQuery) items.push({ label: "Clear search", run: () => { browseQuery = ""; return { refresh: true }; } });
@@ -334,7 +334,7 @@ function buildModelsBrowse(def: ProviderDef): Menu {
 // builds when `def.accounts` is truthy (menu.ts and handler-exports.ts both guard on it before
 // calling in), so `def.accounts!` below is safe.
 
-function buildAccountDetail(def: ProviderDef, view: AccountView): Menu {
+function buildAccountDetail(def: ProviderDef, view: AccountView): AccountMenu {
   const controller = def.accounts!;
   // Re-fetch the live view each rebuild so a Refresh quota / token action updates the
   // bars in place (the pushed builder captured the original snapshot).
@@ -342,7 +342,7 @@ function buildAccountDetail(def: ProviderDef, view: AccountView): Menu {
   const proxies = !!def.proxies;
   const label = view.email || view.id;
   const extra = typeof controller.accountActions === "function" ? controller.accountActions(view) : [];
-  const items: MenuItem[] = [];
+  const items: AccountMenuItem[] = [];
   // This account's own quota bars at the top; this is where the graphs show.
   const bars = accountBars(view);
   if (bars.length) { items.push({ label: "Quota", kind: "heading" }); for (const bar of bars) items.push(bar); items.push({ label: "", separator: true }); }
@@ -386,7 +386,7 @@ function accountAvailabilityHint(view: AccountView): string {
 
 // Shared quota-area builder: pushes bars, or an explanatory note for whichever
 // reason there are none (never silently blank). Used by the Quota submenu.
-function pushQuotaArea(items: MenuItem[], def: ProviderDef, views: AccountView[]): void {
+function pushQuotaArea(items: AccountMenuItem[], def: ProviderDef, views: AccountView[]): void {
   if (def.quotaDisabled === true) { items.push({ label: "Quota display is disabled for this provider.", kind: "note" }); return; }
   if (!views.length) { items.push({ label: "Add an account to see quota.", kind: "note" }); return; }
   // Only enabled accounts contribute quota (quotaBars skips disabled). If none are
@@ -399,10 +399,10 @@ function pushQuotaArea(items: MenuItem[], def: ProviderDef, views: AccountView[]
 }
 
 // Global quota view: bars aggregated across ALL accounts (the combined graphs).
-function buildQuotaMenu(def: ProviderDef): Menu {
+function buildQuotaMenu(def: ProviderDef): AccountMenu {
   const controller = def.accounts!;
   const views = controller.list();
-  const items: MenuItem[] = [{ label: "Back", run: () => ({ pop: true }) }];
+  const items: AccountMenuItem[] = [{ label: "Back", run: () => ({ pop: true }) }];
   // Non-suspend: a quota refetch needs no terminal, so it refreshes the menu IN PLACE
   // (with a flash) instead of dropping out of the TUI and closing the account menu.
   if (typeof controller.refreshQuota === "function") items.push({ label: "Refresh quotas", color: "cyan", run: async () => { let msg: string; try { await controller.refreshQuota!(true); msg = "Quota refreshed"; } catch (e) { msg = "Refresh failed: " + errorMessage(e); } return { refresh: true, flash: msg }; } });
@@ -420,11 +420,11 @@ function buildQuotaMenu(def: ProviderDef): Menu {
 }
 
 // Less-used provider actions, grouped off the main menu into labeled sections.
-function buildManageMenu(def: ProviderDef): Menu {
+function buildManageMenu(def: ProviderDef): AccountMenu {
   const controller = def.accounts!;
   const proxies = !!def.proxies;
   const extraActions = typeof controller.actions === "function" ? controller.actions() : [];
-  const items: MenuItem[] = [{ label: "Back", run: () => ({ pop: true }) }];
+  const items: AccountMenuItem[] = [{ label: "Back", run: () => ({ pop: true }) }];
 
   // Models moved to the provider menu's own Models section (Browse/Configure/Refresh)
   // so they aren't duplicated here.
@@ -480,7 +480,7 @@ function hasRemainingFraction(p: AccountQuota): p is AccountQuota & { remainingF
 }
 
 // One bar row ({ kind:"bar", label, fraction=USED 0..1, reset }) per quota pool.
-function barsFromPools(pools: AccountQuota[]): MenuItem[] {
+function barsFromPools(pools: AccountQuota[]): AccountMenuItem[] {
   return pools
     .filter(hasRemainingFraction)
     .map((p) => {
@@ -494,7 +494,7 @@ function barsFromPools(pools: AccountQuota[]): MenuItem[] {
 }
 
 // Per-account quota pools -> bar rows (for the account-detail menu).
-function accountBars(view: AccountView): MenuItem[] {
+function accountBars(view: AccountView): AccountMenuItem[] {
   return Array.isArray(view.quota) ? barsFromPools(view.quota) : [];
 }
 
@@ -507,7 +507,7 @@ interface QuotaBarAccumulator {
 // Real per-pool quota aggregated across accounts as Claude-/usage-style bar rows.
 // Empty when no enabled account reports remainingFraction (e.g. before the first
 // quota fetch, or a provider with no quota API); no bar is ever faked.
-function quotaBars(views: AccountView[]): MenuItem[] {
+function quotaBars(views: AccountView[]): AccountMenuItem[] {
   const pools: Record<string, QuotaBarAccumulator> = {};
   for (const v of views) {
     if (v.enabled === false || !Array.isArray(v.quota)) continue;
@@ -528,7 +528,7 @@ function quotaBars(views: AccountView[]): MenuItem[] {
 }
 
 /** Builds a provider's top-level menu: its accounts, quota, models and management actions. */
-export function buildAccountMenu(def: ProviderDef): Menu {
+export function buildAccountMenu(def: ProviderDef): AccountMenu {
   const controller = def.accounts!;
   const views = controller.list();
 
@@ -537,14 +537,14 @@ export function buildAccountMenu(def: ProviderDef): Menu {
   // pasted code as the fallback (buildLoginInput, an async, NON-suspend action so
   // the renderer keeps the TUI live instead of dropping to the raw terminal).
   // Providers without a loginFlow fall back to their own login() (suspend).
-  const addAccount: MenuItem = typeof def.loginFlow === "function"
+  const addAccount: AccountMenuItem = typeof def.loginFlow === "function"
     ? { label: "Add account", color: "cyan", run: () => buildLoginInput(def) }
     : { label: "Add account", color: "cyan", suspend: true, run: async () => { try { await controller.login(); await refreshModels(def); } catch (e) { process.stderr.write(String(e) + "\n"); } return { refresh: true }; } };
 
   // Main menu in labeled sections: Accounts (list + Add), Usage (global graphs),
   // Settings & tools (Manage submenu + Delete). Per-account bars show on click
   // (buildAccountDetail); the rarely-used actions live under Manage.
-  const items: MenuItem[] = [];
+  const items: AccountMenuItem[] = [];
   const note = availabilityNote(views);
   items.push({ label: `Accounts (${views.length})`, hint: note || undefined, kind: "heading" });
   if (!views.length) items.push({ label: "No accounts yet - add one below.", kind: "note" });

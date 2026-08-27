@@ -84,7 +84,7 @@ export { runProviderMenu } from "./menu.js";
 export { providerHandlerExports } from "./handler-exports.js";
 export type { ProviderHandlerExports } from "./handler-exports.js";
 export { buildAccountMenu, buildAutoMenu } from "./ui/menu-model.js";
-export type { Menu, MenuItem, MenuInput, MenuNavigation } from "./ui/menu-model.js";
+export type { AccountMenu, AccountMenuItem, AccountMenuInput, AccountMenuNavigation } from "./ui/menu-model.js";
 export { buildLoginInput } from "./ui/url-auth.js";
 export { buildSettingsMenu } from "./ui/settings-menu.js";
 export type { SettingsMenuDef } from "./ui/settings-menu.js";
