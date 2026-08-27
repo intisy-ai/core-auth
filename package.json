@@ -37,7 +37,7 @@
     "emit:teavm": "node node_modules/@intisy-ai/api/scripts/emit-dts.mjs --java-dir . --module :auth-teavm --out src/generated"
   },
   "dependencies": {
-    "@intisy-ai/api": "^1.0.2",
+    "@intisy-ai/api": "^1.6.0",
     "@intisy-ai/core": "^2.6.0",
     "@intisy-ai/core-ir": "^1.4.0"
   },
