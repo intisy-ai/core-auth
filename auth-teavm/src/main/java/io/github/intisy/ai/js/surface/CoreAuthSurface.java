@@ -29,8 +29,8 @@ public interface CoreAuthSurface {
      * lane, or null when it has none. It is ANDed onto the built-in enabled, cooldown and
      * rate-limit check, never replacing it.
      * @param jsStore the live account store to select against and claim into
-     * @return {@code {accountId, access?}} for the claimed account, or {@code {none:true}} when
-     * nobody in the pool is available
+     * @return the claimed account as JSON with {@code accountId} and an optional {@code access},
+     * or JSON with {@code none} set to {@code true} when nobody in the pool is available
      */
     String acquireAccount(String providerId,
                           String lane,
@@ -97,7 +97,8 @@ public interface CoreAuthSurface {
      *
      * @param providerId the provider whose pool to load
      * @param jsStore the live account store to read
-     * @return {@code {accounts, activeIndex, activeIndexByLane}}, all three always present
+     * @return JSON with {@code accounts}, {@code activeIndex} and {@code activeIndexByLane}, all
+     * three always present
      */
     String poolLoad(String providerId, CoreAuthJsStore jsStore);
 
@@ -134,7 +135,7 @@ public interface CoreAuthSurface {
     /**
      * Whether the account's access token has expired, reading only its access and expiry fields.
      *
-     * @param accountJson the account, as {@code {access, expires}} JSON
+     * @param accountJson the account, as JSON with {@code access} and {@code expires}
      * @param now the current epoch-ms
      * @return true when the stored access token is expired as of {@code now}
      */
@@ -152,7 +153,7 @@ public interface CoreAuthSurface {
     /**
      * The exact backoff delay, with jitter off.
      *
-     * @param argsJson {@code {attempt, baseMs, maxMs, jitter}}
+     * @param argsJson JSON with {@code attempt}, {@code baseMs}, {@code maxMs} and {@code jitter}
      * @return the bare JSON number
      */
     String calculateBackoffMsJson(String argsJson);
@@ -171,25 +172,28 @@ public interface CoreAuthSurface {
      * Performs the network OAuth refresh call, persisting nothing.
      *
      * @param refreshToken the stored refresh token to exchange
-     * @param oauthConfigJson {@code {tokenUrl, clientId, clientSecret?, extraParams?}}
+     * @param oauthConfigJson JSON with {@code tokenUrl}, {@code clientId}, an optional
+     * {@code clientSecret} and optional {@code extraParams}
      * @param httpSend the transport, taking a request's JSON and resolving the response's
-     * @return {@code {access, expires, refresh}} on success, or
-     * {@code {failed:{message, revoked, status?, code?, description?}}} for an outcome the token
-     * endpoint reported. Only a failure of the transport itself rejects.
+     * @return JSON with {@code access}, {@code expires} and {@code refresh} on success, or JSON
+     * with a {@code failed} object carrying {@code message}, {@code revoked} and optional
+     * {@code status}, {@code code} and {@code description} for an outcome the token endpoint
+     * reported. Only a failure of the transport itself rejects.
      */
     CompletionStage<String> refreshToken(String refreshToken,
                                          String oauthConfigJson,
                                          Function<String, CompletionStage<String>> httpSend);
 
     /**
-     * The caps the proxy scoring engine enforces, as {@code {maxAccountsPerProxy, ipLimitCooldownMs}}.
+     * The caps the proxy scoring engine enforces, as JSON with {@code maxAccountsPerProxy} and
+     * {@code ipLimitCooldownMs}.
      *
-     * @return {@code {maxAccountsPerProxy, ipLimitCooldownMs}} JSON
+     * @return JSON with {@code maxAccountsPerProxy} and {@code ipLimitCooldownMs}
      */
     String proxyLimits();
 
     /**
-     * The bare key for a {@code {type, id}} scope, not a JSON string.
+     * The bare key for a scope carrying {@code type} and {@code id}, not a JSON string.
      *
      * @param scopeJson the scope object to key
      * @return the bare scope key
@@ -308,8 +312,8 @@ public interface CoreAuthSurface {
     /**
      * Orders model ids by leaderboard score, best first.
      *
-     * @param argsJson {@code {ids, names, scores}}, where names holds each id's display name at the
-     * same position
+     * @param argsJson JSON with {@code ids}, {@code names} and {@code scores}, where names holds
+     * each id's display name at the same position
      * @return the ids as a JSON array
      */
     String leaderboardOrder(String argsJson);
@@ -327,7 +331,8 @@ public interface CoreAuthSurface {
      * alone.
      *
      * @param input the text the user pasted back from the OAuth redirect
-     * @return {@code {code, state}} as JSON, or the literal JSON null when nothing was pasted
+     * @return JSON with {@code code} and {@code state}, or the literal JSON null when nothing was
+     * pasted
      */
     String parsePastedCallback(String input);
 
@@ -345,18 +350,19 @@ public interface CoreAuthSurface {
      * @implNote The refusal crosses as data rather than as a throw, so the caller raises an error its
      * own surrounding JavaScript recognises.
      * @param state the base64 state string round-tripped from the OAuth redirect
-     * @return {@code {payload}} carrying the decoded JSON text, or {@code {error}} when the state
-     * carries no PKCE verifier
+     * @return JSON with {@code payload} carrying the decoded JSON text, or JSON with {@code error}
+     * when the state carries no PKCE verifier
      */
     String decodeState(String state);
 
     /**
-     * The response to send for a terminal provider failure, as {@code {status, body, headers}}.
+     * The response to send for a terminal provider failure, as JSON with {@code status},
+     * {@code body} and {@code headers}.
      *
      * @implNote The caller constructs the Response itself, which has no Java equivalent.
      * @param message the terminal failure message
      * @param optsJson the response-shaping options the underlying builder accepts
-     * @return {@code {status, body, headers}} JSON
+     * @return JSON with {@code status}, {@code body} and {@code headers}
      */
     String chatError(String message, String optsJson);
 }

@@ -49,7 +49,7 @@ export interface CoreAuthJsStore {
 /**
  * Whether the account's access token has expired, reading only its access and expiry fields.
  *
- * @param accountJson - the account, as `{access, expires`} JSON
+ * @param accountJson - the account, as JSON with `access` and `expires`
  * @param now - the current epoch-ms
  * @returns true when the stored access token is expired as of `now`
  */
@@ -83,14 +83,14 @@ export declare function accountUpsert(providerId: string, accountJson: string, j
  * lane, or null when it has none. It is ANDed onto the built-in enabled, cooldown and
  * rate-limit check, never replacing it.
  * @param jsStore - the live account store to select against and claim into
- * @returns `{accountId, access?`} for the claimed account, or `{none:true`} when
- * nobody in the pool is available
+ * @returns the claimed account as JSON with `accountId` and an optional `access`,
+ * or JSON with `none` set to `true` when nobody in the pool is available
  */
 export declare function acquireAccount(providerId: string, lane: string, strategy: string, available: ((a: string, b: string) => boolean) | null, jsStore: CoreAuthJsStore): string;
 /**
  * The exact backoff delay, with jitter off.
  *
- * @param argsJson - `{attempt, baseMs, maxMs, jitter`}
+ * @param argsJson - JSON with `attempt`, `baseMs`, `maxMs` and `jitter`
  * @returns the bare JSON number
  */
 export declare function calculateBackoffMsJson(argsJson: string): string;
@@ -103,13 +103,14 @@ export declare function calculateBackoffMsJson(argsJson: string): string;
  */
 export declare function calculateTokenExpiry(requestTimeMs: number, expiresInSeconds: number): number;
 /**
- * The response to send for a terminal provider failure, as `{status, body, headers`}.
+ * The response to send for a terminal provider failure, as JSON with `status`,
+ * `body` and `headers`.
  *
  * @remarks
  * The caller constructs the Response itself, which has no Java equivalent.
  * @param message - the terminal failure message
  * @param optsJson - the response-shaping options the underlying builder accepts
- * @returns `{status, body, headers`} JSON
+ * @returns JSON with `status`, `body` and `headers`
  */
 export declare function chatError(message: string, optsJson: string): string;
 /**
@@ -119,8 +120,8 @@ export declare function chatError(message: string, optsJson: string): string;
  * The refusal crosses as data rather than as a throw, so the caller raises an error its
  * own surrounding JavaScript recognises.
  * @param state - the base64 state string round-tripped from the OAuth redirect
- * @returns `{payload`} carrying the decoded JSON text, or `{error`} when the state
- * carries no PKCE verifier
+ * @returns JSON with `payload` carrying the decoded JSON text, or JSON with `error`
+ * when the state carries no PKCE verifier
  */
 export declare function decodeState(state: string): string;
 /**
@@ -140,8 +141,8 @@ export declare function leaderboardNormalize(name: string): string;
 /**
  * Orders model ids by leaderboard score, best first.
  *
- * @param argsJson - `{ids, names, scores`}, where names holds each id's display name at the
- * same position
+ * @param argsJson - JSON with `ids`, `names` and `scores`, where names holds
+ * each id's display name at the same position
  * @returns the ids as a JSON array
  */
 export declare function leaderboardOrder(argsJson: string): string;
@@ -173,7 +174,8 @@ export declare function nextAvailableAt(providerId: string, lane: string, jsStor
  * alone.
  *
  * @param input - the text the user pasted back from the OAuth redirect
- * @returns `{code, state`} as JSON, or the literal JSON null when nothing was pasted
+ * @returns JSON with `code` and `state`, or the literal JSON null when nothing was
+ * pasted
  */
 export declare function parsePastedCallback(input: string): string;
 /**
@@ -181,7 +183,8 @@ export declare function parsePastedCallback(input: string): string;
  *
  * @param providerId - the provider whose pool to load
  * @param jsStore - the live account store to read
- * @returns `{accounts, activeIndex, activeIndexByLane`}, all three always present
+ * @returns JSON with `accounts`, `activeIndex` and `activeIndexByLane`, all
+ * three always present
  */
 export declare function poolLoad(providerId: string, jsStore: CoreAuthJsStore): string;
 /**
@@ -226,9 +229,10 @@ export declare function proxyEffectiveMode(storeJson: string, key: string): stri
  */
 export declare function proxyIsIpLimited(proxyJson: string, now: number): boolean;
 /**
- * The caps the proxy scoring engine enforces, as `{maxAccountsPerProxy, ipLimitCooldownMs`}.
+ * The caps the proxy scoring engine enforces, as JSON with `maxAccountsPerProxy` and
+ * `ipLimitCooldownMs`.
  *
- * @returns `{maxAccountsPerProxy, ipLimitCooldownMs`} JSON
+ * @returns JSON with `maxAccountsPerProxy` and `ipLimitCooldownMs`
  */
 export declare function proxyLimits(): string;
 /**
@@ -264,7 +268,7 @@ export declare function proxyQualityLabel(proxyJson: string): string;
  */
 export declare function proxyResolveChain(storeJson: string, accountId: string, providerId: string): string;
 /**
- * The bare key for a `{type, id`} scope, not a JSON string.
+ * The bare key for a scope carrying `type` and `id`, not a JSON string.
  *
  * @param scopeJson - the scope object to key
  * @returns the bare scope key
@@ -302,11 +306,13 @@ export declare function quotaHasCapacity(poolsJson: string): boolean;
  * Performs the network OAuth refresh call, persisting nothing.
  *
  * @param refreshToken - the stored refresh token to exchange
- * @param oauthConfigJson - `{tokenUrl, clientId, clientSecret?, extraParams?`}
+ * @param oauthConfigJson - JSON with `tokenUrl`, `clientId`, an optional
+ * `clientSecret` and optional `extraParams`
  * @param httpSend - the transport, taking a request's JSON and resolving the response's
- * @returns `{access, expires, refresh`} on success, or
- * `{failed:{message, revoked, status?, code?, description?`}} for an outcome the token
- * endpoint reported. Only a failure of the transport itself rejects.
+ * @returns JSON with `access`, `expires` and `refresh` on success, or JSON
+ * with a `failed` object carrying `message`, `revoked` and optional
+ * `status`, `code` and `description` for an outcome the token endpoint
+ * reported. Only a failure of the transport itself rejects.
  */
 export declare function refreshToken(refreshToken: string, oauthConfigJson: string, httpSend: ((value: string) => Promise<string>)): Promise<string>;
 /**
