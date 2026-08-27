@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Single-source standalone account CLI (login/list/remove), lifted out of the
 // near-identical antigravity-auth and claude-code-auth cli.ts copies. A provider
 // supplies a small driver (its already-built AccountController + the raw all-in-one

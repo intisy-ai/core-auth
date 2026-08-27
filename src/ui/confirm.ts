@@ -1,8 +1,7 @@
-// @ts-nocheck
-import { select } from "./select.js";
+import { select, type SelectItem } from "./select.js";
 
-export async function confirm(message, defaultYes = false) {
-  const items = defaultYes
+export async function confirm(message: string, defaultYes = false): Promise<boolean> {
+  const items: SelectItem<boolean>[] = defaultYes
     ? [{ label: "Yes", value: true }, { label: "No", value: false }]
     : [{ label: "No", value: false }, { label: "Yes", value: true }];
   const result = await select(items, { message });

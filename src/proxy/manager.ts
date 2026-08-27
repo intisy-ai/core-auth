@@ -1,38 +1,59 @@
-// @ts-nocheck
-import { loadProxyStore, updateProxyStore } from "./store.js";
+import { loadProxyStore, updateProxyStore, type ProxyStore, type ProxyEntry, type ProxyScope } from "./store.js";
 import { fetchEnabledProxies } from "./providers.js";
 import { scoreOf, countAssignments, MAX_ACCOUNTS_PER_PROXY } from "./scoring.js";
 import { effectiveMode, resolveChain, candidatesForScope, proxiesInScope, stickyUsable } from "./scopes.js";
 
+export type { ProxyEntry, ProxyScope, ProxyStore } from "./store.js";
+export type ScoredProxyEntry = ProxyEntry & { score: number; inUse: number };
+
+export interface ReportRateLimitOpts {
+  ipSuspected?: boolean;
+}
+
+// scopes.ts's proxy* lookups are typed generically (ProxyStoreLike / unknown[]) so that layer
+// stays agnostic to the store's concrete shape; every pick they return is an element of THIS
+// module's own store.proxies, so re-asserting the result as ProxyEntry[] here is honest.
+function asProxyEntries(list: unknown[]): ProxyEntry[] {
+  return list as ProxyEntry[];
+}
+
+function scored(store: ProxyStore, proxies: ProxyEntry[]): ScoredProxyEntry[] {
+  return proxies.map((p) => ({ ...p, score: scoreOf(store, p), inUse: countAssignments(store, p.url) })).sort((a, b) => a.score - b.score);
+}
+
 export class ProxyManager {
-  load() { return loadProxyStore(); }
+  load(): ProxyStore { return loadProxyStore(); }
 
-  getMode(key = "default") { return effectiveMode(this.load(), key); }
-  setMode(key, mode) { updateProxyStore((s) => { s.modes = s.modes || { default: "disabled" }; s.modes[key] = mode; }); }
+  getMode(key = "default"): string { return effectiveMode(this.load(), key); }
+  setMode(key: string, mode: string): void { updateProxyStore((s) => { s.modes = s.modes || { default: "disabled" }; s.modes[key] = mode; }); }
 
-  enableProvider(name, on, key) {
+  enableProvider(name: string, on: boolean, key?: string): void {
     updateProxyStore((s) => { s.providers = s.providers || {}; s.providers[name] = { ...(s.providers[name] || {}), enabled: !!on, ...(key !== undefined ? { key } : {}) }; });
   }
-  providersConfig() { return this.load().providers || {}; }
+  providersConfig(): ProxyStore["providers"] { return this.load().providers || {}; }
 
   // all proxies best-first, annotated with score + inUse (for the UI)
-  list() {
+  list(): ScoredProxyEntry[] {
     const store = this.load();
-    return [...store.proxies].map((p) => ({ ...p, score: scoreOf(store, p), inUse: countAssignments(store, p.url) })).sort((a, b) => a.score - b.score);
+    return scored(store, [...store.proxies]);
   }
-  proxiesForScope(key) {
+  proxiesForScope(key: string): ScoredProxyEntry[] {
     const store = this.load();
-    return proxiesInScope(store, key).map((p) => ({ ...p, score: scoreOf(store, p), inUse: countAssignments(store, p.url) })).sort((a, b) => a.score - b.score);
+    return scored(store, asProxyEntries(proxiesInScope(store, key)));
   }
-  get(url) { const store = this.load(); const p = store.proxies.find((x) => x.url === url); return p ? { ...p, score: scoreOf(store, p), inUse: countAssignments(store, p.url) } : null; }
+  get(url: string): ScoredProxyEntry | null {
+    const store = this.load();
+    const p = store.proxies.find((x) => x.url === url);
+    return p ? { ...p, score: scoreOf(store, p), inUse: countAssignments(store, p.url) } : null;
+  }
 
-  addManual(url, scope) {
+  addManual(url: string, scope?: ProxyScope): string {
     const clean = url.startsWith("http") ? url : "http://" + url;
-    const sc = scope && scope.type ? scope : { type: "global" };
+    const sc: ProxyScope = scope?.type ? scope : { type: "global" };
     updateProxyStore((s) => { if (!s.proxies.find((p) => p.url === clean)) s.proxies.push({ url: clean, provider: "manual", scope: sc, addedAt: Date.now(), stats: { checks: 0, failures: 0, avgLatencyMs: 0, ipRateLimitHits: 0, lastOkAt: 0 } }); });
     return clean;
   }
-  remove(url) {
+  remove(url: string): void {
     updateProxyStore((s) => {
       s.proxies = s.proxies.filter((p) => p.url !== url);
       for (const [acc, u] of Object.entries(s.assignments)) if (u === url) delete s.assignments[acc];
@@ -40,15 +61,15 @@ export class ProxyManager {
     });
   }
 
-  getScopeSelection(key) { return this.load().manualSelection[key] || []; }
-  setScopeSelection(key, urls) { updateProxyStore((s) => { s.manualSelection[key] = urls; }); }
+  getScopeSelection(key: string): string[] { return this.load().manualSelection[key] || []; }
+  setScopeSelection(key: string, urls: string[]): void { updateProxyStore((s) => { s.manualSelection[key] = urls; }); }
 
   // walk account -> provider -> global; sticky per account; fall through on empty/exhausted
-  selectForAccount(accountId, providerId) {
+  selectForAccount(accountId?: string, providerId?: string): string | null {
     const store = this.load();
-    const chain = resolveChain(store, accountId, providerId);
+    const chain = resolveChain(store, accountId ?? null, providerId ?? null);
     if (!chain.length) return null;
-    const current = store.assignments[accountId];
+    const current = accountId ? store.assignments[accountId] : undefined;
     // keep a sticky assignment if it's still usable in some chain scope: the
     // account already holds this slot, so the per-proxy cap must NOT evict it
     // (that would churn, or deadlock to direct with a one-proxy pool).
@@ -56,20 +77,27 @@ export class ProxyManager {
       for (const key of chain) if (stickyUsable(store, key, current)) return current;
     }
     for (const key of chain) {
-      const cands = candidatesForScope(store, key, accountId);
-      if (cands.length) { const chosen = cands[0].url; updateProxyStore((s) => { s.assignments[accountId] = chosen; }); return chosen; }
+      const cands = asProxyEntries(candidatesForScope(store, key, accountId ?? null));
+      if (cands.length) {
+        const chosen = cands[0].url;
+        if (accountId) updateProxyStore((s) => { s.assignments[accountId] = chosen; });
+        return chosen;
+      }
     }
     return null;
   }
 
-  pickForLogin(providerId) {
+  pickForLogin(providerId: string | null): string | null {
     const store = this.load();
     const chain = resolveChain(store, null, providerId);   // no account scope yet
-    for (const key of chain) { const cands = candidatesForScope(store, key, null); if (cands.length) return cands[0].url; }
+    for (const key of chain) {
+      const cands = asProxyEntries(candidatesForScope(store, key, null));
+      if (cands.length) return cands[0].url;
+    }
     return null;
   }
 
-  bindAccountProxy(accountId, url) {
+  bindAccountProxy(accountId: string, url: string | null): void {
     if (!url) return;
     updateProxyStore((s) => {
       const key = "account:" + accountId;
@@ -82,7 +110,7 @@ export class ProxyManager {
     });
   }
 
-  reportRateLimit(url, opts) {
+  reportRateLimit(url: string, opts?: ReportRateLimitOpts): void {
     if (!opts || opts.ipSuspected !== true) return;   // only IP-suspected limits reflect proxy quality
     updateProxyStore((s) => {
       const p = s.proxies.find((x) => x.url === url);
@@ -91,7 +119,7 @@ export class ProxyManager {
     });
   }
 
-  reportResult(url, ok, latencyMs) {
+  reportResult(url: string, ok: boolean, latencyMs?: number): void {
     updateProxyStore((s) => {
       const p = s.proxies.find((x) => x.url === url);
       if (!p) return;
@@ -102,7 +130,7 @@ export class ProxyManager {
     });
   }
 
-  async refresh() {
+  async refresh(): Promise<number> {
     const fetched = await fetchEnabledProxies(this.providersConfig());
     updateProxyStore((s) => {
       const have = new Set(s.proxies.map((p) => p.url));

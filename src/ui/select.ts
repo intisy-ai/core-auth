@@ -1,9 +1,30 @@
-// @ts-nocheck
 // Raw-stdin arrow-key menu (no external deps). Items support headings,
 // separators, hints, colors. Returns the chosen value, or null on Esc/Ctrl-C.
 import { ANSI, parseKey, isTTY, truncateAnsi } from "./ansi.js";
 
-function colorCode(color) {
+export type SelectItemKind = "heading" | "note" | "bar";
+export type SelectItemColor = "red" | "green" | "yellow" | "cyan";
+
+export interface SelectItem<T = unknown> {
+  label: string;
+  value?: T;
+  hint?: string;
+  color?: SelectItemColor;
+  kind?: SelectItemKind;
+  separator?: boolean;
+  disabled?: boolean;
+  fraction?: number;   // "bar" items: fraction USED, 0..1
+  reset?: string;       // "bar" items: human-readable reset time
+}
+
+export interface SelectOptions {
+  message: string;
+  subtitle?: string;
+  clearScreen?: boolean;
+  help?: string;
+}
+
+function colorCode(color: SelectItemColor | undefined): string {
   if (color === "red") return ANSI.red;
   if (color === "green") return ANSI.green;
   if (color === "yellow") return ANSI.yellow;
@@ -13,27 +34,28 @@ function colorCode(color) {
 
 const BAR_WIDTH = 22;
 // Claude /usage-style bar: filled = fraction USED. Native ANSI (auth-login look).
-function barText(item) {
+function barText(item: SelectItem<unknown>): string {
   const frac = Math.max(0, Math.min(1, item.fraction || 0));
   const filled = Math.round(frac * BAR_WIDTH);
   const bar = `${ANSI.cyan}${"▓".repeat(filled)}${ANSI.dim}${"░".repeat(BAR_WIDTH - filled)}${ANSI.reset}`;
   return `${ANSI.bold}${item.label}${ANSI.reset}  ${bar} ${Math.round(frac * 100)}% used`;
 }
 
-export async function select(items, options) {
+export async function select<T>(items: SelectItem<T>[], options: SelectOptions): Promise<T | null> {
   if (!isTTY()) throw new Error("Interactive select requires a TTY terminal");
 
-  const isSelectable = (i) => i && !i.disabled && !i.separator && i.kind !== "heading" && i.kind !== "note" && i.kind !== "bar";
+  const isSelectable = (i: SelectItem<T> | undefined): i is SelectItem<T> =>
+    !!i && !i.disabled && !i.separator && i.kind !== "heading" && i.kind !== "note" && i.kind !== "bar";
   const enabled = items.filter(isSelectable);
   if (enabled.length === 0) throw new Error("All items disabled");
-  if (enabled.length === 1) return enabled[0].value;
+  if (enabled.length === 1) return enabled[0].value ?? null;
 
   const { stdin, stdout } = process;
   let cursor = items.findIndex(isSelectable);
   if (cursor === -1) cursor = 0;
   let renderedLines = 0;
 
-  const render = () => {
+  const render = (): void => {
     const columns = stdout.columns ?? 80;
     const rows = stdout.rows ?? 24;
     const shouldClear = options.clearScreen === true;
@@ -41,7 +63,7 @@ export async function select(items, options) {
     else if (renderedLines > 0) stdout.write(ANSI.up(renderedLines));
 
     let written = 0;
-    const writeLine = (line) => { stdout.write(`${ANSI.clearLine}${line}\n`); written += 1; };
+    const writeLine = (line: string): void => { stdout.write(`${ANSI.clearLine}${line}\n`); written += 1; };
 
     const subtitleLines = options.subtitle ? 3 : 0;
     const fixed = 1 + subtitleLines + 2;
@@ -95,7 +117,7 @@ export async function select(items, options) {
     renderedLines = written;
   };
 
-  return new Promise((resolve) => {
+  return new Promise<T | null>((resolve) => {
     const wasRaw = stdin.isRaw ?? false;
     const cleanup = () => {
       try {
@@ -107,13 +129,13 @@ export async function select(items, options) {
       process.removeListener("SIGINT", onSignal);
     };
     const onSignal = () => { cleanup(); resolve(null); };
-    const nextSelectable = (from, dir) => {
+    const nextSelectable = (from: number, dir: number): number => {
       let next = from;
       do { next = (next + dir + items.length) % items.length; }
       while (!isSelectable(items[next]) && next !== from);
       return next;
     };
-    const nearestSelectable = (idx) => {
+    const nearestSelectable = (idx: number): number => {
       const clamped = Math.max(0, Math.min(items.length - 1, idx));
       for (let d = 0; d < items.length; d++) {
         if (clamped + d < items.length && isSelectable(items[clamped + d])) return clamped + d;
@@ -122,7 +144,7 @@ export async function select(items, options) {
       return cursor;
     };
     const page = () => Math.max(1, (stdout.rows || 24) - 8);
-    const onKey = (data) => {
+    const onKey = (data: Buffer | string) => {
       const action = parseKey(data);
       if (action === "up") { cursor = nextSelectable(cursor, -1); render(); }
       else if (action === "down") { cursor = nextSelectable(cursor, 1); render(); }
