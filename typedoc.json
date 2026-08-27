@@ -20,7 +20,7 @@
     "__module",
     "CoreAuthJsStore"
   ],
-  "highlightLanguages": ["bash", "java", "json", "ts", "typescript"],
+  "highlightLanguages": ["bash", "java", "js", "json", "ts", "typescript"],
   "ignoredHighlightLanguages": ["mermaid"],
   "sourceLinkTemplate": "https://github.com/intisy-ai/core-auth/blob/{gitRevision}/{path}#L{line}",
   "tsconfig": "./tsconfig.json"
