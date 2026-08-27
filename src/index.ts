@@ -45,7 +45,6 @@ export { startOAuthListener } from "./server.js";
 export type { OAuthListener, StartOAuthListenerOptions } from "./server.js";
 export { loadAccounts, saveAccounts, updateAccounts, listAccounts, addAccount, removeAccount, clearAccounts, LockTimeoutError } from "./accounts.js";
 export type { AccountStoreLocation } from "./accounts.js";
-export type { StoreLockOpts } from "./store-lock.js";
 export { createLiveStore } from "./live-store.js";
 export type { LiveStoreLike, LiveStoreOpts } from "./live-store.js";
 export { AccountManager } from "./manager.js";

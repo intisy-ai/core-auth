@@ -15,7 +15,7 @@ export function countAssignments(store: unknown, url: string): number {
   return getCoreAuth().proxyCountAssignments(JSON.stringify(store || {}), url);
 }
 
-/** A proxy's quality score within a store, higher meaning more preferred by selection. */
+/** A proxy's quality score within a store, lower meaning more preferred by selection. */
 export function scoreOf(store: unknown, proxy: unknown): number {
   return getCoreAuth().proxyScoreOf(JSON.stringify(store || {}), JSON.stringify(proxy || {}));
 }

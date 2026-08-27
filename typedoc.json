@@ -15,6 +15,7 @@
     "Menu",
     "SettingsAccessor",
     "MenuBuilder",
+    "StoreLockOpts",
     "ProxyEnv",
     "__module",
     "CoreAuthJsStore"
