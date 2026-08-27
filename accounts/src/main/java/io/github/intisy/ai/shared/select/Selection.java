@@ -10,7 +10,7 @@ import java.util.function.BiPredicate;
  * Picks an account index given availability. Strategies: STICKY (keep the cursor until it
  * becomes unavailable), ROUND_ROBIN (advance the cursor on every call), HYBRID (sticky, but
  * fall back to whoever frees up soonest when nobody is currently available). The cursor is
- * per-lane when a lane is given. Ported from {@code libs/core-auth/src/selection.ts}.
+ * per-lane when a lane is given.
  */
 public final class Selection {
     private Selection() {

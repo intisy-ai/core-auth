@@ -5,10 +5,9 @@ import java.util.List;
 /**
  * Neutral quota-capacity predicate shared by every provider's quota parser. A provider maps its
  * own cachedQuota shape into a list of {@link Pool}s (each pool's remaining capacity normalized
- * to {@code [0, 1]}); this class owns the single decision every provider needs from that list.
- * Ported from the triplicated "any pool with capacity remaining -> the account still has quota"
- * check in claude's {@code accounts-controller.ts}, {@code ClaudeQuotaParser.java}, and
- * antigravity's {@code AntigravityQuotaParser.java}.
+ * to {@code [0, 1]}); this class owns the single decision every provider needs from that list,
+ * centralizing the "any pool with capacity remaining -> the account still has quota" check
+ * rather than duplicating it in each provider's own quota parser.
  */
 public final class QuotaHealth {
     private QuotaHealth() {

@@ -37,14 +37,12 @@ import java.util.Map;
 import java.util.function.BiPredicate;
 
 /**
- * TeaVM JS export surface over core-auth's account/oauth engine, relocated from ai-java's
- * {@code AiJavaJs} (Phase 4 Task 2), ACCOUNT-ONLY: this is exactly the set of exports Phase 4
- * Task 1 EXCLUDED when trimming {@code AiJavaJs} down to {@code core-proxy}'s {@code CoreProxyJs}
- * (routing-only). {@code SimpleJsonCodec}/{@code JsStoreBridge}/{@code JsHttpClientBridge} are
- * NOT duplicated here, this class lives in the same package ({@code io.github.intisy.ai.js}) as
- * core-proxy's {@code :teavm} module (a Gradle project dependency, see
- * {@code core-auth/java/teavm/build.gradle}), so it references those classes unqualified exactly
- * like the original single-module {@code AiJavaJs} did.
+ * TeaVM JS export surface over core-auth's account/oauth engine, ACCOUNT-ONLY: it exports the
+ * account/oauth surface, as distinct from core-proxy's routing-only {@code CoreProxyJs}.
+ * {@code SimpleJsonCodec}/{@code JsStoreBridge}/{@code JsHttpClientBridge} are NOT duplicated
+ * here; this class lives in the same package ({@code io.github.intisy.ai.js}) as core-proxy's
+ * {@code :teavm} module (a Gradle project dependency, see
+ * {@code core-auth/java/teavm/build.gradle}), so it references those classes unqualified.
  */
 public final class CoreAuthJs {
     private CoreAuthJs() {

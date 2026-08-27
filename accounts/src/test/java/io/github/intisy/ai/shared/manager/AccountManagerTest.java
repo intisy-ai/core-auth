@@ -200,7 +200,7 @@ class AccountManagerTest {
         assertNotNull(persisted.lastUsed); // claimed by acquire
     }
 
-    // ---- AccountManager.selectAndClaim (Phase 3 Task 1: select+claim without network refresh) --
+    // ---- AccountManager.selectAndClaim: select+claim without network refresh -----------------
 
     @Test
     void selectAndClaim_claimsWithoutTriggeringNetworkRefresh() {

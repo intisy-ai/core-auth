@@ -5,7 +5,7 @@ import io.github.intisy.ai.api.seam.Random;
 
 /**
  * Generic availability + backoff math; "lanes" are arbitrary strings a driver uses to
- * partition rate limits. Ported from {@code libs/core-auth/src/ratelimit.ts}.
+ * partition rate limits.
  */
 public final class RateLimitMath {
     private RateLimitMath() {

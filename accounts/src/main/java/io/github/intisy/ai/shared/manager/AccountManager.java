@@ -17,18 +17,17 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
- * The generic multi-account engine (storage, selection, rate-limit/cooldown, OAuth refresh).
- * Java port of the JS {@code AccountManager} (see {@code libs/core-auth/src/manager.ts}),
- * rewired onto the shared SPIs: {@link AccountStore} (itself on the {@code Store}/{@code JsonCodec}
+ * The generic multi-account engine (storage, selection, rate-limit/cooldown, OAuth refresh),
+ * built on the shared SPIs: {@link AccountStore} (itself on the {@code Store}/{@code JsonCodec}
  * SPIs), {@link Clock} for {@code now}, {@link Random} for backoff jitter, and {@link HttpClient}+
  * {@link JsonCodec} for the OAuth refresh call. No locks/threads here: the atomic
  * read-modify-write is {@code Store.update}'s concern (the implementation's), and the network
- * refresh call in {@link #acquire} is sequenced OUTSIDE any store call, matching the JS
- * "claim under the lock, refresh outside it" behavior without any actual locking in this class.
+ * refresh call in {@link #acquire} is sequenced OUTSIDE any store call, so an account is claimed
+ * under the store's lock and refreshed outside it, with no actual locking in this class.
  *
- * <p>Note the JS proxy-aware {@code oauthWithProxy} wrapper (routing the refresh call through
- * the account's sticky proxy) is NOT ported here - proxy support doesn't exist in this module
- * yet; {@link ManagerOptions#oauth} is passed to {@link TokenRefresh#refresh} unmodified.
+ * <p>Proxy-aware OAuth routing (sending the refresh call through the account's sticky proxy)
+ * does not exist in this module yet; {@link ManagerOptions#oauth} is passed to
+ * {@link TokenRefresh#refresh} unmodified.
  */
 public class AccountManager {
     private final String providerId;
