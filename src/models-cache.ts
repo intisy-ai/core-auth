@@ -10,29 +10,11 @@ import type { ProviderDef, ProviderModel } from "./types.js";
 
 const MODELS_FILE = "models.json";
 
-export interface ModelFetchCtx {
-  configDir: string;
-  log: (message: string) => void;
-  hasAccounts: boolean;
-}
+/** The context {@link ProviderDef.fetchModels} is called with, derived from its own declaration. */
+export type ModelFetchCtx = Parameters<NonNullable<ProviderDef["fetchModels"]>>[0];
 
-export interface ModelFetchResult {
-  models: Record<string, ProviderModel>;
-  ranking?: string[];
-  defaultModelId?: string;
-}
-
-/**
- * A provider def widened with the live-fetch capability {@link ProviderDef} does not yet declare.
- *
- * @remarks
- * `fetchModels` is read here (and `sorts`/`settings`/`quotaNote`/`quotaDisabled` elsewhere in this
- * cycle) from real provider drivers that already supply them; the public contract in types.ts has
- * not caught up. Kept local until that type is extended.
- */
-export interface ModelFetchingProviderDef extends ProviderDef {
-  fetchModels?: (ctx: ModelFetchCtx) => Promise<ModelFetchResult>;
-}
+/** What {@link ProviderDef.fetchModels} resolves, derived from its own declaration. */
+export type ModelFetchResult = Awaited<ReturnType<NonNullable<ProviderDef["fetchModels"]>>>;
 
 export interface ModelCacheEntry {
   models: Record<string, ProviderModel>;
@@ -82,7 +64,7 @@ export function writeModelCache(providerId: string, entry: ModelCacheEntry): voi
 // (models stay empty until the first `oc auth login`). `nowMs` is injected so
 // callers can stamp fetchedAt without this module touching Date.now directly.
 export async function resolveProviderModels(
-  def: ModelFetchingProviderDef,
+  def: ProviderDef,
   ctx: ModelFetchCtx,
   nowMs: number,
 ): Promise<Record<string, ProviderModel>> {

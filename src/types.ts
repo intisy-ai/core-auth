@@ -1,6 +1,7 @@
 // The provider contract: a plugin supplies one of these and core-auth does all the app/loader integration.
 
 import type { HandlerCtx, IrEventStream, IrRequest, IrResponse } from "@intisy-ai/core-ir";
+import type { SettingsMenuGroup } from "./settings-schema.js";
 
 export interface ProviderCtx {
   configDir: string;
@@ -26,9 +27,39 @@ export interface ProviderDef {
   // when present, core exposes an opencode oauth "code" method; complete(input?)
   // persists the CoreAccount. input is opencode's pasted code / redirect URL;
   // when omitted (CLI path) the driver falls back to its own listener / readline.
-  loginFlow?: (ctx: ProviderCtx) => Promise<{ url: string; instructions?: string; complete: (input?: string) => Promise<CoreAccount | null> }>;
+  loginFlow?: (ctx: ProviderCtx) => Promise<{
+    url: string;
+    instructions?: string;
+    complete: (input?: string) => Promise<CoreAccount | null>;
+    /** Resolves when the browser hits the localhost redirect; omitted if the provider has no loopback. */
+    loopback?: Promise<CoreAccount | null>;
+    /** Releases the listener when the input is dismissed or superseded. */
+    cancel?: () => void;
+  }>;
   accounts?: AccountController;
   proxies?: boolean;   // opt into the shared proxy subsystem (Manage-proxies menu + per-account selection)
+  /** Live model-catalog fetch, used only once the provider has at least one account. */
+  fetchModels?: (ctx: ProviderCtx & { hasAccounts: boolean }) => Promise<{
+    models: Record<string, ProviderModel>;
+    ranking?: string[];
+    defaultModelId?: string;
+  }>;
+  /**
+   * Non-manual Auto-sort sources the provider opts into (manual, the user's hand-ordered list, is
+   * always available and needs no declaration). `"leaderboard"` (or `{id:"leaderboard"}`) is the
+   * built-in quality sort; anything else supplies its own `compute`.
+   */
+  sorts?: Array<"leaderboard" | { id: string; label?: string; compute: (ids: string[]) => Promise<string[]> | string[] }>;
+  /** Schema-driven settings the provider menu's "Settings" screen renders and edits. */
+  settings?: {
+    groups: SettingsMenuGroup[];
+    get(key: string): unknown;
+    set(key: string, value: unknown): void;
+  };
+  /** Footnote shown under the provider's Quota screen (e.g. a pool the API doesn't report). */
+  quotaNote?: string;
+  /** Hides the Quota screen entirely for a provider with no quota API. */
+  quotaDisabled?: boolean;
   /**
    * The canonical-IR entry point, which is the one every ecosystem provider implements.
    *
@@ -103,7 +134,8 @@ export interface AccountController {
   enable(id: string, on: boolean): void;
   remove(id: string): void;
   login(): Promise<AccountView | null>;
-  refreshQuota?(): Promise<void>;
+  /** @param force skip any cache/TTL and refetch now (e.g. the menu's own "Refresh quotas" action). */
+  refreshQuota?(force?: boolean): Promise<void>;
   /** Per-account quota refresh; renders as a core account-detail action. */
   refreshQuotaOne?(id: string): Promise<void>;
   actions?(): MenuAction[];                       // extra top-level menu items

@@ -8,13 +8,13 @@ import { qualityLabel } from "../proxy/scoring.js";
 import { parseScopeKey } from "../proxy/scopes.js";
 import { getAutoConfig, setAutoConfig } from "../config.js";
 import { readModelCache, type ModelCacheEntry } from "../models-cache.js";
-import { buildLoginInput, type LoginCapableProviderDef } from "./url-auth.js";
-import { buildSettingsMenu, type SettingsAccessor } from "./settings-menu.js";
+import { buildLoginInput } from "./url-auth.js";
+import { buildSettingsMenu } from "./settings-menu.js";
 import { refreshModels } from "../refresh.js";
 import { leaderboardSourceShort } from "../leaderboard.js";
 import type { SelectItemColor, SelectItemKind } from "./select.js";
 import type { ProxyScope } from "../proxy/store.js";
-import type { AccountController, AccountQuota, AccountView, ProviderDef } from "../types.js";
+import type { AccountQuota, AccountView, ProviderDef } from "../types.js";
 
 /** What a menu item's `run` tells the renderer to do next. */
 export type MenuNavigation =
@@ -64,32 +64,6 @@ export interface Menu {
   items: MenuItem[];
   providerLabel?: string;
   onOpen?: () => Promise<void>;
-}
-
-/**
- * A provider def widened with the settings/quota-display capabilities {@link ProviderDef} does not
- * yet declare.
- *
- * @remarks
- * Real provider drivers already supply `settings`, `quotaNote` and `quotaDisabled` (see
- * buildManageMenu / buildQuotaMenu below); the public contract in types.ts has not caught up. Same
- * situation as models-cache.ts's `ModelFetchingProviderDef` and sorts.ts's `SortableProviderDef`;
- * kept local to this file until that type is extended.
- */
-interface MenuProviderDef extends ProviderDef {
-  quotaNote?: string;
-  quotaDisabled?: boolean;
-  settings?: SettingsAccessor;
-}
-
-/**
- * An account controller widened with the optional force-refresh parameter this menu's "Refresh
- * quotas" action passes; {@link AccountController} still declares `refreshQuota` as taking none
- * (its own `onOpen` background refresh below calls it with zero args, which this wider signature
- * still accepts).
- */
-interface RefreshQuotaController extends AccountController {
-  refreshQuota?: (force?: boolean) => Promise<void>;
 }
 
 function errorMessage(e: unknown): string {
@@ -377,7 +351,7 @@ function accountAvailabilityHint(view: AccountView): string {
 
 // Shared quota-area builder: pushes bars, or an explanatory note for whichever
 // reason there are none (never silently blank). Used by the Quota submenu.
-function pushQuotaArea(items: MenuItem[], def: MenuProviderDef, views: AccountView[]): void {
+function pushQuotaArea(items: MenuItem[], def: ProviderDef, views: AccountView[]): void {
   if (def.quotaDisabled === true) { items.push({ label: "Quota display is disabled for this provider.", kind: "note" }); return; }
   if (!views.length) { items.push({ label: "Add an account to see quota.", kind: "note" }); return; }
   // Only enabled accounts contribute quota (quotaBars skips disabled). If none are
@@ -390,8 +364,8 @@ function pushQuotaArea(items: MenuItem[], def: MenuProviderDef, views: AccountVi
 }
 
 // Global quota view: bars aggregated across ALL accounts (the combined graphs).
-function buildQuotaMenu(def: MenuProviderDef): Menu {
-  const controller: RefreshQuotaController = def.accounts!;
+function buildQuotaMenu(def: ProviderDef): Menu {
+  const controller = def.accounts!;
   const views = controller.list();
   const items: MenuItem[] = [{ label: "Back", run: () => ({ pop: true }) }];
   // Non-suspend: a quota refetch needs no terminal, so it refreshes the menu IN PLACE
@@ -411,7 +385,7 @@ function buildQuotaMenu(def: MenuProviderDef): Menu {
 }
 
 // Less-used provider actions, grouped off the main menu into labeled sections.
-function buildManageMenu(def: MenuProviderDef): Menu {
+function buildManageMenu(def: ProviderDef): Menu {
   const controller = def.accounts!;
   const proxies = !!def.proxies;
   const extraActions = typeof controller.actions === "function" ? controller.actions() : [];

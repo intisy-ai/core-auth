@@ -12,20 +12,6 @@ import type { ProviderDef } from "./types.js";
 
 const BUILTIN_LABEL = { leaderboard: "Leaderboard (quality)" };
 
-export interface CustomSortSource {
-  id: string;
-  label?: string;
-  compute: (ids: string[]) => Promise<string[]> | string[];
-}
-
-/**
- * A provider def widened with the Auto-sort capability {@link ProviderDef} does not yet declare.
- * See models-cache.ts's {@link ModelFetchingProviderDef} remark for why this stays local.
- */
-export interface SortableProviderDef extends ProviderDef {
-  sorts?: Array<"leaderboard" | CustomSortSource>;
-}
-
 export interface ComputedSorts {
   sorts: Array<{ id: string; label: string }>;
   sortOrders: Record<string, string[]>;
@@ -36,7 +22,7 @@ export interface ComputedSorts {
 // nameOf maps a catalog id -> its display name; the leaderboard ranks by NAME (the id
 // is an opaque API rawId). Defaults to identity when names aren't available.
 export async function computeSorts(
-  def: SortableProviderDef,
+  def: ProviderDef,
   ranking: string[],
   nameOf: (id: string) => string = (id) => id,
 ): Promise<ComputedSorts> {

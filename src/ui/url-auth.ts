@@ -17,7 +17,7 @@ import { getConfigDir } from "../env.js";
 import { log } from "../log.js";
 import { refreshModels } from "../refresh.js";
 import { emitActivity } from "../activity.js";
-import type { CoreAccount, ProviderCtx, ProviderDef } from "../types.js";
+import type { CoreAccount, ProviderDef } from "../types.js";
 import type { MenuInput, MenuNavigation } from "./menu-model.js";
 
 function loginFailedSpec(provider: string, message: string) {
@@ -29,30 +29,12 @@ function loginSucceededSpec(provider: string, account: CoreAccount, durationMs: 
   return { topic: "account", action: "login_succeeded", impact: "notice", outcome: "ok", durationMs, subject: { kind: "account", id: subjectId, label: subjectId }, details: { provider } };
 }
 
-export interface LoginFlowResult {
-  url: string;
-  instructions?: string;
-  complete: (input?: string) => Promise<CoreAccount | null>;
-  /** Resolves when the browser hits the localhost redirect; omitted if the provider has no loopback. */
-  loopback?: Promise<CoreAccount | null>;
-  /** Releases the listener when the input is dismissed or superseded. */
-  cancel?: () => void;
-}
-
-/**
- * A provider def whose {@link ProviderDef.loginFlow} resolves the full shape this module reads
- * (loopback + cancel); {@link ProviderDef} itself declares only url/instructions/complete.
- */
-export type LoginCapableProviderDef = Omit<ProviderDef, "loginFlow"> & {
-  loginFlow?: (ctx: ProviderCtx) => Promise<LoginFlowResult>;
-};
-
 /**
  * @remarks
  * Callers must confirm `def.loginFlow` exists first (e.g. `typeof def.loginFlow === "function"`,
  * as menu-model.ts's addAccount item does); called otherwise, this throws immediately below.
  */
-export async function buildLoginInput(def: LoginCapableProviderDef): Promise<{ input: MenuInput }> {
+export async function buildLoginInput(def: ProviderDef): Promise<{ input: MenuInput }> {
   const flow = await def.loginFlow!({ configDir: getConfigDir(), log });
   openBrowser(flow.url);
   const provider = def.id;
