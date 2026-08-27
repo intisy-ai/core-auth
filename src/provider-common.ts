@@ -6,7 +6,7 @@
 // commonManagerOptions() to AccountManager, so the key name, default, and choice
 // list live in one place.
 
-import { toCapabilitiesFields, toSettingsGroups, type ProviderSettingsSchema } from "./settings-schema.js";
+import { toCapabilitiesFields, toSettingsGroups, type ProviderSettingsSchema, type CapabilitiesField } from "./settings-schema.js";
 
 /** Default value for the account-selection config key every provider spreads into its own defineConfig. */
 export const COMMON_PROVIDER_DEFAULTS = {
@@ -15,7 +15,7 @@ export const COMMON_PROVIDER_DEFAULTS = {
 };
 
 /** Capabilities-fields entry for the account-selection setting, spread into a provider's own defineCapabilities. */
-export const COMMON_PROVIDER_CAPABILITIES = [
+export const COMMON_PROVIDER_CAPABILITIES: CapabilitiesField[] = [
   {
     /** The config key this field reads and writes. */
     key: "account_selection_strategy",
