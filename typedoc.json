@@ -2,7 +2,6 @@
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": ["src/index.ts"],
   "out": "site",
-  "readme": "README.md",
   "name": "@intisy-ai/core-auth",
   "excludePrivate": true,
   "treatWarningsAsErrors": true,
