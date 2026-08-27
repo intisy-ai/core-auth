@@ -22,7 +22,8 @@ export interface ProxyEntry {
   url: string;
   provider: string;
   scope: ProxyScope;
-  addedAt: number;
+  /** Epoch ms the proxy was added. Absent on an entry migrated from a v1 store that never recorded it. */
+  addedAt?: number;
   stats: ProxyStats;
 }
 
@@ -67,7 +68,7 @@ export function migrateStore(raw: unknown): ProxyStore {
   out.assignments = input.assignments || {};
   out.modes = { default: input.mode || "disabled" };
   out.proxies = (input.proxies || []).map((p) => ({
-    url: p.url, provider: p.provider, addedAt: p.addedAt ?? 0, stats: p.stats || {},
+    url: p.url, provider: p.provider, addedAt: p.addedAt, stats: p.stats || {},
     scope: p.owner ? { type: "account" as const, id: p.owner } : { type: "global" as const },
   }));
   out.manualSelection = {};

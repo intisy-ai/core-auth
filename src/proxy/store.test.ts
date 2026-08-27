@@ -26,4 +26,15 @@ describe("migrateStore v1 -> v2", () => {
     const v2 = { version: 2, modes: { default: "disabled" }, providers: {}, proxies: [], assignments: {}, manualSelection: {} };
     expect(migrateStore(structuredClone(v2))).toEqual(v2);
   });
+
+  it("leaves addedAt undefined for a legacy v1 entry that never recorded it, rather than inventing 0", () => {
+    const v1 = {
+      version: 1, mode: "disabled", providers: {},
+      proxies: [{ url: "http://a", provider: "manual", stats: {} }],
+      assignments: {}, manualSelection: {},
+    };
+    const v2 = migrateStore(v1);
+    expect(v2.proxies[0].addedAt).toBeUndefined();
+    expect("addedAt" in v2.proxies[0]).toBe(true);
+  });
 });
