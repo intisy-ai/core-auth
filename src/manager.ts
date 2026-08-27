@@ -67,7 +67,7 @@ export class AccountManager {
     this.strategy = options.selection || "hybrid";
     this.oauth = options.oauth || null;       // { tokenUrl, clientId, clientSecret? }
     this.backoff = options.backoff || {};     // { baseMs?, maxMs? }
-    this.store = options.store || null;       // { dir?, file? } store location override
+    this.store = options.store || null;       // { dir? } store location override
     this.extraAvailable = typeof options.isAvailable === "function" ? options.isAvailable : null;
   }
 

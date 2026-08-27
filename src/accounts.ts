@@ -18,12 +18,11 @@ const STORE_KEY = "accounts.json";
  * Where a provider's account pool is stored, when it is not the default location.
  *
  * @remarks
- * Re-exports store-lock.ts's `StoreLockOpts` under the public name this store's callers use.
- * `file` is real, not speculative: `withLock`'s other caller (live-store.ts) sets it per-key for
- * per-key locking. accounts.ts's own writers never forward a caller's `file`, though -- `lockOpts`
- * below always pins it to `STORE_KEY`, since this store keeps exactly one file per provider.
+ * Narrows store-lock.ts's `StoreLockOpts` to the one field this store's callers can set: `lockOpts`
+ * below always pins `file` to `STORE_KEY`, since this store keeps exactly one file per provider.
+ * `StoreLockOpts` itself keeps `file?`, which live-store.ts's per-key locking still needs.
  */
-export type AccountStoreLocation = StoreLockOpts;
+export type AccountStoreLocation = Pick<StoreLockOpts, "dir">;
 
 function lockOpts(opts: AccountStoreLocation | null | undefined): StoreLockOpts {
   return { dir: opts?.dir, file: STORE_KEY };
