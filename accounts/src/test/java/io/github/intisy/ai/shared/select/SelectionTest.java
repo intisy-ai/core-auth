@@ -12,9 +12,9 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Parity tests for account selection and the shared port of
- * {@code libs/core-auth/src/ratelimit.ts}. All times are passed in explicitly (no
- * wall-clock reads) so the tests are fully deterministic.
+ * Tests for account selection ({@link Selection}) and the rate-limit/backoff math
+ * ({@link RateLimitMath}). All times are passed in explicitly (no wall-clock reads) so the
+ * tests are fully deterministic.
  */
 class SelectionTest {
 
