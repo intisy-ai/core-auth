@@ -77,14 +77,14 @@ async function fetchAA(key: string): Promise<Score[]> {
   if (!response.ok) { log("leaderboard: AA " + response.status); return []; }
   const payload: unknown = await response.json();
   const body = asRecord(payload);
-  const rowsField = body ? (body.data ?? body.models ?? body.results) : undefined;
+  const rowsField = body ? (body.data || body.models || body.results) : undefined;
   const rows = Array.isArray(payload) ? payload : rowsField;
   if (!Array.isArray(rows)) return [];
   const out: Score[] = [];
   for (const item of rows) {
     const r = asRecord(item);
     if (!r) continue;
-    const name = r.name ?? r.model_name ?? r.slug ?? r.id ?? r.model;
+    const name = r.name || r.model_name || r.slug || r.id || r.model;
     const evaluations = asRecord(r.evaluations);
     const scoreRaw =
       r.intelligenceIndex ?? r.intelligence_index ?? r.intelligence ??
