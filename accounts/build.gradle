@@ -5,9 +5,9 @@
 // Store/HttpClient/JsonCodec directly. Zero OTHER dependencies by design (no gson/java.net/java.nio/
 // reflection/threads) so this module stays TeaVM-transpilable.
 dependencies {
-    githubApi "intisy-ai:api:1.6.0:contract"
+    githubApi "intisy-ai:api:1.7.0:contract"
 
     // :seam carries the JSON narrowing helpers the stores hand-roll their Map<->POJO conversion
     // through, and the seam implementations the tests exercise instead of a local double.
-    githubImplementation "intisy-ai:api:1.6.0:seam"
+    githubImplementation "intisy-ai:api:1.7.0:seam"
 }

@@ -11,13 +11,13 @@ dependencies {
     // :seam and :js-base carry the seam implementations (SimpleJsonCodec, InMemoryStore, JsStoreBridge,
     // JsHttpClientBridge), reused rather than duplicated; CoreAuthJs lives in :js-base's own package
     // (io.github.intisy.ai.js) so it references those two unqualified.
-    githubImplementation "intisy-ai:api:1.6.0:seam"
-    githubImplementation "intisy-ai:api:1.6.0:js-base"
+    githubImplementation "intisy-ai:api:1.7.0:seam"
+    githubImplementation "intisy-ai:api:1.7.0:js-base"
     // SOURCE-retention, so nothing here reaches the bundle. The processor jar is a release asset and
     // carries no transitive metadata, so the annotation types it reads are named beside it.
-    githubCompileOnly "intisy-ai:api:1.6.0:annotations"
-    githubAnnotationProcessor "intisy-ai:api:1.6.0:processor"
-    githubAnnotationProcessor "intisy-ai:api:1.6.0:annotations"
+    githubCompileOnly "intisy-ai:api:1.7.0:annotations"
+    githubAnnotationProcessor "intisy-ai:api:1.7.0:processor"
+    githubAnnotationProcessor "intisy-ai:api:1.7.0:annotations"
     teavm teavm.libs.jsoApis
 }
 

@@ -2,11 +2,11 @@
 // and :ir supplies types this module names but never constructs. So all three are compileOnly: this
 // module's jar carries none of them, and no :teavm module embeds a second copy of any.
 dependencies {
-    githubCompileOnly "intisy-ai:api:1.6.0:annotations"
-    githubCompileOnly "intisy-ai:api:1.6.0:contract"
+    githubCompileOnly "intisy-ai:api:1.7.0:annotations"
+    githubCompileOnly "intisy-ai:api:1.7.0:contract"
     githubCompileOnly "intisy-ai:core-ir:1.4.0:ir"
-    githubAnnotationProcessor "intisy-ai:api:1.6.0:processor"
-    githubAnnotationProcessor "intisy-ai:api:1.6.0:annotations"
+    githubAnnotationProcessor "intisy-ai:api:1.7.0:processor"
+    githubAnnotationProcessor "intisy-ai:api:1.7.0:annotations"
 }
 
 tasks.named("compileJava") {
